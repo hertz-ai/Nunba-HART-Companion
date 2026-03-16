@@ -3,7 +3,7 @@
 # Nunba 2.0.0 | Python Embed 3.12.6
 
 # HARTOS — Hive Agent Runtime OS (the AI backend)
-# Install from GitHub (open source): pip install git+https://github.com/hertz-ai/HARTOS.git
+# Install from GitHub: pip install git+https://github.com/hertz-ai/HARTOS.git
 # Or from local clone: pip install -e ../HARTOS
 hart-backend @ git+https://github.com/hertz-ai/HARTOS.git
 

@@ -911,8 +911,8 @@ if getattr(args, 'validate', False):
 
     _required_files = [
         ('main.py', 'Flask app entry point'),
-        ('hart_intelligence.py', 'LangChain pipeline'),
-        ('helper.py', 'LangChain helper functions'),
+        ('hart_intelligence', 'HART intelligence pipeline'),
+        ('helper', 'LangChain helper functions'),
     ]
     _optional_files = [
         ('langchain_config.json', 'LangChain tool config (search, API endpoints)'),
@@ -921,10 +921,19 @@ if getattr(args, 'validate', False):
     ]
 
     for _fname, _desc in _required_files:
-        _fpath = os.path.join(_base, _fname)
-        if os.path.isfile(_fpath):
-            _vprint(f"  [OK]   {_fname} — {_desc}")
-        else:
+        # Check root (.py), lib/ (.py or .pyc) — compiled builds put HARTOS modules in lib/
+        _found = False
+        for _candidate in [
+            os.path.join(_base, f"{_fname}.py"),
+            os.path.join(_base, _fname) if _fname.endswith('.py') else None,
+            os.path.join(_base, 'lib', f"{_fname}.py"),
+            os.path.join(_base, 'lib', f"{_fname}.pyc"),
+        ]:
+            if _candidate and os.path.isfile(_candidate):
+                _vprint(f"  [OK]   {_fname} — {_desc} ({os.path.basename(_candidate)})")
+                _found = True
+                break
+        if not _found:
             _fail.append((_fname, f"Required file missing: {_desc}"))
             _vprint(f"  [FAIL] {_fname} — MISSING ({_desc})")
 
@@ -5164,9 +5173,22 @@ def main():
             def _on_bg_shown():
                 if _bg_first_show[0]:
                     _bg_first_show[0] = False
-                    logger.info("[BACKGROUND] Window shown for first time — reloading page")
 
                     def _bg_reload_with_check():
+                        # Check if page already loaded correctly — don't reload if React is live
+                        try:
+                            _cur_url = _window.get_current_url() or ''
+                            if _cur_url and 'localhost' in _cur_url and 'error' not in _cur_url.lower():
+                                # Page looks good — check if React actually mounted
+                                _state = _window.evaluate_js(
+                                    "document.getElementById('root')?.children?.length || 0")
+                                if _state and int(_state) > 0:
+                                    logger.info(f"[BACKGROUND] Page already loaded (root children={_state}) — skipping reload")
+                                    return
+                        except Exception:
+                            pass
+
+                        logger.info("[BACKGROUND] Window shown for first time — reloading page")
                         # Wait briefly for Flask to be ready
                         import urllib.request as _ur_bg
                         for _bg_poll in range(10):  # poll up to 5s

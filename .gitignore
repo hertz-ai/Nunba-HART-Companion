@@ -103,9 +103,36 @@ nul
 # Credentials and keys
 *.pem
 *.key
+*.priv
+*.enc
 credentials.json
 service-account.json
-/static/landing-page/static/
-config.json
-*.pem
 master_private_key*
+
+# Secrets / local env
+landing-page/.env
+landing-page/.env.production
+landing-page/.env.production.local
+landing-page/.env.production.enc
+landing-page/.crossbar/key.priv
+
+# Build/vendor artifacts
+/static/landing-page/static/
+python-embed/
+@fortawesome.zip
+landing-page/@fortawesome.zip
+
+# Large media (not tracked — download separately or use LFS)
+landing-page/src/Gif/
+landing-page/src/assets/Video/
+landing-page/src/fonts/materialdesignicons-webfont.svg
+
+# Dev analysis artifacts
+agent_data/
+hart_*.json
+langchain_config.json
+/test_splash.py
+*.stackdump
+
+# Symlinks to sibling projects
+.trueflow

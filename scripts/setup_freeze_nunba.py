@@ -8,6 +8,8 @@ import sys
 import os
 import glob
 import shutil
+import compileall
+import py_compile
 
 # hevolveai/embodied_ai pull in torch/transformers which cause cx_Freeze
 # import recursion. Block them from being importable during the build —
@@ -850,7 +852,6 @@ setup(
 if 'build' in sys.argv or 'build_exe' in sys.argv:
     _build_lib = os.path.join(os.path.abspath(build_exe_options["build_exe"]), "lib")
     if os.path.isdir(_build_lib):
-        import py_compile
         _compiled = 0
         for _py_file in glob.glob(os.path.join(_build_lib, "*.py")):
             _base = os.path.splitext(_py_file)[0]
