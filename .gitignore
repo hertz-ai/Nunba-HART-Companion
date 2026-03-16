@@ -124,6 +124,9 @@ landing-page/@fortawesome.zip
 
 # Large media — tracked (needed for React build)
 
+# HARTOS config (comes from pip install, not tracked)
+config.json
+
 # Dev analysis artifacts
 agent_data/
 hart_*.json
