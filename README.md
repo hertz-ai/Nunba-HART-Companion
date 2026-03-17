@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://hevolve.ai">Website</a> |
   <a href="https://docs.hevolve.ai">Docs</a> |
-  <a href="https://github.com/hertz-ai/Nunba-HART-Companion/releases">Download</a>
+  <a href="https://github.com/hertz-ai/Nunba/releases">Download</a>
 </p>
 
 ---
@@ -22,12 +22,12 @@
 Nunba is a desktop AI companion that runs entirely on your machine. No cloud required. No data leaves your device.
 
 - **Chat** with a local LLM (Qwen3.5 VL, Gemma 3, or any GGUF model via llama.cpp)
-- **See** — vision understanding via multimodal models (camera, screenshots, images)
-- **Speak** — text-to-speech in 20+ languages (Indic Parler, CosyVoice3, Chatterbox Turbo, Piper)
-- **Listen** — speech-to-text via Faster Whisper (runs locally)
-- **Create agents** — autonomous AI agents that code, research, and collaborate
-- **Social** — federated social network for humans and agents (Hevolve Social)
-- **Connect** — join the Hive to share compute and collaborate with friends' agents
+- **See** -vision understanding via multimodal models (camera, screenshots, images)
+- **Speak** -text-to-speech in 20+ languages (Indic Parler, CosyVoice3, Chatterbox Turbo, Piper)
+- **Listen** -speech-to-text via Faster Whisper (runs locally)
+- **Create agents** -autonomous AI agents that code, research, and collaborate
+- **Social** -federated social network for humans and agents (Hevolve Social)
+- **Connect** -join the Hive to share compute and collaborate with friends' agents
 
 ## Architecture
 
@@ -56,8 +56,8 @@ Nunba Desktop App (this repo)
 
 ```bash
 # Clone
-git clone https://github.com/hertz-ai/Nunba-HART-Companion.git
-cd Nunba-HART-Companion
+git clone https://github.com/hertz-ai/Nunba.git
+cd Nunba
 
 # Create venv
 python -m venv .venv
@@ -104,11 +104,11 @@ bash scripts/build_appimage.sh
 
 ### Desktop Features
 
-- **AI Setup Wizard** — auto-detects GPU, downloads best model for your hardware
-- **System tray** — runs in background, Win+N hotkey to toggle
-- **Auto-start** — launches on Windows boot (optional)
-- **Animated splash** — Tamil-aesthetic startup with HART greeting
-- **Dark theme** — #0F0E17 background, #6C63FF accent
+- **AI Setup Wizard** -auto-detects GPU, downloads best model for your hardware
+- **System tray** -runs in background, Win+N hotkey to toggle
+- **Auto-start** -launches on Windows boot (optional)
+- **Animated splash** -Tamil-aesthetic startup with HART greeting
+- **Dark theme** -#0F0E17 background, #6C63FF accent
 
 ### Social Features (Hevolve Social)
 
@@ -121,11 +121,11 @@ bash scripts/build_appimage.sh
 
 ### Security
 
-- **Privacy first** — all AI runs locally, no data sent to cloud
-- **Encrypted vault** — API keys stored with AES-256 (PBKDF2 derived)
-- **Ed25519 node keys** — cryptographic identity for peer-to-peer
-- **Boot verification** — signed release manifests
-- **HevolveAI** — native binary (Rust/C++), encrypted at rest, decrypted to RAM only
+- **Privacy first** -all AI runs locally, no data sent to cloud
+- **Encrypted vault** -API keys stored with AES-256 (PBKDF2 derived)
+- **Ed25519 node keys** -cryptographic identity for peer-to-peer
+- **Boot verification** -signed release manifests
+- **HevolveAI** -native binary (Rust/C++), encrypted at rest, decrypted to RAM only
 
 ## Project Structure
 
@@ -163,10 +163,10 @@ Nunba/
 
 ## Dependencies
 
-- **HARTOS** (hart-backend) — the AI brain. Install from [github.com/hertz-ai/HARTOS](https://github.com/hertz-ai/HARTOS)
-- **llama.cpp** — local LLM inference. Auto-installed by the AI Setup Wizard
-- **Python 3.12** — runtime
-- **Node.js 20+** — React frontend build
+- **HARTOS** (hart-backend) -the AI brain. Install from [github.com/hertz-ai/HARTOS](https://github.com/hertz-ai/HARTOS)
+- **llama.cpp** -local LLM inference. Auto-installed by the AI Setup Wizard
+- **Python 3.12** -runtime
+- **Node.js 20+** -React frontend build
 
 ## Platforms
 
