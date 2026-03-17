@@ -7,6 +7,41 @@ Connect to Hivemind with your friends' agents.
 # app.py (VERY TOP — before any other imports)
 import os, sys
 
+# Trace recursion in frozen builds — write to file since Win32GUI has no console
+if getattr(sys, 'frozen', False):
+    sys.setrecursionlimit(2000)
+    _import_depth = [0]
+    _max_depth = [0]
+    _import_stack = []
+    _orig_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+
+    def _trace_import(name, *args, **kwargs):
+        _import_depth[0] += 1
+        if _import_depth[0] > _max_depth[0]:
+            _max_depth[0] = _import_depth[0]
+        _import_stack.append(name)
+        if _import_depth[0] > 900:
+            # About to overflow — dump the chain
+            _dump = os.path.join(os.path.expanduser('~'), 'Documents', 'Nunba', 'logs', 'import_recursion.txt')
+            os.makedirs(os.path.dirname(_dump), exist_ok=True)
+            with open(_dump, 'w') as f:
+                f.write(f'Max depth: {_max_depth[0]}\n')
+                f.write(f'Stack depth: {_import_depth[0]}\n\n')
+                for i, m in enumerate(_import_stack):
+                    f.write(f'{i}: {m}\n')
+            os._exit(99)  # Exit before stack overflow kills us
+        try:
+            return _orig_import(name, *args, **kwargs)
+        finally:
+            _import_stack.pop()
+            _import_depth[0] -= 1
+
+    if hasattr(__builtins__, '__import__'):
+        __builtins__.__import__ = _trace_import
+    else:
+        import builtins
+        builtins.__import__ = _trace_import
+
 def _isolate_frozen_imports():
     if not getattr(sys, "frozen", False):
         return
@@ -383,9 +418,11 @@ def _load_deferred_config():
 
             if _llm_cfg.get('use_external_llm') and _llm_cfg.get('external_llm_endpoint'):
                 _ext = _llm_cfg['external_llm_endpoint']
-                _base = _ext.get('base_url', '')
-                os.environ.setdefault('HEVOLVE_LOCAL_LLM_URL', _base + '/v1')
-                os.environ.setdefault('LLAMA_CPP_PORT', str(_base.rsplit(':', 1)[-1].split('/')[0]))
+                # Prefer server_port from config (authoritative) over parsed URL port
+                # to avoid stale external_llm_endpoint URLs after port changes
+                _cfg_port = str(_llm_cfg.get('server_port', 8080))
+                os.environ.setdefault('LLAMA_CPP_PORT', _cfg_port)
+                os.environ.setdefault('HEVOLVE_LOCAL_LLM_URL', f'http://127.0.0.1:{_cfg_port}/v1')
                 _llm_configured = True
             else:
                 _port = str(_llm_cfg.get('server_port', 8080))
@@ -992,11 +1029,11 @@ if getattr(args, 'validate', False):
             _vprint(f"    - {_fmod}: {_fmsg}")
         _vprint("")
         _val_log.close()
-        sys.exit(1)
+        os._exit(1)  # os._exit skips Py_Finalize — prevents 0xC0000005 in Win32GUI
     else:
         _vprint(f"\n  All modules bundled correctly. Build is good.\n")
         _val_log.close()
-        sys.exit(0)
+        os._exit(0)  # os._exit skips Py_Finalize — prevents 0xC0000005 in Win32GUI
 
 # Configure logging — use explicit FileHandler instead of basicConfig alone.
 # basicConfig is a no-op if root already has handlers (e.g. when imported from
@@ -6082,8 +6119,11 @@ if __name__ == "__main__":
                     logger.info("Not first run - checking if server should auto-start...")
 
                     # Propagate configured endpoint to env so HARTOS picks it up
+                    # Only propagate external endpoints if we are NOT auto-starting
+                    # a local server — start_server() will set the authoritative URL
                     _ext = llama_config.config.get("external_llm_endpoint")
-                    if llama_config.config.get("use_external_llm") and _ext:
+                    _will_autostart = llama_config.config.get("auto_start_server", True)
+                    if llama_config.config.get("use_external_llm") and _ext and not _will_autostart:
                         _ext_url = _ext.get("base_url", "")
                         if _ext_url:
                             if '/v1' not in _ext_url:

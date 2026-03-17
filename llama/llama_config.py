@@ -963,6 +963,8 @@ class LlamaConfig:
             if server_type == ServerType.NUNBA_MANAGED:
                 logger.info(f"Nunba-managed server already running on port {_port}")
                 self.api_base = f"http://127.0.0.1:{_port}/v1"
+                os.environ['LLAMA_CPP_PORT'] = str(_port)
+                os.environ['CUSTOM_LLM_BASE_URL'] = self.api_base
                 return True
 
             if server_type == ServerType.EXTERNAL_LLAMA:
@@ -970,6 +972,8 @@ class LlamaConfig:
                 logger.info("Using existing llama.cpp server instead of starting new one")
                 self.api_base = f"http://127.0.0.1:{_port}/v1"
                 self.config["server_port"] = _port
+                os.environ['LLAMA_CPP_PORT'] = str(_port)
+                os.environ['CUSTOM_LLM_BASE_URL'] = self.api_base
                 self._save_config()
                 return True
 
