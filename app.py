@@ -578,7 +578,7 @@ def _update_early_splash(msg):
     if _early_splash:
         try:
             _early_splash[3].set(msg)
-            _early_splash[0].update()
+            _early_splash[1].update()  # update Toplevel (dark), NOT _eroot (hidden, white)
         except Exception:
             pass
 
