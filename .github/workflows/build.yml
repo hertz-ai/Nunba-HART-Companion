@@ -39,14 +39,15 @@ jobs:
         with:
           repository: hertz-ai/HARTOS
           path: _deps/HARTOS
-          token: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
 
       - name: Checkout HevolveAI
         uses: actions/checkout@v4
         with:
           repository: hertz-ai/HevolveAI
           path: _deps/hevolveai
-          token: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
         continue-on-error: true
 
       - name: Symlink sibling repos
@@ -155,14 +156,15 @@ jobs:
         with:
           repository: hertz-ai/HARTOS
           path: _deps/HARTOS
-          token: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
 
       - name: Checkout HevolveAI
         uses: actions/checkout@v4
         with:
           repository: hertz-ai/HevolveAI
           path: _deps/hevolveai
-          token: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
         continue-on-error: true
 
       - name: Symlink sibling repos
@@ -254,14 +256,15 @@ jobs:
         with:
           repository: hertz-ai/HARTOS
           path: _deps/HARTOS
-          token: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
 
       - name: Checkout HevolveAI
         uses: actions/checkout@v4
         with:
           repository: hertz-ai/HevolveAI
           path: _deps/hevolveai
-          token: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
         continue-on-error: true
 
       - name: Symlink sibling repos
