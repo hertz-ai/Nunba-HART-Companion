@@ -544,9 +544,8 @@ if '--validate' not in sys.argv and '--install-ai' not in sys.argv and '--backgr
                     pass
 
             _es_animate()
-            _es_top.update()  # update Toplevel (dark bg) — NOT _eroot (hidden, white default bg)
-            # Self-destruct: if early splash is still alive after 5 min, something hung
-            _es_top.after(300000, lambda: (_es_top.destroy(), _eroot.destroy()))
+            _eroot.update_idletasks()  # MUST be update_idletasks(), NOT update()
+            # update() maps the hidden root window as white on Windows DPI-aware systems
             # Store: (hidden_root, toplevel, canvas, status_var, photo_ref)
             _early_splash = (_eroot, _es_top, _es_canvas, _es_status, _es_photo)
         else:
@@ -578,7 +577,7 @@ def _update_early_splash(msg):
     if _early_splash:
         try:
             _early_splash[3].set(msg)
-            _early_splash[1].update()  # update Toplevel (dark), NOT _eroot (hidden, white)
+            _early_splash[0].update()  # _eroot.update() — safe here, splash is fully set up
         except Exception:
             pass
 
