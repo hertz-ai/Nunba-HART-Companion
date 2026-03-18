@@ -544,9 +544,9 @@ if '--validate' not in sys.argv and '--install-ai' not in sys.argv and '--backgr
                     pass
 
             _es_animate()
-            _eroot.update()  # must be update() not update_idletasks() — processes DPI events
-            # Self-destruct: if splash is still alive after 5 min, something hung — kill it
-            _eroot.after(300000, lambda: _eroot.destroy())
+            _es_top.update()  # update Toplevel (dark bg) — NOT _eroot (hidden, white default bg)
+            # Self-destruct: if early splash is still alive after 5 min, something hung
+            _es_top.after(300000, lambda: (_es_top.destroy(), _eroot.destroy()))
             # Store: (hidden_root, toplevel, canvas, status_var, photo_ref)
             _early_splash = (_eroot, _es_top, _es_canvas, _es_status, _es_photo)
         else:
