@@ -173,8 +173,8 @@ Nunba/
 | Platform | Status | Format |
 |----------|--------|--------|
 | **Windows** | Production | `.exe` installer (Inno Setup) |
-| **Linux** | Beta | `.AppImage` (universal) |
-| **macOS** | Planned | `.dmg` (cx_Freeze) |
+| **Linux** | Beta | `.AppImage` + `.deb` |
+| **macOS** | Beta | `.dmg` (cx_Freeze + create-dmg) |
 
 ## Configuration
 
