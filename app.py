@@ -573,12 +573,16 @@ import urllib.parse
 import requests
 
 # Update early splash status after heavy imports
-if _early_splash:
-    try:
-        _early_splash[3].set('Loading modules...')
-        _early_splash[0].update()
-    except Exception:
-        pass
+def _update_early_splash(msg):
+    """Update early splash status and pump event loop so progress bar animates."""
+    if _early_splash:
+        try:
+            _early_splash[3].set(msg)
+            _early_splash[0].update()
+        except Exception:
+            pass
+
+_update_early_splash('Loading modules...')
 
 # Lazy import for webview - only loaded when actually needed (not for --install-ai mode)
 pywebview = None
@@ -626,6 +630,8 @@ def get_webview():
         import webview as _pywebview
         pywebview = _pywebview
     return pywebview
+
+_update_early_splash('Loading AI engine...')
 
 # Import Llama.cpp installer for first-run initialization
 try:
@@ -731,6 +737,8 @@ def _clipboard_monitor_thread():
             pass
         time.sleep(2)
 
+
+_update_early_splash('Preparing interface...')
 
 # Default configuration for stop API URL
 DEFAULT_STOP_API_URL = "http://gcp_training2.hertzai.com:5001/stop"
@@ -2166,6 +2174,8 @@ if getattr(args, 'setup_ai', False):
         else:
             _setup_logger.info("--setup-ai: CLI fallback, no endpoints found, skipping AI setup")
         sys.exit(0)
+
+_update_early_splash('Initializing...')
 
 logger = logging.getLogger('NunbaGUI')
 
@@ -5792,24 +5802,31 @@ def _show_splash():
         import math
 
         logger.info("[SPLASH] Creating Tk root window...")
+        # Use a Toplevel on the hidden _eroot (same pattern as the early splash).
+        # NEVER deiconify _eroot — its default white bg causes a flash on Windows
+        # that persists until destroy(). A Toplevel inherits no bg from root and
+        # can be configured dark before it's mapped.
         if _eroot is not None:
-            root = _eroot
-            root.deiconify()
+            root = _eroot  # keep reference for event loop (update/after)
+            splash_win = tk.Toplevel(_eroot)
         else:
             root = tk.Tk()
-        root.overrideredirect(True)  # No title bar / border
-        root.attributes('-topmost', True)
+            root.withdraw()
+            splash_win = tk.Toplevel(root)
+
+        splash_win.configure(bg='#0A0914')
+        splash_win.overrideredirect(True)
+        splash_win.attributes('-topmost', True)
 
         # Splash dimensions
         W, H = 900, 560
-        sw = root.winfo_screenwidth()
-        sh = root.winfo_screenheight()
+        sw = splash_win.winfo_screenwidth()
+        sh = splash_win.winfo_screenheight()
         x = (sw - W) // 2
         y = (sh - H) // 2
-        root.geometry(f"{W}x{H}+{x}+{y}")
-        root.configure(bg='#0A0914')
+        splash_win.geometry(f"{W}x{H}+{x}+{y}")
 
-        canvas = tk.Canvas(root, width=W, height=H, bg='#0A0914',
+        canvas = tk.Canvas(splash_win, width=W, height=H, bg='#0A0914',
                            highlightthickness=0, bd=0)
         canvas.pack(fill='both', expand=True)
         logger.info(f"[SPLASH] Window created: {W}x{H} at ({x},{y})")
@@ -5879,7 +5896,7 @@ def _show_splash():
                     _anim_state['dir'] = 1
                 px = bar_x + _anim_state['pos']
                 canvas.coords(progress_rect, px, bar_y, px + 40, bar_y + 3)
-                root.after(30, _animate)
+                splash_win.after(30, _animate)
             except tk.TclError:
                 pass  # Window already destroyed
 
@@ -5891,7 +5908,7 @@ def _show_splash():
             logger.info("[SPLASH] Importing splash_effects...")
             from desktop.splash_effects import run_splash_animation
             logger.info("[SPLASH] Running splash animation...")
-            run_splash_animation(canvas, root, W, H)
+            run_splash_animation(canvas, splash_win, W, H)
             logger.info("[SPLASH] Animation engine started")
         except Exception as _fx_err:
             logger.warning(f"[SPLASH] Animation skipped: {_fx_err}")
@@ -5902,13 +5919,17 @@ def _show_splash():
         logger.info("[SPLASH] Splash screen visible")
 
         def close_splash():
-            """Close the splash window safely on macOS."""
+            """Close the splash window safely across all platforms."""
             try:
-                root.attributes('-alpha', 0.0)
+                splash_win.withdraw()  # hide immediately
             except Exception:
                 pass
             try:
-                root.destroy()
+                splash_win.destroy()
+            except Exception:
+                pass
+            try:
+                root.destroy()  # destroy hidden Tk root
             except Exception:
                 pass
 
@@ -6022,6 +6043,11 @@ if __name__ == "__main__":
         # The splash closes in main() right before webview.start().
         _splash_update('Starting...')
         _import_error = [None]
+
+        # Expose splash updater as a module-level function so main.py
+        # can report progress during its heavy import chain.
+        import app as _self_mod
+        _self_mod._startup_splash_update = _splash_update
 
         def _bg_import():
             try:
