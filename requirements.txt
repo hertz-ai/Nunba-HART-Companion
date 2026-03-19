@@ -1,4 +1,4 @@
-# AUTO-GENERATED from scripts/deps.py — DO NOT EDIT MANUALLY
+# AUTO-GENERATED from scripts/deps.py â€” DO NOT EDIT MANUALLY
 # Regenerate: python scripts/deps.py requirements
 # Nunba 2.0.0 | Python Embed 3.12.6
 
@@ -54,7 +54,7 @@ aiohttp==3.13.3
 python-dotenv==1.2.1
 cryptography==46.0.5
 
-# Platform: win32
+# Platform: darwin
+rumps
 pystray==0.19.5
-win10toast==0.9
-pywin32==311
+pyobjc-framework-Cocoa

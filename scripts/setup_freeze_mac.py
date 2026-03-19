@@ -22,6 +22,13 @@ if sys.platform != "darwin":
 _scripts_dir = os.path.dirname(os.path.abspath(__file__))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
+
+# Ensure project root is on sys.path so cx_Freeze can find local packages
+# (llama, desktop, routes, tts, models, etc.)
+_project_root = os.path.normpath(os.path.join(_scripts_dir, '..'))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from deps import VERSION, version_short
 
 def ensure_icon_exists():
@@ -79,6 +86,7 @@ icon_path = ensure_icon_exists()
 
 # Common packages for all platforms
 build_exe_options = {
+    "path": sys.path + [_project_root],
     "packages": [
         "os", "sys", "flask", "threading", "logging",
         "webview", "argparse", "importlib", "traceback",
@@ -106,6 +114,7 @@ build_exe_options = {
         "jose",
     ],
     "zip_includes": [],
+    "zip_exclude_packages": ["*"],  # extract all packages to filesystem (avoids zip import issues on macOS)
     "build_exe": "build/Nunba.app/Contents/MacOS",
     "excludes": [
         "unittest", "test", "tests",

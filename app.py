@@ -394,6 +394,23 @@ if getattr(sys, 'frozen', False):
     except Exception:
         pass
 
+# ── macOS-safe tkinter event pump ──
+# On macOS, root.update() enters the Cocoa run loop and never returns when
+# after() timers keep scheduling new events (every 30ms). This helper
+# processes events one-at-a-time with a time budget so it always returns.
+def _safe_tk_update(root, budget_ms=50):
+    """Pump tkinter events without getting stuck on macOS."""
+    if sys.platform != 'darwin':
+        root.update()
+        return
+    import time as _t
+    import _tkinter
+    deadline = _t.monotonic() + budget_ms / 1000.0
+    while _t.monotonic() < deadline:
+        if not root.tk.dooneevent(_tkinter.DONT_WAIT):
+            break  # no more pending events
+
+
 # ── Deferred startup config ──
 # LLM config, AI key vault, and hardware tier detection are DEFERRED until after
 # the splash screen is visible. These involve disk I/O (config reads), crypto
@@ -5087,7 +5104,7 @@ def main():
         # Keep splash responsive while waiting
         try:
             if _splash_root:
-                _splash_root.update()  # update() not update_idletasks() — processes paint+timer events
+                _safe_tk_update(_splash_root)
         except Exception:
             pass
         time.sleep(0.5)
@@ -5900,7 +5917,7 @@ def _show_splash():
             logger.warning(traceback.format_exc())
 
         logger.info("[SPLASH] Calling root.update()...")
-        root.update()  # process paint + timer events so animation renders
+        _safe_tk_update(root)
         logger.info("[SPLASH] Splash screen visible")
 
         def close_splash():
@@ -5979,7 +5996,7 @@ if __name__ == "__main__":
         try:
             if _splash_root and _splash_status:
                 _splash_status.set(msg)
-                _splash_root.update()  # update() not update_idletasks() — keeps animation alive
+                _safe_tk_update(_splash_root)
         except Exception:
             pass
 
@@ -6043,7 +6060,7 @@ if __name__ == "__main__":
         while _import_thread.is_alive() and time.time() < _import_timeout:
             try:
                 if _splash_root:
-                    _splash_root.update()
+                    _safe_tk_update(_splash_root)
             except Exception:
                 pass
             time.sleep(0.03)
