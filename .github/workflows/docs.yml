@@ -129,21 +129,31 @@ jobs:
           DISABLE_ESLINT_PLUGIN: 'true'
           NODE_OPTIONS: '--max-old-space-size=4096'
 
-      # Start Flask backend serving the React build
+      # Start Flask backend serving the React build (headless, no GUI)
       - name: Start Nunba backend
         run: |
-          python app.py --port 5000 --background &
-          # Wait for Flask to be ready
-          for i in $(seq 1 30); do
+          # Start main.py directly (Flask only, no Tk/webview GUI)
+          # app.py needs tkinter/pywebview which aren't on CI runners
+          python -c "
+          import sys, os
+          sys.path.insert(0, '.')
+          os.environ['HEVOLVE_NODE_TIER'] = 'flat'
+          os.environ['HEVOLVE_DEV_MODE'] = 'true'
+          from main import app
+          from waitress import serve
+          serve(app, host='127.0.0.1', port=5000, threads=4)
+          " &
+          # Wait for Flask to be ready (up to 60s for heavy imports)
+          for i in $(seq 1 60); do
             if curl -s http://127.0.0.1:5000/cors/test > /dev/null 2>&1; then
               echo "Backend ready after ${i}s"
               break
             fi
+            if [ $i -eq 60 ]; then
+              echo "WARNING: Backend did not start within 60s"
+            fi
             sleep 1
           done
-        env:
-          HEVOLVE_NODE_TIER: 'flat'
-          HEVOLVE_DEV_MODE: 'true'
 
       # Run Cypress E2E tests against the full stack
       - name: Run Cypress E2E tests
