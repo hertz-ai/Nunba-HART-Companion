@@ -759,6 +759,9 @@ function initCrossbar({
         `com.hertzai.hevolve.${userId}`,
         `com.hertzai.bookparsing.${userId}`,
         `com.hertzai.hevolve.social.${userId}`,
+        `com.hertzai.hevolve.channel.response.${userId}`,
+        `com.hertzai.hevolve.channel.presence.${userId}`,
+        `com.hertzai.hevolve.hive.${userId}`,
       ];
 
       const uniqueTopics = [...new Set(topics)];

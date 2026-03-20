@@ -86,6 +86,13 @@ const AgentChatPage = lazyRetry(() => import('./components/Social/Chat/AgentChat
 // Thought Experiment Tracker
 const ThoughtExperimentTracker = lazyRetry(() => import('./components/Social/Tracker/ThoughtExperimentTracker'));
 
+// Agent Hive View
+const AgentHiveView = lazyRetry(() => import('./components/Social/Tracker/AgentHiveView'));
+
+// Channel pages (user-facing)
+const ChannelBindingsPage = lazyRetry(() => import('./components/Channels/ChannelBindingsPage'));
+const ConversationHistoryPanel = lazyRetry(() => import('./components/Channels/ConversationHistoryPanel'));
+
 // Settings
 const BackupSettingsPage = lazyRetry(() => import('./components/Social/Settings/BackupSettingsPage'));
 const ThemeSettingsPage = lazyRetry(() => import('./components/Social/Settings/ThemeSettingsPage'));
@@ -491,6 +498,9 @@ function MainRoutes() {
           <Route path="agent/:agentId/chat" element={<><Helmet><title>Nunba — Agent Chat</title></Helmet><AgentChatPage /></>} />
           <Route path="coding" element={<><Helmet><title>Nunba — Coding Agent</title></Helmet><AgentChatPage /></>} />
           <Route path="tracker" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Experiment Tracker</title></Helmet><ThoughtExperimentTracker /></RoleGuard>} />
+          <Route path="hive" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Agent Hive</title></Helmet><AgentHiveView /></RoleGuard>} />
+          <Route path="channels" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — My Channels</title></Helmet><ChannelBindingsPage /></RoleGuard>} />
+          <Route path="channels/history" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Channel History</title></Helmet><ConversationHistoryPanel /></RoleGuard>} />
           <Route path="settings/backup" element={<RoleGuard minRole="guest"><Helmet><title>Nunba — Backup &amp; Sync</title></Helmet><BackupSettingsPage /></RoleGuard>} />
           <Route path="settings/appearance" element={<RoleGuard minRole="guest"><Helmet><title>Nunba — Appearance</title></Helmet><ThemeSettingsPage /></RoleGuard>} />
           <Route path="agents" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Agent Audit</title></Helmet><AgentAuditPage /></RoleGuard>} />
