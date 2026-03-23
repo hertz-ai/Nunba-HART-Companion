@@ -405,7 +405,7 @@ if getattr(sys, 'frozen', False):
     except Exception:
         pass
 
-# ── macOS-safe tkinter event pump ──
+# -- macOS-safe tkinter event pump --
 # On macOS, root.update() enters the Cocoa run loop and never returns when
 # after() timers keep scheduling new events (every 30ms). This helper
 # processes events one-at-a-time with a time budget so it always returns.

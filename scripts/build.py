@@ -801,7 +801,7 @@ def build_windows(python_exe, app_only=False, installer_only=False):
 
     print_info(f"Build successful: {exe_path}")
 
-    # ── Sync HARTOS source into python-embed ──────────────────────────
+    # -- Sync HARTOS source into python-embed --
     # The source python-embed/ is a snapshot that may contain stale HARTOS
     # files from a previous build. cx_Freeze copies modules via include_files
     # but the post-build copytree from python-embed/ can overwrite them.
@@ -961,7 +961,7 @@ def build_macos(python_exe, app_only=False, installer_only=False):
         if os.path.exists(exe_path):
             os.chmod(exe_path, 0o755)
 
-        # ── Copy tcl/tk scripts to Contents/Resources/share/ ──
+        # -- Copy tcl/tk scripts to Contents/Resources/share/ --
         # cx_Freeze puts tcl/tk in Contents/MacOS/share/ but _tkinter looks in
         # Contents/Resources/share/ on macOS.  Copy so tkinter finds init.tcl.
         _macos_share = os.path.join(app_path, 'Contents', 'MacOS', 'share')
@@ -970,7 +970,7 @@ def build_macos(python_exe, app_only=False, installer_only=False):
             shutil.copytree(_macos_share, _resources_share)
             print_info("Copied tcl/tk scripts to Contents/Resources/share/")
 
-        # ── Thin universal binaries to arm64 on Apple Silicon ──
+        # -- Thin universal binaries to arm64 on Apple Silicon --
         # cx_Freeze bundles a universal Python executable but .so extensions are
         # arm64-only.  If the OS picks the x86_64 slice the .so files fail to
         # load.  Thinning both the launcher and libPython forces arm64.
