@@ -392,6 +392,20 @@ export const channelsApi = {
     adminApiClient.post(`/channels/${channelType}/reconnect`),
 };
 
+// --- Channel User API (user-facing channel bindings, presence, pairing) ---
+export const channelUserApi = {
+  catalog: () => socialApi.get('/channels/catalog'),
+  catalogChannel: (type) => socialApi.get(`/channels/catalog/${type}`),
+  bindings: () => socialApi.get('/channels/bindings'),
+  createBinding: (data) => socialApi.post('/channels/bindings', data),
+  removeBinding: (id) => socialApi.delete(`/channels/bindings/${id}`),
+  setPreferred: (id) => socialApi.put(`/channels/bindings/${id}/preferred`),
+  generatePairCode: () => socialApi.post('/channels/pair/generate'),
+  verifyPairCode: (data) => socialApi.post('/channels/pair/verify', data),
+  presence: () => socialApi.get('/channels/presence'),
+  conversations: (params) => socialApi.get('/channels/conversations', {params}),
+};
+
 // --- Workflows API --- uses channels admin_bp at /api/admin/automation/workflows
 export const workflowsApi = {
   list: (params) => adminApiClient.get('/automation/workflows', {params}),
@@ -536,6 +550,10 @@ export const trackerApi = {
   myPledges: (params) => socialApi.get('/tracker/pledges/mine', { params }),
   allPledges: (params) => socialApi.get('/tracker/pledges/all', { params }),
   verifyPledge: (escrowId) => socialApi.post(`/tracker/pledges/${escrowId}/verify`),
+  inject: (postId, data) => socialApi.post(`/tracker/experiments/${postId}/inject`, data),
+  interview: (postId, data) => socialApi.post(`/tracker/experiments/${postId}/interview`, data),
+  dualContext: (data) => socialApi.post('/tracker/dual-context', data),
+  encounters: () => socialApi.get('/tracker/encounters'),
 };
 
 // --- Experiment Discovery ---

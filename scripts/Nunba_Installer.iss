@@ -199,6 +199,32 @@ begin
     Log('Installer initialized. WebView2 will be installed if needed.');
 end;
 
+// Clean stale bytecode before new files are copied (upgrade safety).
+// Previous installs or manual patches may leave __pycache__/ dirs and
+// orphaned .py/.pyc that shadow the fresh build's compiled modules.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+    ResultCode: Integer;
+begin
+    Result := '';
+    // Kill running Nunba so files aren't locked
+    Exec('taskkill', '/F /IM Nunba.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill', '/F /IM llama-server.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(500);
+    // Purge __pycache__ recursively and stale lib/ from previous install
+    if DirExists(ExpandConstant('{app}')) then
+    begin
+        DelTree(ExpandConstant('{app}\lib'), True, True, True);
+        DelTree(ExpandConstant('{app}\__pycache__'), True, True, True);
+        // Recurse: Inno can't glob **/__pycache__, use known deep paths
+        DelTree(ExpandConstant('{app}\core\__pycache__'), True, True, True);
+        DelTree(ExpandConstant('{app}\security\__pycache__'), True, True, True);
+        DelTree(ExpandConstant('{app}\integrations\__pycache__'), True, True, True);
+        DelTree(ExpandConstant('{app}\agent_ledger\__pycache__'), True, True, True);
+        Log('Purged stale __pycache__ and lib/ from previous install');
+    end;
+end;
+
 // Set up entries during installation
 procedure CurStepChanged(CurStep: TSetupStep);
 begin

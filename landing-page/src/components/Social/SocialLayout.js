@@ -48,6 +48,8 @@ import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import BuildIcon from '@mui/icons-material/Build';
 import StorefrontIcon from '@mui/icons-material/Storefront';
+import CableIcon from '@mui/icons-material/Cable';
+import HiveIcon from '@mui/icons-material/Hive';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import {alpha} from '@mui/material/styles';
@@ -152,6 +154,18 @@ const navGroups = [
         label: 'Tracker',
         path: '/social/tracker',
         icon: <ScienceIcon />,
+        minRole: 'flat',
+      },
+      {
+        label: 'Channels',
+        path: '/social/channels',
+        icon: <CableIcon />,
+        minRole: 'flat',
+      },
+      {
+        label: 'Hive',
+        path: '/social/hive',
+        icon: <HiveIcon />,
         minRole: 'flat',
       },
       {

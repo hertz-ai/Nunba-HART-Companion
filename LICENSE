@@ -1,31 +1,20 @@
-Business Source License 1.1
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
 
-License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
-"Business Source License" is a trademark of MariaDB Corporation Ab.
-(BSL-1.1 is a standard license format used by CockroachDB, Sentry, HashiCorp, etc.)
+   Copyright 2024-2026 Hevolve AI (hertz-ai) and contributors
 
-Parameters
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-Licensor:             Hevolve AI (hertz-ai)
-Licensed Work:        Nunba Desktop & Mobile Companion App
-                      The Licensed Work is (c) 2024-2026 Hevolve AI
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Additional Use Grant: You may use the Licensed Work for personal,
-                      non-commercial, academic, and evaluation purposes.
-                      You may NOT use it to create a competing commercial
-                      product, service, or operating system.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 
-Change Date:          2030-01-01
-
-Change License:       Apache License, Version 2.0
-
-For information about alternative licensing arrangements for the Licensed Work,
-please contact: legal@hevolve.ai
-
-Notice
-
-The Business Source License (this document, or the "License") is not an Open
-Source license. However, the Licensed Work will eventually be made available
-under an Open Source License, as stated in this License.
-
-License text: https://mariadb.com/bsl11/
+   See NOTICE file for additional information regarding copyright ownership
+   and the relationship between Nunba, HART OS, and HevolveAI.

@@ -179,12 +179,19 @@ class _AgentPipelineTestBase(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp(prefix='nunba_uat_')
         self._orig_prompts = self.lgapi.PROMPTS_DIR
         self.lgapi.PROMPTS_DIR = self.temp_dir
+        # hart_intelligence_entry has its own module-level PROMPTS_DIR that all
+        # file I/O inside chat() reads directly.  The re-export module is a
+        # separate object, so assigning lgapi.PROMPTS_DIR never reaches the
+        # actual code.  Patch the entry module's global too.
+        import hart_intelligence_entry as _hie
+        self._hie = _hie
+        self._orig_hie_prompts = _hie.PROMPTS_DIR
+        _hie.PROMPTS_DIR = self.temp_dir
         _ensure_recipe_mocks(self.lgapi)
         _reset_state(self.lgapi, self.temp_dir)
         # Patch recipe/chat_agent in hart_intelligence_entry (where chat() is defined).
         # star-import copies values, so patching hart_intelligence doesn't reach
         # chat()'s globals which point to hart_intelligence_entry.__dict__.
-        import hart_intelligence_entry as _hie
         self._recipe_patcher = patch.object(
             _hie, 'recipe', MagicMock(return_value='Reviewing'))
         self._chat_agent_patcher = patch.object(
@@ -195,6 +202,8 @@ class _AgentPipelineTestBase(unittest.TestCase):
     def tearDown(self):
         self._recipe_patcher.stop()
         self._chat_agent_patcher.stop()
+        import hart_intelligence_entry as _hie
+        _hie.PROMPTS_DIR = self._orig_hie_prompts
         self.lgapi.PROMPTS_DIR = self._orig_prompts
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
@@ -437,7 +446,7 @@ class TestAgentPipelineReview(_AgentPipelineTestBase):
         """With agent JSON but no recipe, should enter Review Mode."""
         self._create_agent_json('99010')
 
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Reviewing action 1'):
             result = _chat(self.client, 'Review this agent',
                            prompt_id='99010')
@@ -450,7 +459,7 @@ class TestAgentPipelineReview(_AgentPipelineTestBase):
         """recipe() returning success → completed status."""
         self._create_agent_json('99011')
 
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Agent Created Successfully'), \
              patch(MOCK_SOCIAL_AGENT, return_value=None):
             result = _chat(self.client, 'Looks good',
@@ -465,7 +474,7 @@ class TestAgentPipelineReview(_AgentPipelineTestBase):
         self._create_agent_json('99012')
 
         # First: complete the agent
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Agent Created Successfully'), \
              patch(MOCK_SOCIAL_AGENT, return_value=None):
             _chat(self.client, 'Create it', prompt_id='99012')
@@ -479,7 +488,7 @@ class TestAgentPipelineReview(_AgentPipelineTestBase):
         with open(recipe_path, 'w') as f:
             json.dump({'recipe': 'test', 'flow_index': 0}, f)
 
-        with patch.object(self.lgapi, 'chat_agent',
+        with patch.object(self._hie, 'chat_agent',
                           return_value='Hello from agent!') as mock_ca:
             result = _chat(self.client, 'Hello agent', prompt_id='99012')
         mock_ca.assert_called()
@@ -496,7 +505,7 @@ class TestAgentPipelineAutonomous(_AgentPipelineTestBase):
     # Test 10: Autonomous creation saves JSON and returns Review Mode
     # ------------------------------------------------------------------
     @patch(MOCK_POOLED_GET, side_effect=Exception("DB unavailable"))
-    @patch('hart_intelligence._autonomous_gather_info')
+    @patch('hart_intelligence_entry._autonomous_gather_info')
     def test_autonomous_creation(self, mock_auto_gather, _):
         """Autonomous dispatch should return Review Mode."""
         mock_auto_gather.return_value = (
@@ -557,7 +566,7 @@ class TestAgentPipelineFileRouting(_AgentPipelineTestBase):
         """JSON exists but no recipe → review mode (recipe called)."""
         self._write_agent_files('99030', with_recipe=False)
 
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Reviewing flow_0'):
             result = _chat(self.client, 'Review', prompt_id='99030')
         self.assertEqual(result.get('Agent_status'), 'Review Mode')
@@ -570,7 +579,7 @@ class TestAgentPipelineFileRouting(_AgentPipelineTestBase):
         self._write_agent_files('99031', with_recipe=True,
                                 num_flows=3, all_recipes=False)
 
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Creating recipe for flow_2'):
             result = _chat(self.client, 'Next flow', prompt_id='99031')
         self.assertEqual(result.get('Agent_status'), 'Review Mode')
@@ -583,7 +592,7 @@ class TestAgentPipelineFileRouting(_AgentPipelineTestBase):
         self._write_agent_files('99032', with_recipe=True,
                                 num_flows=2, all_recipes=True)
 
-        with patch.object(self.lgapi, 'chat_agent',
+        with patch.object(self._hie, 'chat_agent',
                           return_value='Hello from your agent!') as mock_ca:
             result = _chat(self.client, 'Hey agent', prompt_id='99032')
         mock_ca.assert_called()
@@ -834,14 +843,14 @@ class TestAgentPipelineEndToEnd(_AgentPipelineTestBase):
         self.assertTrue(os.path.isfile(json_path))
 
         # === Step 4: Review phase ===
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Reviewing: Find recipe'):
             r4 = _chat(self.client, 'Yes, review it',
                         prompt_id=prompt_id)
         self.assertEqual(r4['Agent_status'], 'Review Mode')
 
         # === Step 5: Recipe completes ===
-        with patch.object(self.lgapi, 'recipe',
+        with patch.object(self._hie, 'recipe',
                           return_value='Agent Created Successfully'):
             r5 = _chat(self.client, 'Approve all',
                         prompt_id=prompt_id)
@@ -856,7 +865,7 @@ class TestAgentPipelineEndToEnd(_AgentPipelineTestBase):
         with open(recipe_path, 'w') as f:
             json.dump({'recipe': 'test'}, f)
 
-        with patch.object(self.lgapi, 'chat_agent',
+        with patch.object(self._hie, 'chat_agent',
                           return_value='Hello! I am CookBot.') as mock_ca:
             r6 = _chat(self.client, 'Suggest a dinner recipe',
                         prompt_id=prompt_id)

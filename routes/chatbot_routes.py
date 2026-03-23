@@ -1799,7 +1799,7 @@ def chat_route():
     request_id = data.get('request_id', str(int(time.time())))
     prompt_id = data.get('prompt_id')
     create_agent = data.get('create_agent', False)
-    autonomous_creation = data.get('autonomous_creation', False)
+    autonomous_creation = data.get('autonomous_creation', False) or data.get('autonomous', False)
     agentic_execute = data.get('agentic_execute', False)
     agentic_plan = data.get('agentic_plan', None)
     preferred_lang = data.get('preferred_lang', 'en')
@@ -1823,66 +1823,82 @@ def chat_route():
     if agent_type == 'local':
         logger.info(f'Chat with LOCAL agent: {agent_id}')
 
-        # --- Check if local LLM is available; wait for warm-up or offer setup card ---
+        # ── Model availability gate (single check via ModelOrchestrator) ──
+        # Orchestrator is the single source of truth for what's loaded.
+        # If LLM is not loaded, return a setup card — can't chat without it.
+        # TTS/STT missing is non-blocking — included in response for UI to show.
+        #
+        # IMPORTANT: If the LLM server is reachable (health OK), skip the LLM
+        # setup card regardless of catalog state. The catalog may be out of sync
+        # (e.g., server was started externally or by a previous session).
         try:
-            from llama.llama_config import LlamaConfig
-            _llm_config = LlamaConfig()
-            if not _llm_config.is_llm_available() and not _llm_config.is_cloud_configured():
-                # Server may still be warming up (auto-start takes ~5s).
-                # If binary + model exist on disk, wait briefly instead of showing setup card.
-                _has_binary = bool(_llm_config.installer.find_llama_server())
-                _has_config = not _llm_config.is_first_run()
-                if _has_binary and _has_config:
-                    # Warm-up wait: poll health for up to 15s before giving up
-                    import time as _wait_time
-                    logger.info('LLM server warming up — waiting up to 15s...')
-                    for _poll in range(30):
-                        _wait_time.sleep(0.5)
-                        if _llm_config.is_llm_available():
-                            logger.info(f'LLM server ready after {(_poll + 1) * 0.5:.1f}s warm-up')
-                            break
-                    else:
-                        # Still not ready after 15s — try auto-starting
-                        logger.warning('LLM server not responding after 15s — attempting auto-start')
-                        try:
-                            _llm_config.start_server()
-                            # Wait another 10s for it to start
-                            for _poll2 in range(20):
-                                _wait_time.sleep(0.5)
-                                if _llm_config.is_llm_available():
-                                    logger.info(f'LLM server started after auto-start + {(_poll2 + 1) * 0.5:.1f}s')
-                                    break
-                        except Exception as _start_err:
-                            logger.error(f'Auto-start failed: {_start_err}')
+            from models.orchestrator import get_orchestrator
+            from models.catalog import ModelType
 
-                # Re-check after warm-up/auto-start
-                if not _llm_config.is_llm_available() and not _llm_config.is_cloud_configured():
-                    gpu_label = 'GPU' if _llm_config.installer.gpu_available != 'none' else 'CPU'
-                    best_idx = _llm_config.select_best_model_for_hardware()
-                    from llama.llama_installer import MODEL_PRESETS
-                    best_model = MODEL_PRESETS[best_idx]
-                    return jsonify({
-                        'text': (
-                            f"A local LLM is needed for chat and agentic tasks. "
-                            f"I recommend {best_model.display_name} ({gpu_label} mode, "
-                            f"~{best_model.size_mb / 1024:.1f}GB download)."
-                        ),
-                        'agent_id': agent_id,
-                        'agent_type': 'local',
-                        'source': 'system',
-                        'success': True,
-                        'llm_setup_card': {
-                            'model_name': best_model.display_name,
-                            'model_index': best_idx,
-                            'size_mb': best_model.size_mb,
-                            'gpu_mode': gpu_label,
-                            'description': best_model.description,
-                        },
-                    })
-        except ImportError:
-            pass  # llama module not available
+            orch = get_orchestrator()
+            missing_models = []
+
+            # Quick LLM health check — if server responds, LLM is ready
+            _llm_reachable = False
+            try:
+                from core.port_registry import get_local_llm_url
+                import requests as _req
+                _health = _req.get(get_local_llm_url().replace('/v1', '/health'), timeout=2)
+                _llm_reachable = _health.status_code == 200
+            except Exception:
+                pass
+
+            for mt in (ModelType.LLM, ModelType.TTS, ModelType.STT):
+                # Skip LLM check if server is reachable
+                if str(mt) == 'llm' and _llm_reachable:
+                    continue
+
+                entry = orch.select_best(str(mt))
+                if not entry:
+                    continue
+                if entry.loaded:
+                    continue
+
+                loader = orch._loaders.get(str(mt))
+                downloaded = loader.is_downloaded(entry) if loader else entry.downloaded
+                missing_models.append({
+                    'model_type': str(mt),
+                    'model_id': entry.id,
+                    'model_name': entry.name,
+                    'size_mb': int(entry.disk_gb * 1024) if entry.disk_gb else int(entry.ram_gb * 1024),
+                    'vram_gb': entry.vram_gb,
+                    'downloaded': downloaded,
+                    'action': 'load' if downloaded else 'download',
+                })
+
+            llm_missing = any(m['model_type'] == 'llm' for m in missing_models)
+
+            if llm_missing:
+                # LLM not loaded — try auto_load before giving up
+                llm_entry_obj = orch.auto_load('llm')
+                if llm_entry_obj and llm_entry_obj.loaded:
+                    logger.info(f'LLM auto-loaded on first chat: {llm_entry_obj.id}')
+                    missing_models = [m for m in missing_models if m['model_type'] != 'llm']
+                    llm_missing = False
+
+            if llm_missing:
+                # Still no LLM — return setup card
+                llm_info = next(m for m in missing_models if m['model_type'] == 'llm')
+                return jsonify({
+                    'text': f"Setting up {llm_info['model_name']}... Click below to start.",
+                    'agent_id': agent_id,
+                    'agent_type': 'local',
+                    'source': 'system',
+                    'success': True,
+                    'llm_setup_card': llm_info,
+                    'missing_models': missing_models,
+                })
         except Exception as e:
-            logger.debug(f'LLM availability check failed: {e}')
+            missing_models = []
+            logger.debug(f'Model availability check: {e}')
+
+        # Stash missing_models for attaching to the chat response later
+        _non_llm_missing = [m for m in missing_models if m['model_type'] != 'llm'] if missing_models else []
 
         # Get system prompt for local agent
         system_prompt = None
@@ -1894,12 +1910,23 @@ def chat_route():
             try:
                 # Determine langchain prompt_id:
                 # - Built-in local agents (local_assistant, etc.) → None → regular LangChain chat
-                # - Custom agents with numeric prompt_id → pass through → create/reuse flow
+                # - Custom agents with numeric prompt_id AND a HARTOS prompt file → create/reuse flow
+                # - Agents without a prompt file → casual chat (no prompt_id)
                 langchain_prompt_id = None
-                if prompt_id and str(prompt_id).isdigit():
-                    langchain_prompt_id = int(prompt_id)
-                elif agent_id and str(agent_id).isdigit():
-                    langchain_prompt_id = int(agent_id)
+                _candidate_pid = prompt_id or agent_id
+                if _candidate_pid and str(_candidate_pid).isdigit():
+                    # Only pass prompt_id to HARTOS if the agent has a prompt file
+                    # (user-created agents). Hardcoded default agents (e.g. id=54)
+                    # don't have prompt files and should go to casual LangChain chat.
+                    try:
+                        from core.platform_paths import get_prompts_dir
+                        _prompt_file = os.path.join(get_prompts_dir(), f'{_candidate_pid}.json')
+                    except ImportError:
+                        _prompt_file = os.path.join(
+                            os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts',
+                            f'{_candidate_pid}.json')
+                    if os.path.isfile(_prompt_file):
+                        langchain_prompt_id = int(_candidate_pid)
 
                 # --- Recursion guard: skip detection if already in creation/review flow ---
                 already_creating = (
@@ -2022,6 +2049,9 @@ def chat_route():
                     if thinking_traces:
                         response_json['thinking_steps'] = thinking_traces
                         logger.info(f'Including {len(thinking_traces)} thinking traces in response')
+                    # Attach non-blocking missing models (TTS, STT) so frontend can show setup cards
+                    if _non_llm_missing:
+                        response_json['missing_models'] = _non_llm_missing
                     # Auto-post to social feed when agent creation completes
                     if agent_status == 'completed':
                         import threading

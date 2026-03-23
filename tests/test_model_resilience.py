@@ -1065,9 +1065,14 @@ class TestBypassPathSync(unittest.TestCase):
                       "voice_transcribe must reference Whisper Base")
 
     def test_app_auto_start_has_notify(self):
+        # auto_load() is the orchestrator path: it calls mark_loaded +
+        # _register_vram + _register_lifecycle + _register_service_tool
+        # internally, so notify_loaded (bypass-path API) is not needed and
+        # would cause double-registration.  The lifecycle contract is
+        # maintained by auto_load itself.
         self.assertTrue(
-            self._file_contains('app.py', 'get_orchestrator().notify_loaded'),
-            "app.py auto-start must call notify_loaded")
+            self._file_contains('app.py', 'get_orchestrator().auto_load'),
+            "app.py auto-start must call get_orchestrator().auto_load('llm')")
 
     def test_app_install_ai_has_catalog_update(self):
         self.assertTrue(

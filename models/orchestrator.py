@@ -94,7 +94,30 @@ class LlamaLoader(ModelLoader):
 
 
 class TTSLoader(ModelLoader):
-    """Loader for TTS engines via tts_engine."""
+    """Loader for TTS engines via tts_engine.
+
+    Download installs pip packages + CUDA torch (via package_installer).
+    Load checks if the backend is runnable (packages + CUDA + VRAM).
+    """
+
+    def download(self, entry: ModelEntry) -> bool:
+        """Install TTS backend packages (pip) + CUDA torch if needed."""
+        backend_name = entry.id.replace('tts-', '')
+        try:
+            from tts.package_installer import install_backend_full
+            logger.info(f"TTS download: installing backend '{backend_name}'")
+            ok, result = install_backend_full(backend_name)
+            if ok:
+                logger.info(f"TTS backend '{backend_name}' installed successfully")
+            else:
+                logger.warning(f"TTS backend '{backend_name}' install failed: {result}")
+            return ok
+        except ImportError:
+            logger.warning("package_installer not available for TTS download")
+            return False
+        except Exception as e:
+            logger.error(f"TTS download failed for '{backend_name}': {e}")
+            return False
 
     def load(self, entry: ModelEntry, run_mode: str) -> bool:
         try:
@@ -125,14 +148,46 @@ class TTSLoader(ModelLoader):
 
 
 class STTLoader(ModelLoader):
-    """Loader for STT models (lazy-loaded by whisper on first use)."""
+    """Loader for STT models (faster-whisper, lazy-loaded on first use)."""
+
+    def download(self, entry: ModelEntry) -> bool:
+        """Install faster-whisper + CUDA torch if needed."""
+        try:
+            from tts.package_installer import is_cuda_torch, install_cuda_torch, has_nvidia_gpu
+            # Ensure CUDA torch is available for GPU whisper
+            if has_nvidia_gpu() and not is_cuda_torch():
+                logger.info("STT download: installing CUDA torch for faster-whisper")
+                ok, msg = install_cuda_torch()
+                if not ok:
+                    logger.warning(f"CUDA torch install failed: {msg}")
+                    return False
+            # Install faster-whisper itself
+            import importlib.util
+            if importlib.util.find_spec('faster_whisper') is None:
+                import subprocess, sys
+                logger.info("STT download: installing faster-whisper")
+                result = subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', 'faster-whisper', '--quiet'],
+                    capture_output=True, text=True, timeout=300)
+                if result.returncode != 0:
+                    logger.warning(f"faster-whisper install failed: {result.stderr[:200]}")
+                    return False
+            logger.info("STT dependencies ready (faster-whisper + CUDA torch)")
+            return True
+        except Exception as e:
+            logger.error(f"STT download failed: {e}")
+            return False
 
     def load(self, entry: ModelEntry, run_mode: str) -> bool:
         logger.info(f"STT model {entry.id} will load lazily on first use")
         return True
 
     def is_downloaded(self, entry: ModelEntry) -> bool:
-        return False  # STT download state not easily checkable
+        try:
+            import importlib.util
+            return importlib.util.find_spec('faster_whisper') is not None
+        except Exception:
+            return False
 
 
 class VLMLoader(ModelLoader):

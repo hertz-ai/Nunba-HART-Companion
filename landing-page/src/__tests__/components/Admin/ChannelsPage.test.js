@@ -8,14 +8,22 @@ jest.mock('../../../services/socialApi', () => ({
   channelsApi: {
     list: jest.fn(),
   },
+  channelUserApi: {
+    presence: jest.fn().mockResolvedValue({data: {data: []}}),
+    catalog: jest.fn().mockResolvedValue({data: {data: []}}),
+    createBinding: jest.fn().mockResolvedValue({data: {data: {}}}),
+  },
 }));
 
-import {channelsApi} from '../../../services/socialApi';
+import {channelsApi, channelUserApi} from '../../../services/socialApi';
 
 describe('ChannelsPage Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     channelsApi.list.mockResolvedValue({data: mockChannels});
+    channelUserApi.presence.mockResolvedValue({data: {data: []}});
+    channelUserApi.catalog.mockResolvedValue({data: {data: []}});
+    channelUserApi.createBinding.mockResolvedValue({data: {data: {}}});
   });
 
   describe('Rendering', () => {

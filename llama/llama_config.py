@@ -290,14 +290,13 @@ class LlamaConfig:
         # - Budget ≥ 2910MB → Qwen3.5-4B (index 0)
         # - Budget < 2910MB → Qwen3.5-2B (index 1)
         # Then try larger models (9B, 27B, etc.) if they fit
-        best_idx = 1  # Qwen3.5-2B as safe default (low VRAM / CPU)
-        if budget_mb >= MODEL_PRESETS[0].size_mb:
-            best_idx = 0  # Qwen3.5-4B fits
-
-        # Check if even larger Qwen3.5 models fit (9B, 27B, 35B-MoE at higher indices)
-        best_size = MODEL_PRESETS[best_idx].size_mb
+        # Find the largest model that fits the budget.
+        # Walk all presets and pick the biggest one within budget.
+        # Falls back to Gemma-1B (index 3, ~632MB) for very low-budget/CPU machines.
+        best_idx = 3  # Gemma-3-1B as absolute fallback (smallest, ~632MB)
+        best_size = 0
         for i, preset in enumerate(MODEL_PRESETS):
-            if "Qwen3.5" in preset.display_name and preset.size_mb <= budget_mb and preset.size_mb > best_size:
+            if preset.size_mb <= budget_mb and preset.size_mb > best_size:
                 best_idx = i
                 best_size = preset.size_mb
 
@@ -976,19 +975,53 @@ class LlamaConfig:
         for _port in _check_ports:
             server_type, server_info = self.check_server_type(_port)
 
-            if server_type == ServerType.NUNBA_MANAGED:
-                logger.info(f"Nunba-managed server already running on port {_port}")
-                self.api_base = f"http://127.0.0.1:{_port}/v1"
-                self._propagate_llm_url(self.api_base)
-                return True
-
-            if server_type == ServerType.EXTERNAL_LLAMA:
-                logger.info(f"External llama.cpp server detected on port {_port}")
-                logger.info("Using existing llama.cpp server instead of starting new one")
+            if server_type in (ServerType.NUNBA_MANAGED, ServerType.EXTERNAL_LLAMA):
+                label = "Nunba-managed" if server_type == ServerType.NUNBA_MANAGED else "External llama.cpp"
+                logger.info(f"{label} server already running on port {_port}")
                 self.api_base = f"http://127.0.0.1:{_port}/v1"
                 self.config["server_port"] = _port
                 self._propagate_llm_url(self.api_base)
                 self._save_config()
+
+                # Sync orchestrator catalog with the ACTUAL running model.
+                # Query /v1/models to get the GGUF filename, then match against
+                # MODEL_PRESETS (which map display_name ↔ file_name) and catalog.
+                try:
+                    import requests as _req
+                    resp = _req.get(f"http://127.0.0.1:{_port}/v1/models", timeout=3)
+                    if resp.status_code == 200:
+                        rj = resp.json()
+                        actual_gguf = (rj.get('data', [{}])[0].get('id', '')
+                                       or rj.get('models', [{}])[0].get('name', ''))
+                        logger.info(f"Running model: {actual_gguf}")
+
+                        # Match GGUF filename to MODEL_PRESETS display name
+                        display_name = actual_gguf  # fallback
+                        try:
+                            from llama.llama_installer import MODEL_PRESETS
+                            for p in MODEL_PRESETS:
+                                if p.file_name == actual_gguf:
+                                    display_name = p.display_name
+                                    # Update config to reflect the actual running model
+                                    idx = MODEL_PRESETS.index(p)
+                                    if self.config.get('selected_model_index') != idx:
+                                        self.config['selected_model_index'] = idx
+                                        self._save_config()
+                                    break
+                        except ImportError:
+                            pass
+
+                        # Notify orchestrator so catalog marks it as loaded
+                        try:
+                            from models.orchestrator import get_orchestrator
+                            get_orchestrator().notify_loaded(
+                                'llm', display_name, device='gpu')
+                            logger.info(f"Catalog synced: LLM '{display_name}' marked as loaded")
+                        except ImportError:
+                            pass
+                except Exception as _sync_err:
+                    logger.debug(f"Catalog sync skipped: {_sync_err}")
+
                 return True
 
         # Re-check the desired port — use raw TCP bind test to catch TIME_WAIT
@@ -1142,7 +1175,9 @@ class LlamaConfig:
             "--ctx-size", str(ctx_size),
             "--threads", str(os.cpu_count() or 4),
             "--host", "127.0.0.1",
-            "--jinja"  # Required for chat template support
+            "--jinja",  # Model's native Jinja template (respects reasoning-budget)
+            "--reasoning-format", "deepseek",  # Extract <think> into reasoning_content, content has clean answer only
+            "--reasoning-budget", "0",  # No thinking tokens — fastest inference
         ]
 
         # Qwen3.5 models need additional flags

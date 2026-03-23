@@ -265,6 +265,23 @@ def _execute_plan(language: str, gpu_info: dict) -> None:
                              detail=f'Download error: {e}')
                 continue
 
+        # Ensure CUDA torch is available for GPU models (TTS, STT)
+        # The frozen build ships with a stub torch. If the model needs GPU
+        # and CUDA torch isn't installed, use the existing package_installer.
+        if model_type in (ModelType.TTS, ModelType.STT) and gpu_info.get('cuda_available', False):
+            try:
+                from tts.package_installer import is_cuda_torch, install_cuda_torch, has_nvidia_gpu
+                if not is_cuda_torch() and has_nvidia_gpu():
+                    _update_step(model_type, status='loading',
+                                 detail='Installing CUDA PyTorch (one-time ~2.5GB)...')
+                    def _progress(msg):
+                        _update_step(model_type, detail=msg)
+                    ok, msg = install_cuda_torch(progress_cb=_progress)
+                    if not ok:
+                        logger.warning(f"CUDA torch install failed: {msg}")
+            except ImportError:
+                pass
+
         # Load
         _update_step(model_type, status='loading',
                      detail=f'Starting {entry.name}...')
@@ -296,6 +313,19 @@ def _update_step(model_type: str, **kwargs) -> None:
         if step:
             for k, v in kwargs.items():
                 setattr(step, k, v)
+        user_id = _state.language  # bootstrapper doesn't track user — use broadcast
+    # Push via WAMP so frontend SetupProgressCard updates in real-time
+    try:
+        from integrations.social.realtime import publish_event
+        publish_event('setup_progress', {
+            'type': 'setup_progress',
+            'job_type': str(model_type),
+            'model_name': kwargs.get('detail', ''),
+            'status': kwargs.get('status', ''),
+            'message': kwargs.get('detail', ''),
+        })
+    except Exception:
+        pass
 
 
 def _refresh_vram() -> None:

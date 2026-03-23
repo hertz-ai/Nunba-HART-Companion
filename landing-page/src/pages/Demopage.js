@@ -78,6 +78,13 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   // Detect if we're on the /local route to force guest mode
   const isLocalRoute = location.pathname === '/local';
 
+  // Signal readiness immediately on mount — the chat UI is usable before agents load.
+  // Previously onReady was gated behind fetchPrompts (HTTP call) which blocked the
+  // hero→demo transition for seconds on slow/loaded machines.
+  useEffect(() => {
+    if (onReady) onReady();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const textareaRef = useRef(null);
@@ -751,7 +758,6 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       } finally {
         setAgentsLoading(false);
         setAgentFetchAttempts((prev) => prev + 1);
-        if (onReady) onReady();
       }
     };
     fetchPrompts();
@@ -2841,40 +2847,76 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
         : `${setupCard.size_mb}MB`;
       setMessages((prev) => [...prev, {
         type: 'system',
-        content: `Setting up ${setupCard.model_name} UD-Q4_K_XL + vision projector (~${sizeLabel}, ${setupCard.gpu_mode})... Server will diagnose hardware and pick the right configuration.`,
+        content: `Setting up AI models (~${sizeLabel})... This includes LLM, TTS, STT — detecting GPU, installing CUDA if needed.`,
       }]);
-      // Let server diagnose and handle all edge cases (GPU/CPU mismatch, model size, mmproj, etc.)
-      const res = await fetch('/api/llm/auto-setup', {
+
+      // Use bootstrap endpoint — handles ALL models: LLM, TTS, STT, CUDA torch install
+      const lang = localStorage.getItem('hart_language') || 'en';
+      const res = await fetch('/api/ai/bootstrap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ language: lang }),
       });
       const data = await res.json();
-      setIsRequestInFlight(false);
-      if (data.success) {
-        const modeNote = data.run_mode === 'cpu' ? ' (CPU)' : ' (GPU)';
-        let extra = '';
-        if (data.diagnosis?.gpu_occupied) extra = ' GPU was occupied — using CPU.';
-        else if (data.diagnosis?.binary_mismatch === 'need_gpu_build' && data.run_mode === 'cpu') extra = ' CUDA build unavailable — using CPU.';
 
-        // Push notification, not persistent chat message
-        pushNotification({
-          type: 'success',
-          message: 'Your Nunba is fully awake',
-          detail: `${data.model_name}${modeNote}${extra}`,
-        });
-      } else {
-        pushNotification({
-          type: 'warning',
-          message: `Setup: ${data.message || 'trying again...'}`,
-        });
-      }
+      // Poll for completion
+      const pollStatus = async () => {
+        for (let i = 0; i < 120; i++) { // poll up to 2 min
+          await new Promise(r => setTimeout(r, 1000));
+          try {
+            const statusRes = await fetch('/api/ai/bootstrap/status');
+            const status = await statusRes.json();
+
+            // Update progress in chat
+            if (status.steps) {
+              const stepMsgs = Object.values(status.steps)
+                .filter(s => s.status !== 'pending')
+                .map(s => `${s.model_name || s.model_type}: ${s.status}${s.detail ? ' — ' + s.detail : ''}`);
+              if (stepMsgs.length > 0) {
+                setMessages((prev) => {
+                  const idx = prev.findIndex(m => m.type === 'setup_progress' && m.jobType === 'bootstrap');
+                  const card = {
+                    type: 'setup_progress',
+                    jobType: 'bootstrap',
+                    steps: Object.values(status.steps).map(s => ({
+                      job_type: s.model_type,
+                      message: `${s.model_name || s.model_type}: ${s.detail || s.status}`,
+                      status: s.status,
+                    })),
+                    isComplete: status.phase === 'done',
+                  };
+                  if (idx >= 0) {
+                    const updated = [...prev];
+                    updated[idx] = card;
+                    return updated;
+                  }
+                  return [...prev, card];
+                });
+              }
+            }
+
+            if (status.phase === 'done') {
+              setIsRequestInFlight(false);
+              if (status.error) {
+                pushNotification({ type: 'warning', message: `Setup completed with issues: ${status.error}` });
+              } else {
+                pushNotification({ type: 'success', message: 'All AI models ready', detail: `GPU: ${status.gpu_name || 'CPU'}` });
+              }
+              return;
+            }
+          } catch { /* poll error, keep trying */ }
+        }
+        setIsRequestInFlight(false);
+        pushNotification({ type: 'warning', message: 'Setup is taking longer than expected — it will continue in the background' });
+      };
+
+      pollStatus();
     } catch (err) {
       setIsRequestInFlight(false);
-      logger.error('LLM auto-setup failed:', err);
+      logger.error('Bootstrap setup failed:', err);
       setMessages((prev) => [...prev, {
         type: 'system',
-        content: 'Auto setup failed. Check your internet connection and try again, or use "I\'ll Configure" for manual setup.',
+        content: 'Auto setup failed. Check your internet connection and try again.',
       }]);
     }
   }, []);
@@ -3220,7 +3262,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           })}
         </div>
       )}
-      <div className="flex bg-black min-h-screen mb-6">
+      <div className="flex bg-black h-screen overflow-hidden">
         <AgentSidebar
           screenWidth={screenWidth}
           showContent={showContent}
@@ -3248,19 +3290,18 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           toggleDropdown={toggleDropdown}
         />
 
-        <div className="flex flex-col min-h-screen bg-black w-full">
+        <div className="flex flex-col h-full bg-black w-full overflow-hidden">
           <div className="w-full flex flex-col md:flex-row-reverse flex-1">
             {/* Chat/Messages section - Now on the left for wider screens */}
 
             <div
               className={`${
                 !uploadedImage && !uploadedPdf && window.innerWidth > 768
-                  ? 'w-[30%]'
+                  ? (isTextMode || (!videoUrl && !audioUrl) ? 'w-0 overflow-hidden' : 'w-[30%]')
                   : 'w-full'
-              } 
-        ${
-          window.innerWidth <= 768 ? 'h-[35vh] mb-4 ' : ''
-        } flex justify-center items-center  `}
+              } ${
+                window.innerWidth <= 768 ? (isTextMode || (!videoUrl && !audioUrl) ? '' : 'h-[35vh] mb-4') : ''
+              } flex justify-center items-center transition-all duration-300`}
             >
               {!isTextMode && (
                 <>
@@ -3400,7 +3441,11 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
             </div>
 
             <div
-              className="flex-1 w-full md:w-[60%] overflow-x-clip"
+              className={`flex-1 w-full ${
+                !isTextMode && (videoUrl || audioUrl) && !uploadedImage && !uploadedPdf && window.innerWidth > 768
+                  ? 'md:w-[60%]'
+                  : 'md:w-full'
+              } overflow-x-clip pt-10 md:pt-0`}
             >
               {messages.length === 0 ? (
                 <>

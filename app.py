@@ -80,6 +80,13 @@ def _isolate_frozen_imports():
 
 _isolate_frozen_imports()
 
+# === User-writable site-packages (runtime pip installs go here) ===
+# Program Files is read-only for non-admin. Packages installed at runtime
+# (e.g. CUDA torch, TTS engines) go to ~/.nunba/site-packages/ instead.
+_user_sp = os.path.join(os.path.expanduser('~'), '.nunba', 'site-packages')
+if os.path.isdir(_user_sp) and _user_sp not in sys.path:
+    sys.path.insert(0, _user_sp)
+
 # === Single-instance guard ===
 # Prevent multiple Nunba processes (Windows auto-start + manual launch).
 # Check if port 5000 is already bound by another Nunba — if so, bring it
@@ -5290,16 +5297,28 @@ def main():
                         try:
                             _cur_url = _window.get_current_url() or ''
                             if _cur_url and 'localhost' in _cur_url and 'error' not in _cur_url.lower():
-                                # Page URL is correct — just force repaint, no reload needed
+                                # Page URL is correct — force WebView2 to repaint.
+                                # WebView2 suspends its compositor when the window is hidden.
+                                # A JS-triggered reflow + resize forces the compositor to wake up.
                                 logger.info(f"[BACKGROUND] Page loaded while hidden — forcing repaint")
                                 try:
+                                    # 1. JS reflow: read offsetHeight to force layout recalc
+                                    _window.evaluate_js(
+                                        "document.body.style.opacity='0.99';"
+                                        "void document.body.offsetHeight;"
+                                        "requestAnimationFrame(()=>{"
+                                        "  document.body.style.opacity='1';"
+                                        "  void document.body.offsetHeight;"
+                                        "});"
+                                    )
+                                    # 2. Resize trick: ±1px forces compositor
                                     w, h = _window.width, _window.height
-                                    _window.resize(w + 1, h)
-                                    time.sleep(0.15)
+                                    _window.resize(w + 1, h + 1)
+                                    time.sleep(0.05)
                                     _window.resize(w, h)
-                                    logger.info("[BACKGROUND] Forced resize repaint on first show")
-                                except Exception:
-                                    pass
+                                    logger.info("[BACKGROUND] Forced JS reflow + resize repaint on first show")
+                                except Exception as _rp_err:
+                                    logger.warning(f"[BACKGROUND] Repaint workaround failed: {_rp_err}")
                                 return
                         except Exception:
                             pass
@@ -6124,24 +6143,20 @@ if __name__ == "__main__":
                             if success:
                                 logger.info("AI initialization completed successfully!")
 
-                                # Start server if auto_start is enabled
+                                # Load LLM via ModelOrchestrator — single path for model selection,
+                                # compute-aware loading, VRAM tracking, and lifecycle management.
                                 if llama_config.config.get("auto_start_server", True):
-                                    logger.info("Auto-start enabled, starting llama.cpp server...")
-                                    if llama_config.start_server():
-                                        logger.info("Llama.cpp server started successfully!")
-                                        # Sync catalog state
-                                        try:
-                                            from models.orchestrator import get_orchestrator
-                                            from llama.llama_installer import MODEL_PRESETS
-                                            idx = llama_config.config.get('selected_model_index', 0)
-                                            p = MODEL_PRESETS[idx] if idx < len(MODEL_PRESETS) else None
-                                            if p:
-                                                dev = 'gpu' if llama_config.config.get('use_gpu') else 'cpu'
-                                                get_orchestrator().notify_loaded('llm', p.display_name, device=dev)
-                                        except Exception:
-                                            pass
-                                    else:
-                                        logger.warning("Failed to start llama.cpp server")
+                                    try:
+                                        from models.orchestrator import get_orchestrator
+                                        entry = get_orchestrator().auto_load('llm')
+                                        if entry:
+                                            logger.info(f"LLM loaded via orchestrator: {entry.id} on {entry.device}")
+                                        else:
+                                            logger.warning("Orchestrator: no LLM fits current compute")
+                                    except Exception as _orch_err:
+                                        logger.warning(f"Orchestrator auto_load failed, falling back to direct start: {_orch_err}")
+                                        if llama_config.start_server():
+                                            logger.info("Llama.cpp server started (direct fallback)")
                             else:
                                 logger.warning("AI initialization completed with errors")
                         except Exception as e:
@@ -6175,31 +6190,25 @@ if __name__ == "__main__":
                         except Exception:
                             pass
 
-                    # Auto-start server on subsequent runs if enabled
+                    # Auto-start server on subsequent runs via ModelOrchestrator
                     if llama_config.config.get("auto_start_server", True):
                         def server_start_thread():
                             try:
-                                logger.info("Auto-start enabled, starting llama.cpp server...")
-                                if llama_config.start_server():
-                                    logger.info("Llama.cpp server started successfully!")
-                                    # Sync catalog state
-                                    try:
-                                        from models.orchestrator import get_orchestrator
-                                        from llama.llama_installer import MODEL_PRESETS
-                                        idx = llama_config.config.get('selected_model_index', 0)
-                                        p = MODEL_PRESETS[idx] if idx < len(MODEL_PRESETS) else None
-                                        if p:
-                                            dev = 'gpu' if llama_config.config.get('use_gpu') else 'cpu'
-                                            get_orchestrator().notify_loaded('llm', p.display_name, device=dev)
-                                    except Exception:
-                                        pass
+                                logger.info("Auto-start enabled, loading LLM via orchestrator...")
+                                from models.orchestrator import get_orchestrator
+                                entry = get_orchestrator().auto_load('llm')
+                                if entry:
+                                    logger.info(f"LLM loaded via orchestrator: {entry.id} on {entry.device}")
                                 else:
-                                    logger.warning("Failed to start llama.cpp server")
+                                    logger.warning("Orchestrator: no LLM fits current compute, trying direct start...")
+                                    if llama_config.start_server():
+                                        logger.info("Llama.cpp server started (direct fallback)")
+                                    else:
+                                        logger.warning("Failed to start llama.cpp server")
                             except Exception as e:
                                 logger.error(f"Failed to start server: {e}")
                                 logger.error(traceback.format_exc())
 
-                        # Start server in background thread
                         server_thread = threading.Thread(target=server_start_thread, daemon=True)
                         server_thread.start()
                         logger.info("Server auto-start initiated in background thread")

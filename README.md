@@ -131,7 +131,7 @@ bash scripts/build_appimage.sh
 
 ```
 Nunba/
-+-- app.py                 # Desktop app entry point (splash, webview, tray)
++-- app.py                 # Desktop app entry point (splash, webview, tray)Creat
 +-- main.py                # Flask server (routes, social, database)
 +-- routes/
 |   +-- chatbot_routes.py  # /chat, /prompts, TTS, voice, agents

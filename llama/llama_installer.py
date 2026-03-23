@@ -81,13 +81,13 @@ MODEL_PRESETS = [
         mmproj_file="mmproj-Qwen3-VL-2B-F16.gguf",
         mmproj_source_file="mmproj-F16.gguf"
     ),
-    # Text-only options
+    # Smallest Qwen3.5 — for CPU-only / ultra-low VRAM machines
     ModelPreset(
-        "Gemma-3-1B IT Q4_K_M",
-        "unsloth/gemma-3-1b-it-GGUF",
-        "gemma-3-1b-it-Q4_K_M.gguf",
-        600,
-        "Text-only, compact & fast, good for quick analysis",
+        "Qwen3.5-0.8B UD-Q4_K_XL",
+        "unsloth/Qwen3.5-0.8B-GGUF",
+        "Qwen3.5-0.8B-UD-Q4_K_XL.gguf",
+        550,
+        "Smallest Qwen3.5, text-only, ~550MB, runs on anything",
         has_vision=False
     ),
     ModelPreset(

@@ -165,16 +165,40 @@ def has_nvidia_gpu() -> bool:
         return False
 
 
+def get_user_site_packages() -> str:
+    """Get user-writable site-packages directory at ~/.nunba/site-packages/.
+
+    This is where runtime pip installs go — Program Files is read-only
+    for non-admin users. Added to sys.path at startup.
+    """
+    sp = os.path.join(Path.home(), '.nunba', 'site-packages')
+    os.makedirs(sp, exist_ok=True)
+    return sp
+
+
+def ensure_user_site_on_path():
+    """Add ~/.nunba/site-packages/ to sys.path if not already there."""
+    sp = get_user_site_packages()
+    if sp not in sys.path:
+        sys.path.insert(0, sp)
+
+
 def _run_pip(args: List[str], progress_cb: Optional[Callable] = None,
              timeout: int = 600) -> Tuple[bool, str]:
-    """Run pip in python-embed with progress reporting.
+    """Run pip with --target ~/.nunba/site-packages/ for user-writable installs.
 
-    Uses python-embed/python.exe -m pip so packages go into
-    python-embed/Lib/site-packages/ (not the frozen build's lib/).
+    Uses python-embed/python.exe -m pip but targets the user-writable
+    ~/.nunba/site-packages/ directory instead of Program Files.
     """
     python_exe = get_embed_python()
     if not python_exe:
         return False, "python-embed not found"
+
+    # Use --target for install commands so packages go to user-writable dir
+    # instead of Program Files (which needs admin)
+    user_sp = get_user_site_packages()
+    if args and args[0] == 'install':
+        args = args[:1] + ['--target', user_sp] + args[1:]
 
     cmd = [python_exe, '-m', 'pip'] + args
     env = os.environ.copy()
@@ -198,6 +222,8 @@ def _run_pip(args: List[str], progress_cb: Optional[Callable] = None,
             env=env, startupinfo=si, creationflags=cf,
         )
         if proc.returncode == 0:
+            # Ensure the target dir is on sys.path NOW (not just next restart)
+            ensure_user_site_on_path()
             return True, proc.stdout
         else:
             logger.error(f"pip failed: {proc.stderr}")
@@ -237,8 +263,26 @@ def install_cuda_torch(progress_cb: Optional[Callable] = None) -> Tuple[bool, st
     if ok:
         # Invalidate cached import checks
         _invalidate_import_cache()
-        if progress_cb:
-            progress_cb("CUDA PyTorch installed successfully")
+
+        # Force-reload torch in current session — the old stub (0.0.0)
+        # is cached in sys.modules and won't be replaced by importlib alone
+        _torch_mods = [k for k in sys.modules if k == 'torch' or k.startswith('torch.')]
+        for k in _torch_mods:
+            del sys.modules[k]
+        try:
+            import torch
+            if torch.cuda.is_available():
+                logger.info(f"CUDA torch active in current session: {torch.cuda.get_device_name(0)}")
+                if progress_cb:
+                    progress_cb(f"CUDA PyTorch ready — {torch.cuda.get_device_name(0)}")
+            else:
+                logger.warning("CUDA torch installed but not available in current session (may need restart)")
+                if progress_cb:
+                    progress_cb("CUDA PyTorch installed — will activate on next start")
+        except Exception as e:
+            logger.warning(f"torch reload after CUDA install failed: {e}")
+            if progress_cb:
+                progress_cb("CUDA PyTorch installed — will activate on next start")
     return ok, msg
 
 

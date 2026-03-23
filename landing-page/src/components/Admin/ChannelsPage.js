@@ -1,4 +1,6 @@
 import {channelsApi} from '../../services/socialApi';
+import ChannelSetupWizard from '../Channels/ChannelSetupWizard';
+import ChannelPresenceIndicator from '../Channels/ChannelPresenceIndicator';
 
 import {
   Typography,
@@ -141,6 +143,7 @@ export default function ChannelsPage() {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [newChannel, setNewChannel] = useState({type: 'telegram', name: '', token: ''});
 
   useEffect(() => {
@@ -175,7 +178,7 @@ export default function ChannelsPage() {
     setActionLoading('create');
     try {
       const res = await channelsApi.create({
-        type: newChannel.type,
+        channel_type: newChannel.type,
         name: newChannel.name,
         config: newChannel.token ? {token: newChannel.token} : {},
       });
@@ -292,7 +295,7 @@ export default function ChannelsPage() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setDialogOpen(true)}
+              onClick={() => setWizardOpen(true)}
               sx={{
                 background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                 borderRadius: 2,
@@ -438,6 +441,7 @@ export default function ChannelsPage() {
                                   }}
                                 />
                               </Box>
+                              <ChannelPresenceIndicator channelType={channel.type} size={8} />
                             </Box>
                           </Box>
                           <Switch
@@ -525,6 +529,21 @@ export default function ChannelsPage() {
             })}
           </Grid>
         )}
+
+        {/* Channel Setup Wizard */}
+        <ChannelSetupWizard
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          onSuccess={() => {
+            setWizardOpen(false);
+            // Refresh channels list
+            channelsApi.list().then(res => {
+              const data = res?.data;
+              const list = Array.isArray(data) ? data : Array.isArray(data?.channels) ? data.channels : [];
+              setChannels(list);
+            }).catch(() => {});
+          }}
+        />
 
         {/* Add Channel Dialog */}
         <Dialog
