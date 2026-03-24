@@ -98,16 +98,17 @@ jobs:
         continue-on-error: true
 
   # ── Cypress E2E Tests ──
-  # Uses React dev server (port 3000) with backend calls stubbed via cy.intercept.
-  # No Flask/HARTOS server needed — tests verify frontend behavior only.
-  # For full-stack E2E, run locally with Nunba + `npx cypress run`.
+  # Full-stack: Flask backend (port 5000) + React dev server (port 3000).
+  # HARTOS is pip-installed. SQLite for DB (no external services needed).
   cypress-e2e:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: landing-page
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -115,38 +116,63 @@ jobs:
           cache: npm
           cache-dependency-path: landing-page/package-lock.json
 
-      - name: Install dependencies
+      # ── Backend: Flask + HARTOS ──
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt 2>&1 | tail -5
+          pip install hevolveai 2>&1 | tail -3
+        continue-on-error: true  # Some platform-specific deps may fail on Linux
+
+      - name: Start Flask backend
+        run: |
+          python main.py --port 5000 &
+          echo $! > /tmp/flask.pid
+        env:
+          NUNBA_BIND_HOST: '127.0.0.1'
+          NUNBA_DISABLE_TTS: '1'  # No TTS models on CI
+          NUNBA_CI: '1'
+
+      - name: Wait for Flask backend
+        run: |
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+              echo "Flask is ready (attempt $i)"
+              break
+            fi
+            echo "Waiting for Flask... (attempt $i)"
+            sleep 2
+          done
+          curl -sf http://localhost:5000/health || echo "Flask health check returned non-200 (may still work)"
+
+      # ── Frontend: React dev server ──
+      - name: Install frontend dependencies
+        working-directory: landing-page
         run: npm ci --legacy-peer-deps
 
-      # Start React dev server in background.
-      # Cypress baseUrl is localhost:3000 (React dev server).
-      # Backend API calls (localhost:5000) are stubbed in cy.intercept
-      # or gracefully handled with failOnStatusCode: false.
       - name: Start React dev server
+        working-directory: landing-page
         run: npm start &
         env:
-          BROWSER: none  # Don't open browser
+          BROWSER: none
           PORT: 3000
-          GENERATE_SOURCEMAP: false  # Faster startup on CI
-          ESLINT_NO_DEV_ERRORS: true  # Don't block on lint warnings
+          GENERATE_SOURCEMAP: false
+          ESLINT_NO_DEV_ERRORS: true
 
-      - name: Wait for dev server
+      - name: Wait for React dev server
+        working-directory: landing-page
         run: npx wait-on http://localhost:3000 --timeout 120000
 
-      # Run Cypress in chunks to avoid OOM on CI runners.
-      # Specs that require a live Flask backend are tagged with
-      # failOnStatusCode: false and degrade gracefully.
+      # ── Cypress: Full-stack E2E ──
       - name: Cypress E2E tests
         uses: cypress-io/github-action@v6
         with:
           working-directory: landing-page
-          install: false  # Already installed above
+          install: false
           wait-on: http://localhost:3000
           wait-on-timeout: 120
           browser: chrome
           config: baseUrl=http://localhost:3000,video=false
-          # Run all specs — backend-dependent tests use failOnStatusCode:false
-          # and cy.request with status acceptance so they pass without Flask
           record: false
         env:
           CI: true
@@ -164,3 +190,7 @@ jobs:
         with:
           name: cypress-reports
           path: landing-page/cypress/reports/
+
+      - name: Stop Flask backend
+        if: always()
+        run: kill $(cat /tmp/flask.pid) 2>/dev/null || true

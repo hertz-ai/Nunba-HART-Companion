@@ -391,7 +391,7 @@ build_exe_options = {
     "include_files": (
         # 1. Auto-include ALL .py files from project root
         [(f, f) for f in glob.glob("*.py")
-         if f not in ("app.py", "setup.py")]
+         if f not in ("app.py", "setup.py") and not f.startswith(("test_", "_test_"))]
         # 2. Auto-include ALL .json files from project root (config, templates)
         + [(f, f) for f in glob.glob("*.json")]
         # 3. Auto-include ALL .png/.ico asset files from project root
