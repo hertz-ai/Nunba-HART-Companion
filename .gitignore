@@ -87,6 +87,10 @@ nul
 /gapanalysisforsathish.*
 /planforsathish.md
 
+# Test scenario docs (generated)
+tests/Nunba_Test_Scenarios.md
+tests/Nunba_Test_Scenarios.pdf
+
 # Bootstrap scripts (large, downloadable)
 /get-pip.py
 
