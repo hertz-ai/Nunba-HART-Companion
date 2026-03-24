@@ -673,3 +673,124 @@ class TestStartServerUsesConfigIndex:
         # select_best_model_for_hardware (which is deleted) and did not crash.
         assert result is False
         assert not hasattr(cfg, 'select_best_model_for_hardware')
+
+
+# ============================================================
+# Public API — methods consumed by app.py and frontend
+# ============================================================
+
+class TestPublicAPI:
+    """Public methods used by the rest of Nunba — wrong return type = crash."""
+
+    def test_get_llm_mode_returns_string(self, tmp_config_dir):
+        """get_llm_mode drives the frontend LLM status badge."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        mode = cfg.get_llm_mode()
+        assert isinstance(mode, str)
+        assert mode in ('local', 'cloud', 'custom_api', 'disabled', 'none', '')
+
+    def test_get_selected_model_preset_returns_preset_or_none(self, tmp_config_dir):
+        """Returns the currently configured model — displayed in settings page."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        preset = cfg.get_selected_model_preset()
+        if preset is not None:
+            assert hasattr(preset, 'display_name')
+            assert hasattr(preset, 'size_mb')
+
+    def test_get_selected_model_preset_handles_invalid_index(self, tmp_config_dir):
+        """Invalid model index must not crash — return None or first preset."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        cfg.config['selected_model_index'] = 99999
+        result = cfg.get_selected_model_preset()
+        assert result is None  # Out of range
+
+    def test_is_cloud_configured_returns_bool(self, tmp_config_dir):
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        assert isinstance(cfg.is_cloud_configured(), bool)
+
+    def test_is_first_run_returns_bool(self, tmp_config_dir):
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        assert isinstance(cfg.is_first_run(), bool)
+
+    def test_is_llm_available_returns_bool(self, tmp_config_dir):
+        """is_llm_available is polled by frontend — must always return bool."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        result = cfg.is_llm_available()
+        assert isinstance(result, bool)
+
+    def test_is_llm_server_running_returns_bool(self, tmp_config_dir):
+        """is_llm_server_running used by startup to avoid duplicate starts."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        result = cfg.is_llm_server_running()
+        assert isinstance(result, bool)
+
+    def test_check_server_running_returns_bool(self, tmp_config_dir):
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        result = cfg.check_server_running(8080)
+        assert isinstance(result, bool)
+
+    def test_check_server_type_returns_tuple(self, tmp_config_dir):
+        """check_server_type returns (ServerType, info_dict) — used by diagnose()."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        server_type, info = cfg.check_server_type(8080)
+        assert server_type is not None  # ServerType enum value
+
+    def test_get_cached_version_returns_int_or_none(self, tmp_config_dir):
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        result = cfg.get_cached_version()
+        assert result is None or isinstance(result, int)
+
+    def test_find_available_port_returns_int(self, tmp_config_dir):
+        """Port finder must return a free port — used when default 8080 is busy."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        port = cfg.find_available_port()
+        assert isinstance(port, int)
+        assert 1024 <= port <= 65535
+
+    def test_config_save_and_reload(self, tmp_config_dir):
+        """Config changes must survive save→reload cycle."""
+        from llama.llama_config import LlamaConfig
+        cfg = LlamaConfig(config_dir=tmp_config_dir)
+        cfg.config['test_key'] = 'test_value'
+        cfg._save_config()
+        cfg2 = LlamaConfig(config_dir=tmp_config_dir)
+        assert cfg2.config.get('test_key') == 'test_value'
+
+
+# ============================================================
+# KNOWN_LLM_ENDPOINTS — external LLM detection
+# ============================================================
+
+class TestKnownEndpoints:
+    """KNOWN_LLM_ENDPOINTS drives scan_openai_compatible_ports — wrong = false positives."""
+
+    def test_port_5000_not_in_known_endpoints(self):
+        """Port 5000 is Nunba's Flask — scanning it falsely detects Flask as LLM."""
+        from llama.llama_config import KNOWN_LLM_ENDPOINTS
+        ports = [ep['base_url'] for ep in KNOWN_LLM_ENDPOINTS]
+        assert not any(':5000' in p for p in ports), "Port 5000 should not be scanned (Nunba's own Flask)"
+
+    def test_all_endpoints_have_required_keys(self):
+        from llama.llama_config import KNOWN_LLM_ENDPOINTS
+        required = {'name', 'base_url', 'health', 'completions', 'type'}
+        for ep in KNOWN_LLM_ENDPOINTS:
+            missing = required - set(ep.keys())
+            assert not missing, f"Endpoint '{ep.get('name', '?')}' missing: {missing}"
+
+    def test_all_endpoints_use_localhost(self):
+        """External LLM scan must only check localhost — not external IPs."""
+        from llama.llama_config import KNOWN_LLM_ENDPOINTS
+        for ep in KNOWN_LLM_ENDPOINTS:
+            assert 'localhost' in ep['base_url'] or '127.0.0.1' in ep['base_url'], (
+                f"Endpoint '{ep['name']}' scans non-local: {ep['base_url']}")
