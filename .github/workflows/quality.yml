@@ -102,9 +102,39 @@ jobs:
   # HARTOS is pip-installed. SQLite for DB (no external services needed).
   cypress-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout HARTOS
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/HARTOS
+          path: _deps/HARTOS
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
+      - name: Checkout HevolveAI
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/HevolveAI
+          path: _deps/hevolveai
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
+      - name: Checkout Hevolve_Database
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/Hevolve_Database
+          path: _deps/Hevolve_Database
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
+      - name: Symlink sibling repos
+        run: |
+          ln -sf "$GITHUB_WORKSPACE/_deps/HARTOS" ../HARTOS || true
+          ln -sf "$GITHUB_WORKSPACE/_deps/hevolveai" ../hevolveai || true
+          ln -sf "$GITHUB_WORKSPACE/_deps/Hevolve_Database" ../Hevolve_Database || true
 
       - uses: actions/setup-python@v5
         with:
@@ -116,12 +146,19 @@ jobs:
           cache: npm
           cache-dependency-path: landing-page/package-lock.json
 
-      # ── Backend: Flask + HARTOS ──
+      # ── Backend: Flask + HARTOS (from source) ──
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt 2>&1 | tail -5
-          pip install hevolveai 2>&1 | tail -3
+
+          # Install sibling deps in order: hevolve-database → hevolveai → hart-backend
+          for dep_dir in ../Hevolve_Database ../hevolveai ../HARTOS; do
+            if [ -f "$dep_dir/pyproject.toml" ] || [ -f "$dep_dir/setup.py" ]; then
+              echo "Installing $(basename $dep_dir) from source..."
+              pip install --no-deps "$dep_dir" 2>&1 | tail -2
+            fi
+          done
         continue-on-error: true  # Some platform-specific deps may fail on Linux
 
       - name: Start Flask backend

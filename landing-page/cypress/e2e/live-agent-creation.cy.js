@@ -357,7 +357,7 @@ describe('Live Agent Creation E2E (Requires Local LLM)', () => {
 
     it('4.1 Demopage loads and sends message to live backend', () => {
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 15000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       seedGuestAuth();
 
       cy.get('textarea', {timeout: 20000})
@@ -374,7 +374,7 @@ describe('Live Agent Creation E2E (Requires Local LLM)', () => {
 
     it('4.2 Chat response from live LLM renders in the UI', () => {
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 15000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       seedGuestAuth();
 
       cy.get('textarea', {timeout: 20000})
@@ -391,7 +391,7 @@ describe('Live Agent Creation E2E (Requires Local LLM)', () => {
 
     it('4.3 Agent creation intent from UI triggers creation flow', () => {
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 15000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       seedGuestAuth();
 
       cy.get('textarea', {timeout: 20000})

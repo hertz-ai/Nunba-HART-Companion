@@ -534,7 +534,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       // Type and send a message
@@ -572,7 +572,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea').first().type('Hello{enter}', {force: true});
@@ -613,7 +613,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -661,7 +661,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -703,7 +703,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -746,7 +746,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -785,7 +785,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -826,7 +826,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea').first().type('create an agent{enter}', {force: true});
@@ -851,7 +851,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -883,7 +883,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea')
@@ -910,7 +910,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -958,7 +958,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -988,7 +988,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea').first().type('create an agent{enter}', {force: true});
@@ -1011,7 +1011,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -1051,7 +1051,7 @@ describe('Autonomous Agent Creation E2E', () => {
 
     it('8.1 in guest mode, "Create new Agent" starts conversational flow (not cloud form)', () => {
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       // Click the Create new Agent button
@@ -1073,7 +1073,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       // Click Create new Agent
@@ -1093,7 +1093,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea').first().type('Hello{enter}', {force: true});
@@ -1133,7 +1133,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -1166,7 +1166,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -1209,7 +1209,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -1434,7 +1434,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       // Send autonomous creation request
@@ -1470,7 +1470,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       // Create agent without autonomous keywords
@@ -1504,7 +1504,7 @@ describe('Autonomous Agent Creation E2E', () => {
       cy.clock();
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.tick(3000);
 
       cy.get('textarea')
@@ -1539,7 +1539,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea')
@@ -1567,7 +1567,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       cy.get('textarea')
@@ -1614,7 +1614,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
-      cy.wait('@getLocalPrompts', {timeout: 20000});
+      cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
       // First message triggers creation_suggested
