@@ -5,7 +5,8 @@ Creates a WebApp with reliable startup and system tray functionality + Sidebar C
 Connect to Hivemind with your friends' agents.
 """
 # app.py (VERY TOP — before any other imports)
-import os, sys
+import os
+import sys
 
 # Trace recursion in frozen builds — write to file since Win32GUI has no console
 if getattr(sys, 'frozen', False):
@@ -97,13 +98,17 @@ def _check_single_instance():
     _port = 5000
     for a in sys.argv:
         if a.startswith('--port='):
-            try: _port = int(a.split('=')[1])
-            except ValueError: pass
+            try:
+                _port = int(a.split('=')[1])
+            except ValueError:
+                pass
         if a == '--port':
             idx = sys.argv.index(a)
             if idx + 1 < len(sys.argv):
-                try: _port = int(sys.argv[idx + 1])
-                except ValueError: pass
+                try:
+                    _port = int(sys.argv[idx + 1])
+                except ValueError:
+                    pass
     import socket as _sock
     _s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
     try:
@@ -119,11 +124,13 @@ def _check_single_instance():
             pass
         print(f"Nunba is already running on port {_port}. Exiting duplicate instance.")
         sys.exit(0)
-    except (_sock.timeout, ConnectionRefusedError, OSError):
+    except (TimeoutError, ConnectionRefusedError, OSError):
         pass  # Port is free — we are the first instance
     finally:
-        try: _s.close()
-        except Exception: pass
+        try:
+            _s.close()
+        except Exception:
+            pass
 
 _check_single_instance()
 

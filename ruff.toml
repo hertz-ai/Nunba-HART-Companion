@@ -47,6 +47,8 @@ exclude = [
 "Hevolve_Database/*" = ["S", "E", "F"]
 "scripts/setup_freeze_nunba.py" = ["S603", "S607"]
 "test_*.py" = ["S"]
+# app.py intentionally defers imports (splash before Flask, frozen build isolation)
+"app.py" = ["E402"]
 
 [lint.isort]
 known-first-party = [
