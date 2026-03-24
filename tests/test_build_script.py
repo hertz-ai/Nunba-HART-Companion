@@ -13,10 +13,7 @@ NFT: Cross-platform path handling, subprocess error handling,
 import os
 import sys
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:

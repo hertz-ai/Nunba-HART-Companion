@@ -16,9 +16,9 @@ Covers:
 """
 import json
 import os
-import sys
 import socket
-from unittest.mock import patch, MagicMock, PropertyMock
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -257,6 +257,7 @@ class TestCheckServerType:
 
     def test_not_running(self, tmp_config_dir):
         import requests as req
+
         from llama.llama_config import LlamaConfig, ServerType
         cfg = LlamaConfig(config_dir=tmp_config_dir)
 
@@ -333,6 +334,7 @@ class TestScanEndpoints:
 
     def test_scan_existing_none_found(self):
         import requests as req
+
         from llama.llama_config import scan_existing_llm_endpoints
 
         with patch("llama.llama_config.requests.get", side_effect=req.exceptions.ConnectionError):
@@ -353,6 +355,7 @@ class TestScanEndpoints:
 
     def test_scan_openai_ports_none_found(self):
         import requests as req
+
         from llama.llama_config import scan_openai_compatible_ports
 
         with patch("llama.llama_config.requests.get", side_effect=req.exceptions.ConnectionError):
@@ -375,8 +378,8 @@ class TestModuleLevelHelpers:
     """Test the module-level convenience functions."""
 
     def test_get_llama_endpoint(self, tmp_config_dir):
-        from llama.llama_config import get_llama_endpoint, _get_cached_config
         import llama.llama_config as lc
+        from llama.llama_config import get_llama_endpoint
         lc._cached_config = None  # reset singleton
 
         with patch("llama.llama_config.LlamaConfig") as MockCfg:
@@ -390,6 +393,7 @@ class TestModuleLevelHelpers:
 
     def test_check_llama_health_false_when_connection_error(self):
         import requests as req
+
         from llama import llama_config as lc
         lc._cached_config = None
 
@@ -530,8 +534,9 @@ class TestComputeBudgetMethodsDeleted:
 
     def test_deletion_comment_present_in_source(self):
         """The source file must contain the deletion notice comment."""
-        import llama.llama_config as lc
         import inspect
+
+        import llama.llama_config as lc
         try:
             src = inspect.getsource(lc)
             assert '_compute_budget' in src and 'DELETED' in src, (
@@ -630,7 +635,6 @@ class TestStartServerUsesConfigIndex:
     def test_start_server_no_preset_reads_config_index(self, tmp_config_dir):
         """Without model_preset, start_server reads MODEL_PRESETS[selected_model_index]."""
         from llama.llama_config import LlamaConfig
-        from llama.llama_installer import MODEL_PRESETS
         cfg = LlamaConfig(config_dir=tmp_config_dir)
         # Set a specific index — orchestrator would normally do this via LlamaLoader.load()
         cfg.config['selected_model_index'] = 1
@@ -644,7 +648,7 @@ class TestStartServerUsesConfigIndex:
     def test_start_server_with_preset_skips_config_index(self, tmp_config_dir):
         """When model_preset is provided, it is used directly (config index ignored)."""
         from llama.llama_config import LlamaConfig
-        from llama.llama_installer import MODEL_PRESETS, ModelPreset
+        from llama.llama_installer import MODEL_PRESETS
         cfg = LlamaConfig(config_dir=tmp_config_dir)
         cfg.config['selected_model_index'] = 99  # garbage index
 
@@ -658,7 +662,6 @@ class TestStartServerUsesConfigIndex:
         """_do_start_server selects MODEL_PRESETS[selected_model_index], never calls
         select_best_model_for_hardware (which no longer exists)."""
         from llama.llama_config import LlamaConfig
-        from llama.llama_installer import MODEL_PRESETS
         cfg = LlamaConfig(config_dir=tmp_config_dir)
         cfg.config['selected_model_index'] = 0
 

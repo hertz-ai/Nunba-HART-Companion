@@ -7,16 +7,12 @@ Supports expressive, multilingual speech synthesis with voice cloning.
 VibeVoice: https://github.com/microsoft/VibeVoice
 Model: https://huggingface.co/microsoft/VibeVoice-1.5B
 """
-import os
-import sys
-import json
 import logging
-import subprocess
-import tempfile
 import shutil
-import threading
+import subprocess
+import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Callable, Dict, List, Tuple
 
 logger = logging.getLogger('NunbaVibeVoiceTTS')
 
@@ -65,7 +61,7 @@ VIBEVOICE_MODELS = {
 DEFAULT_MODEL = "VibeVoice-Realtime-0.5B"  # Smaller, faster, multilingual
 
 
-def _recommend_model(vram_gb: float) -> Optional[str]:
+def _recommend_model(vram_gb: float) -> str | None:
     """Pick the best VibeVoice model variant for the available VRAM."""
     if vram_gb >= 8:
         return "VibeVoice-1.5B"
@@ -74,7 +70,7 @@ def _recommend_model(vram_gb: float) -> Optional[str]:
     return None
 
 
-def _detect_nvidia() -> Optional[Dict]:
+def _detect_nvidia() -> dict | None:
     """Detect NVIDIA GPU via nvidia-smi (no torch needed)."""
     nvidia_smi = shutil.which('nvidia-smi')
     if not nvidia_smi:
@@ -110,7 +106,7 @@ def _detect_nvidia() -> Optional[Dict]:
         return None
 
 
-def _detect_amd() -> Optional[Dict]:
+def _detect_amd() -> dict | None:
     """Detect AMD GPU via rocm-smi (ROCm stack)."""
     rocm_smi = shutil.which('rocm-smi')
     if not rocm_smi:
@@ -173,7 +169,7 @@ def _detect_amd() -> Optional[Dict]:
     return None
 
 
-def _detect_gpu_wmic() -> Optional[Dict]:
+def _detect_gpu_wmic() -> dict | None:
     """Fallback: detect any GPU on Windows via PowerShell/WMI (includes Intel, AMD, NVIDIA)."""
     if sys.platform != 'win32':
         return None
@@ -227,13 +223,12 @@ def _detect_gpu_wmic() -> Optional[Dict]:
         return None
 
 
-def _detect_apple_metal() -> Optional[Dict]:
+def _detect_apple_metal() -> dict | None:
     """Detect Apple Silicon GPU via Metal/MPS (macOS only)."""
     if sys.platform != 'darwin':
         return None
     try:
         import subprocess
-        import platform
         # Get chip name (e.g., "Apple M1 Pro")
         proc = subprocess.run(
             ['sysctl', '-n', 'machdep.cpu.brand_string'],
@@ -262,7 +257,7 @@ def _detect_apple_metal() -> Optional[Dict]:
         return None
 
 
-def detect_gpu() -> Dict:
+def detect_gpu() -> dict:
     """
     Detect GPU availability and VRAM without importing torch.
 
@@ -326,8 +321,8 @@ class VibeVoiceTTS:
 
     def __init__(self,
                  model_name: str = DEFAULT_MODEL,
-                 models_dir: Optional[str] = None,
-                 cache_dir: Optional[str] = None,
+                 models_dir: str | None = None,
+                 cache_dir: str | None = None,
                  device: str = "cuda"):
         """
         Initialize VibeVoice TTS.
@@ -381,7 +376,7 @@ class VibeVoiceTTS:
         return model_path.exists() and any(model_path.iterdir())
 
     def download_model(self,
-                       progress_callback: Optional[Callable[[str, float], None]] = None) -> bool:
+                       progress_callback: Callable[[str, float], None] | None = None) -> bool:
         """
         Download the VibeVoice model from HuggingFace.
 
@@ -489,7 +484,7 @@ class VibeVoiceTTS:
 
             logger.info("VibeVoice model unloaded")
 
-    def list_speakers(self) -> Dict[str, dict]:
+    def list_speakers(self) -> dict[str, dict]:
         """List available speaker presets"""
         model_info = VIBEVOICE_MODELS.get(self.model_name, {})
         supported_languages = model_info.get("languages", ["en"])
@@ -511,10 +506,10 @@ class VibeVoiceTTS:
 
     def synthesize(self,
                    text: str,
-                   output_path: Optional[str] = None,
-                   speaker: Optional[str] = None,
+                   output_path: str | None = None,
+                   speaker: str | None = None,
                    speed: float = 1.0,
-                   emotion: Optional[str] = None) -> Optional[str]:
+                   emotion: str | None = None) -> str | None:
         """
         Synthesize text to speech.
 
@@ -572,7 +567,7 @@ class VibeVoiceTTS:
 
     def synthesize_streaming(self,
                              text: str,
-                             speaker: Optional[str] = None,
+                             speaker: str | None = None,
                              speed: float = 1.0):
         """
         Synthesize text with streaming output (for real-time playback).
@@ -663,7 +658,7 @@ class VibeVoiceTTS:
 
 
 # Global instance
-_vibevoice_instance: Optional[VibeVoiceTTS] = None
+_vibevoice_instance: VibeVoiceTTS | None = None
 
 
 def get_vibevoice_tts(model_name: str = DEFAULT_MODEL) -> VibeVoiceTTS:
@@ -677,7 +672,7 @@ def get_vibevoice_tts(model_name: str = DEFAULT_MODEL) -> VibeVoiceTTS:
 def synthesize_with_vibevoice(text: str,
                               speaker: str = DEFAULT_SPEAKER,
                               speed: float = 1.0,
-                              output_path: Optional[str] = None) -> Optional[str]:
+                              output_path: str | None = None) -> str | None:
     """
     Convenience function to synthesize text using VibeVoice.
 

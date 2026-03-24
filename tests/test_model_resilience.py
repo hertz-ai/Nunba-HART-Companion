@@ -9,16 +9,13 @@ Comprehensive tests for the unified model management system:
 """
 
 import collections
-import json
 import os
 import sys
 import tempfile
 import threading
 import time
 import unittest
-from dataclasses import asdict
-from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 # Ensure project root is on path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -242,8 +239,7 @@ class TestModelOrchestrator(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix='.json', delete=False)
         self.tmp.close()
-        from models.catalog import (ModelCatalog, ModelEntry,
-                                    populate_llm_presets, populate_tts_engines)
+        from models.catalog import ModelCatalog, ModelEntry, populate_llm_presets, populate_tts_engines
         from models.orchestrator import ModelOrchestrator
         # Ensure tests don't depend on host machine tier
         self._tier_patcher = patch.object(
@@ -388,8 +384,12 @@ class TestModelLifecycleManager(unittest.TestCase):
 
     def setUp(self):
         from integrations.service_tools.model_lifecycle import (
-            ModelLifecycleManager, ModelState, ModelDevice, ModelPriority,
-            _PRIORITY_RANK)
+            _PRIORITY_RANK,
+            ModelDevice,
+            ModelLifecycleManager,
+            ModelPriority,
+            ModelState,
+        )
         self.MLM = ModelLifecycleManager
         self.ModelState = ModelState
         self.ModelDevice = ModelDevice
@@ -875,10 +875,14 @@ class TestIntegration(unittest.TestCase):
 
     def test_crash_recovery_syncs_catalog(self):
         """When lifecycle detects crash → catalog marks model as unloaded."""
+        from integrations.service_tools.model_lifecycle import (
+            ModelDevice,
+            ModelLifecycleManager,
+            ModelState,
+        )
+
         from models.catalog import ModelCatalog, ModelEntry
         from models.orchestrator import ModelOrchestrator
-        from integrations.service_tools.model_lifecycle import (
-            ModelLifecycleManager, ModelState, ModelDevice, ModelPriority)
 
         tmp = tempfile.NamedTemporaryFile(suffix='.json', delete=False)
         tmp.close()
@@ -911,11 +915,10 @@ class TestIntegration(unittest.TestCase):
 
     def test_full_lifecycle_flow(self):
         """notify_loaded → notify_access → mark healthy → notify_unloaded"""
-        from models.catalog import (ModelCatalog, ModelEntry,
-                                    populate_llm_presets, populate_tts_engines)
+        from integrations.service_tools.model_lifecycle import ModelDevice, ModelLifecycleManager, ModelState
+
+        from models.catalog import ModelCatalog, populate_llm_presets, populate_tts_engines
         from models.orchestrator import ModelOrchestrator
-        from integrations.service_tools.model_lifecycle import (
-            ModelLifecycleManager, ModelState, ModelDevice)
 
         tmp = tempfile.NamedTemporaryFile(suffix='.json', delete=False)
         tmp.close()
@@ -950,7 +953,11 @@ class TestIntegration(unittest.TestCase):
     def test_swap_queue_entry_format(self):
         """Swap queue entries have correct structure."""
         from integrations.service_tools.model_lifecycle import (
-            ModelLifecycleManager, ModelState, ModelDevice, ModelPriority)
+            ModelDevice,
+            ModelLifecycleManager,
+            ModelPriority,
+            ModelState,
+        )
 
         mlm = ModelLifecycleManager()
         mlm._models['old'] = ModelState(
@@ -1038,7 +1045,7 @@ class TestBypassPathSync(unittest.TestCase):
     """Verify that bypass paths contain notify_* calls."""
 
     def _file_contains(self, filepath, pattern):
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(filepath, encoding='utf-8', errors='ignore') as f:
             return pattern in f.read()
 
     def test_main_auto_setup_has_notify(self):
@@ -1064,7 +1071,7 @@ class TestBypassPathSync(unittest.TestCase):
             "chatbot_routes.py tts_install must call notify_downloaded")
 
     def test_chatbot_routes_voice_transcribe_has_notify(self):
-        content = open('routes/chatbot_routes.py', 'r',
+        content = open('routes/chatbot_routes.py',
                        encoding='utf-8', errors='ignore').read()
         self.assertIn('notify_loaded', content,
                       "voice_transcribe must have notify_loaded for STT")
@@ -1095,8 +1102,7 @@ class TestThreadSafety(unittest.TestCase):
     """Verify concurrent access doesn't crash."""
 
     def test_concurrent_notify_access(self):
-        from integrations.service_tools.model_lifecycle import (
-            ModelLifecycleManager, ModelState, ModelDevice)
+        from integrations.service_tools.model_lifecycle import ModelDevice, ModelLifecycleManager, ModelState
 
         mlm = ModelLifecycleManager()
         mlm._models['concurrent'] = ModelState(
@@ -1153,7 +1159,11 @@ class TestThreadSafety(unittest.TestCase):
 
     def test_concurrent_swap_requests(self):
         from integrations.service_tools.model_lifecycle import (
-            ModelLifecycleManager, ModelState, ModelDevice, ModelPriority)
+            ModelDevice,
+            ModelLifecycleManager,
+            ModelPriority,
+            ModelState,
+        )
 
         mlm = ModelLifecycleManager()
         mlm._do_unload = MagicMock()
@@ -1220,8 +1230,8 @@ class TestLlamaLoaderEntryToPreset(unittest.TestCase):
 
     def test_entry_to_preset_returns_model_preset(self):
         """_entry_to_preset() converts a ModelEntry into a ModelPreset."""
-        from models.orchestrator import _entry_to_preset
         from llama.llama_installer import ModelPreset
+        from models.orchestrator import _entry_to_preset
         entry = self._make_llm_entry()
         preset = _entry_to_preset(entry)
         self.assertIsNotNone(preset, "Expected a ModelPreset, got None")
@@ -1288,8 +1298,8 @@ class TestLlamaLoaderEntryToPreset(unittest.TestCase):
 
     def test_entry_to_preset_missing_model_file_returns_none(self):
         """_entry_to_preset returns None when files['model'] is absent."""
-        from models.orchestrator import _entry_to_preset
         from models.catalog import ModelEntry, ModelType
+        from models.orchestrator import _entry_to_preset
         entry = ModelEntry(
             id='llm-no-file', name='No File Model',
             model_type=ModelType.LLM,
@@ -1300,8 +1310,8 @@ class TestLlamaLoaderEntryToPreset(unittest.TestCase):
 
     def test_resolve_preset_and_index_known_model(self):
         """_resolve_preset_and_index returns (preset, int_index) for a known built-in model."""
-        from models.orchestrator import LlamaLoader
         from llama.llama_installer import MODEL_PRESETS
+        from models.orchestrator import LlamaLoader
         loader = LlamaLoader()
         # Use the first built-in preset as the target
         target = MODEL_PRESETS[0]
@@ -1333,8 +1343,8 @@ class TestLlamaLoaderEntryToPreset(unittest.TestCase):
 
     def test_resolve_preset_matches_by_display_name(self):
         """_resolve_preset_and_index can match via display_name alone (file_name different)."""
-        from models.orchestrator import LlamaLoader
         from llama.llama_installer import MODEL_PRESETS
+        from models.orchestrator import LlamaLoader
         loader = LlamaLoader()
         target = MODEL_PRESETS[0]
         # Use correct display_name but a bogus file_name to test name-based fallback
@@ -1353,8 +1363,8 @@ class TestTTSLoaderDownload(unittest.TestCase):
     """Tests for TTSLoader.download() — verifies install_backend_full is called."""
 
     def setUp(self):
-        from models.orchestrator import TTSLoader
         from models.catalog import ModelEntry, ModelType
+        from models.orchestrator import TTSLoader
         self.loader = TTSLoader()
         self.entry = ModelEntry(
             id='tts-chatterbox_turbo',
@@ -1408,8 +1418,8 @@ class TestSTTLoaderDownload(unittest.TestCase):
     """Tests for STTLoader.download() — verifies faster-whisper pip install is attempted."""
 
     def setUp(self):
-        from models.orchestrator import STTLoader
         from models.catalog import ModelEntry, ModelType
+        from models.orchestrator import STTLoader
         self.loader = STTLoader()
         self.entry = ModelEntry(
             id='stt-whisper-base',
@@ -1428,7 +1438,6 @@ class TestSTTLoaderDownload(unittest.TestCase):
 
     def test_download_installs_faster_whisper_via_subprocess_when_missing(self):
         """When faster_whisper is absent, subprocess.run is called with pip install."""
-        import subprocess as sp
         mock_result = MagicMock()
         mock_result.returncode = 0
         # find_spec returns None for faster_whisper (not installed)
@@ -1448,7 +1457,6 @@ class TestSTTLoaderDownload(unittest.TestCase):
 
     def test_download_returns_false_when_pip_fails(self):
         """When pip install exits with non-zero, download returns False."""
-        import subprocess as sp
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stderr = 'some error'

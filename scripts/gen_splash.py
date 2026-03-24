@@ -4,6 +4,7 @@ This ensures all Indic scripts (Tamil, Devanagari, Bengali, Telugu, etc.)
 render with proper complex text shaping via the browser's HarfBuzz engine.
 """
 import os
+
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))

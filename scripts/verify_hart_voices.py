@@ -100,7 +100,7 @@ GENERATE_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'generate_hart_voices.py')
 
 
 def load_lines_dict():
-    with open(GENERATE_SCRIPT, 'r', encoding='utf-8') as f:
+    with open(GENERATE_SCRIPT, encoding='utf-8') as f:
         content = f.read()
     lines_start = content.index('LINES = {')
     brace_count = 0
@@ -123,7 +123,7 @@ def update_lines_text(line_id, lang, new_text):
     Finds the line matching '<lang>': "..." within the '<line_id>': { } block
     and replaces the text value. Returns True if updated, False if not found.
     """
-    with open(GENERATE_SCRIPT, 'r', encoding='utf-8') as f:
+    with open(GENERATE_SCRIPT, encoding='utf-8') as f:
         content = f.read()
 
     # Find the line_id block: e.g. 'greeting': {
@@ -214,8 +214,9 @@ def verify_all(target_langs=None, model_name='base'):
 
 def run_server(port=8765, model_name='large-v3-turbo'):
     """Start a local HTTP server that serves Whisper transcription on demand."""
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-    from urllib.parse import urlparse, parse_qs
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
+
     from faster_whisper import WhisperModel
 
     lines_dict = load_lines_dict()
@@ -228,15 +229,15 @@ def run_server(port=8765, model_name='large-v3-turbo'):
 
     # Load existing results JSON for persistence
     if os.path.isfile(RESULTS_PATH):
-        with open(RESULTS_PATH, 'r', encoding='utf-8') as f:
+        with open(RESULTS_PATH, encoding='utf-8') as f:
             state['results'] = json.load(f)
         print(f"Loaded existing results: {RESULTS_PATH}")
     else:
         state['results'] = {}
 
-    import threading
-    import subprocess
     import shutil
+    import subprocess
+    import threading
     results_lock = threading.Lock()
 
     def _save_results():
@@ -545,13 +546,13 @@ def run_server(port=8765, model_name='large-v3-turbo'):
             pass  # suppress default access logs
 
     server = HTTPServer(('127.0.0.1', port), Handler)
-    print(f"\nEndpoints:")
-    print(f"  GET  /status")
-    print(f"  GET  /transcribe?lang=en&line=greeting   (auto-saves to results JSON)")
-    print(f"  GET  /switch-model?model=large-v3-turbo")
-    print(f"  GET  /rebuild-html                        (rebuild HTML from saved results)")
-    print(f"  POST /regenerate  {{lang, line, text}}      (update text + regenerate audio + verify)")
-    print(f"\nPress Ctrl+C to stop.\n")
+    print("\nEndpoints:")
+    print("  GET  /status")
+    print("  GET  /transcribe?lang=en&line=greeting   (auto-saves to results JSON)")
+    print("  GET  /switch-model?model=large-v3-turbo")
+    print("  GET  /rebuild-html                        (rebuild HTML from saved results)")
+    print("  POST /regenerate  {lang, line, text}      (update text + regenerate audio + verify)")
+    print("\nPress Ctrl+C to stop.\n")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -789,7 +790,7 @@ col.c-sim {{ width: 50px; }} col.c-det {{ width: 35px; }} col.c-flag {{ width: 9
             f.write(f'<tr class="{row_class}" id="{row_id}" data-lang="{html_mod.escape(lang)}" data-line="{html_mod.escape(lid)}" data-flag="{html_mod.escape(flag)}" data-clip="{clip_data}" data-sim="{sim:.1f}">')
             # Escape expected text for data attribute (double-quote safe)
             expected_attr = html_mod.escape(expected, quote=True)
-            f.write(f'<td><div class="action-btns">')
+            f.write('<td><div class="action-btns">')
             f.write(f'<button class="play-btn" onclick="playAudio(this, \'{html_mod.escape(audio_path)}\')">&#9654;</button>')
             f.write(f'<button class="retranscribe-btn" onclick="retranscribeRow(\'{html_mod.escape(lang)}\', \'{html_mod.escape(lid)}\', this)" title="Re-transcribe with Whisper">&#8635;</button>')
             f.write(f'<button class="regen-btn" onclick="regenerateRow(\'{html_mod.escape(lang)}\', \'{html_mod.escape(lid)}\', this)" title="Edit text &amp; regenerate audio">&#x1F504;</button>')
@@ -1206,7 +1207,7 @@ def main():
 
     if args.skip_verify:
         if os.path.isfile(RESULTS_PATH):
-            with open(RESULTS_PATH, 'r', encoding='utf-8') as f:
+            with open(RESULTS_PATH, encoding='utf-8') as f:
                 results = json.load(f)
             print(f"Using existing results: {RESULTS_PATH}")
         else:

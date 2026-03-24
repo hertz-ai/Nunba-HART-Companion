@@ -9,13 +9,10 @@ Covers:
 - main.py: Flask app creation, route registration, CORS, static serving,
   /local route, security helpers, device ID, probe/status endpoints
 """
-import io
-import json
 import os
 import sys
 import tempfile
-import textwrap
-from unittest.mock import patch, MagicMock, mock_open, call
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
@@ -44,7 +41,7 @@ class TestDepsVersion:
         assert len(parts) >= 2
 
     def test_version_tuple(self):
-        from scripts.deps import version_tuple, VERSION
+        from scripts.deps import VERSION, version_tuple
         vt = version_tuple()
         assert isinstance(vt, tuple)
         assert all(isinstance(x, int) for x in vt)
@@ -59,7 +56,7 @@ class TestDepsVersion:
 
     def test_version_win32_pads_zeros(self):
         """version_win32 pads to 4 parts with zeros."""
-        from scripts.deps import version_win32, VERSION
+        from scripts.deps import VERSION, version_win32
         v = version_win32()
         expected_parts = VERSION.split(".")
         while len(expected_parts) < 4:
@@ -67,7 +64,7 @@ class TestDepsVersion:
         assert v == ".".join(expected_parts[:4])
 
     def test_version_short(self):
-        from scripts.deps import version_short, VERSION
+        from scripts.deps import VERSION, version_short
         vs = version_short()
         parts = VERSION.split(".")
         assert vs == ".".join(parts[:2])
@@ -101,7 +98,7 @@ class TestDepsInstallLists:
         assert len(flask_deps) >= 1
 
     def test_get_venv_install_list_win32_has_platform_deps(self):
-        from scripts.deps import get_venv_install_list, PLATFORM_DEPS
+        from scripts.deps import PLATFORM_DEPS, get_venv_install_list
         deps = get_venv_install_list(platform="win32")
         if "win32" in PLATFORM_DEPS:
             for name in PLATFORM_DEPS["win32"]:
@@ -110,7 +107,7 @@ class TestDepsInstallLists:
 
     def test_get_venv_install_list_unknown_platform(self):
         """Unknown platform returns only core deps."""
-        from scripts.deps import get_venv_install_list, CORE_DEPS
+        from scripts.deps import CORE_DEPS, get_venv_install_list
         deps = get_venv_install_list(platform="freebsd")
         assert len(deps) == len(CORE_DEPS)
 
@@ -127,7 +124,7 @@ class TestDepsInstallLists:
         assert len(torch_deps) >= 1
 
     def test_get_torch_spec_with_version(self):
-        from scripts.deps import get_torch_spec, EMBED_DEPS
+        from scripts.deps import EMBED_DEPS, get_torch_spec
         spec = get_torch_spec()
         if EMBED_DEPS.get("torch"):
             assert spec.startswith("torch==")
@@ -135,7 +132,7 @@ class TestDepsInstallLists:
             assert spec == "torch"
 
     def test_get_all_deps_combines_all(self):
-        from scripts.deps import get_all_deps, CORE_DEPS, EMBED_DEPS, PLATFORM_DEPS
+        from scripts.deps import CORE_DEPS, EMBED_DEPS, get_all_deps
         all_d = get_all_deps()
         # Should contain at least all core deps
         for name in CORE_DEPS:
@@ -263,8 +260,9 @@ class TestBuildRunCommand:
 
     @patch('scripts.build.subprocess.run')
     def test_run_command_failure_returns_false(self, mock_run):
-        from scripts.build import run_command
         import subprocess
+
+        from scripts.build import run_command
         mock_run.side_effect = subprocess.CalledProcessError(1, 'cmd')
         result = run_command(['bad_cmd'], check=True)
         assert result is False
@@ -380,7 +378,7 @@ class TestBuildPlatformDetection:
     """Test platform detection constants in build.py."""
 
     def test_platform_constants_are_bool(self):
-        from scripts.build import IS_WINDOWS, IS_MACOS, IS_LINUX
+        from scripts.build import IS_LINUX, IS_MACOS, IS_WINDOWS
         assert isinstance(IS_WINDOWS, bool)
         assert isinstance(IS_MACOS, bool)
         assert isinstance(IS_LINUX, bool)
@@ -491,8 +489,9 @@ class TestFlaskAppCreation:
     """Test that the Flask app is properly created."""
 
     def test_app_exists(self):
-        from main import app
         from flask import Flask
+
+        from main import app
         assert isinstance(app, Flask)
 
     def test_app_has_no_default_static_folder(self):

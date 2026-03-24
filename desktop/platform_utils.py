@@ -8,10 +8,10 @@ Provides platform-specific functionality for:
 - Autostart configuration
 - Console window hiding
 """
-import os
-import sys
 import logging
+import os
 import subprocess
+import sys
 
 logger = logging.getLogger('NunbaPlatform')
 
@@ -64,7 +64,7 @@ def _get_screen_dimensions_windows():
     and divide accordingly so the values are safe for window positioning.
     """
     import ctypes
-    from ctypes import windll, Structure, byref
+    from ctypes import Structure, byref, windll
     from ctypes.wintypes import RECT
 
     class RECT(Structure):

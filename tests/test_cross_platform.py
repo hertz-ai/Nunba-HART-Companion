@@ -8,7 +8,6 @@ for Windows, macOS, and Linux. Also validates package restructuring
 import ast
 import importlib
 import os
-import re
 import sys
 import unittest
 
@@ -115,7 +114,7 @@ class TestAppPyCrossPlatform(unittest.TestCase):
 
     def setUp(self):
         self.app_py = os.path.join(PROJ_ROOT, 'app.py')
-        with open(self.app_py, 'r', encoding='utf-8') as f:
+        with open(self.app_py, encoding='utf-8') as f:
             self.code = f.read()
 
     def test_syntax_valid(self):
@@ -162,14 +161,14 @@ class TestBuildScripts(unittest.TestCase):
     def test_build_py_syntax(self):
         """scripts/build.py should have valid Python syntax"""
         build_py = os.path.join(PROJ_ROOT, 'scripts', 'build.py')
-        with open(build_py, 'r', encoding='utf-8') as f:
+        with open(build_py, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
     def test_build_py_has_all_platforms(self):
         """build.py should support all platforms"""
         build_py = os.path.join(PROJ_ROOT, 'scripts', 'build.py')
-        with open(build_py, 'r', encoding='utf-8') as f:
+        with open(build_py, encoding='utf-8') as f:
             code = f.read()
         self.assertIn('def build_windows', code)
         self.assertIn('def build_macos', code)
@@ -178,21 +177,21 @@ class TestBuildScripts(unittest.TestCase):
     def test_setup_freeze_nunba_syntax(self):
         """scripts/setup_freeze_nunba.py should have valid Python syntax"""
         setup_file = os.path.join(PROJ_ROOT, 'scripts', 'setup_freeze_nunba.py')
-        with open(setup_file, 'r', encoding='utf-8') as f:
+        with open(setup_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
     def test_setup_freeze_mac_syntax(self):
         """scripts/setup_freeze_mac.py should have valid Python syntax"""
         setup_file = os.path.join(PROJ_ROOT, 'scripts', 'setup_freeze_mac.py')
-        with open(setup_file, 'r', encoding='utf-8') as f:
+        with open(setup_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
     def test_setup_freeze_mac_has_info_plist(self):
         """setup_freeze_mac.py should generate Info.plist"""
         setup_file = os.path.join(PROJ_ROOT, 'scripts', 'setup_freeze_mac.py')
-        with open(setup_file, 'r', encoding='utf-8') as f:
+        with open(setup_file, encoding='utf-8') as f:
             code = f.read()
         self.assertIn('Info.plist', code)
         self.assertIn('CFBundleIdentifier', code)
@@ -207,14 +206,14 @@ class TestBuildScripts(unittest.TestCase):
     def test_build_bat_delegates_to_scripts(self):
         """build.bat should invoke scripts/build.py"""
         bat_file = os.path.join(PROJ_ROOT, 'scripts', 'build.bat')
-        with open(bat_file, 'r') as f:
+        with open(bat_file) as f:
             code = f.read()
         self.assertIn('scripts\\build.py', code.replace('/', '\\'))
 
     def test_build_mac_delegates_to_scripts(self):
         """build_mac.sh should invoke scripts/build.py"""
         sh_file = os.path.join(PROJ_ROOT, 'scripts', 'build_mac.sh')
-        with open(sh_file, 'r') as f:
+        with open(sh_file) as f:
             code = f.read()
         self.assertIn('scripts/build.py', code)
 
@@ -225,14 +224,14 @@ class TestLlamaConfigCrossPlatform(unittest.TestCase):
     def test_syntax_valid(self):
         """llama/llama_config.py should have valid Python syntax"""
         config_file = os.path.join(PROJ_ROOT, 'llama', 'llama_config.py')
-        with open(config_file, 'r', encoding='utf-8') as f:
+        with open(config_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
     def test_subprocess_uses_flags(self):
         """llama_config.py subprocess calls should use platform flags"""
         config_file = os.path.join(PROJ_ROOT, 'llama', 'llama_config.py')
-        with open(config_file, 'r', encoding='utf-8') as f:
+        with open(config_file, encoding='utf-8') as f:
             code = f.read()
         # Should have STARTUPINFO for Windows
         self.assertIn('STARTUPINFO', code)
@@ -253,7 +252,7 @@ class TestAIInstaller(unittest.TestCase):
     def test_platform_detection(self):
         """get_platform_name should return valid platform"""
         sys.path.insert(0, PROJ_ROOT)
-        from desktop.ai_installer import get_platform_name, IS_WINDOWS, IS_MACOS, IS_LINUX
+        from desktop.ai_installer import IS_LINUX, IS_MACOS, IS_WINDOWS, get_platform_name
         name = get_platform_name()
         self.assertIsInstance(name, str)
         self.assertTrue(len(name) > 0)
@@ -304,7 +303,7 @@ class TestTTSEngine(unittest.TestCase):
     def test_syntax_valid(self):
         """tts/tts_engine.py should have valid Python syntax"""
         tts_file = os.path.join(PROJ_ROOT, 'tts', 'tts_engine.py')
-        with open(tts_file, 'r', encoding='utf-8') as f:
+        with open(tts_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
@@ -323,7 +322,7 @@ class TestVibeVoiceTTS(unittest.TestCase):
     def test_syntax_valid(self):
         """tts/vibevoice_tts.py should have valid Python syntax"""
         vv_file = os.path.join(PROJ_ROOT, 'tts', 'vibevoice_tts.py')
-        with open(vv_file, 'r', encoding='utf-8') as f:
+        with open(vv_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
@@ -341,7 +340,7 @@ class TestPiperTTS(unittest.TestCase):
     def test_syntax_valid(self):
         """tts/piper_tts.py should have valid Python syntax"""
         piper_file = os.path.join(PROJ_ROOT, 'tts', 'piper_tts.py')
-        with open(piper_file, 'r', encoding='utf-8') as f:
+        with open(piper_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
@@ -422,7 +421,7 @@ class TestRoutesPackage(unittest.TestCase):
     def test_chatbot_routes_internal_import(self):
         """chatbot_routes should import from routes.hartos_backend_adapter (not flat)"""
         routes_file = os.path.join(PROJ_ROOT, 'routes', 'chatbot_routes.py')
-        with open(routes_file, 'r', encoding='utf-8') as f:
+        with open(routes_file, encoding='utf-8') as f:
             code = f.read()
         # Must NOT have bare "from hartos_backend_adapter"
         self.assertNotIn('from hartos_backend_adapter ', code,
@@ -462,7 +461,7 @@ class TestDesktopPackage(unittest.TestCase):
             except Exception as e:
                 failures.append(f"{mod_name}: {e}")
         self.assertEqual(failures, [],
-                         f"Desktop module import failures:\n" +
+                         "Desktop module import failures:\n" +
                          "\n".join(failures))
 
 
@@ -525,7 +524,7 @@ class TestHartosModules(unittest.TestCase):
                 # on partially loaded namespace packages — module is still importable
                 pass
         self.assertEqual(failures, [],
-                         f"HARTOS modules not found:\n" + "\n".join(failures))
+                         "HARTOS modules not found:\n" + "\n".join(failures))
 
 
 class TestLangchainImportChain(unittest.TestCase):
@@ -583,7 +582,7 @@ class TestBuildPackageReferences(unittest.TestCase):
 
     def _read_file(self, *path_parts):
         fpath = os.path.join(PROJ_ROOT, *path_parts)
-        with open(fpath, 'r', encoding='utf-8') as f:
+        with open(fpath, encoding='utf-8') as f:
             return f.read()
 
     def test_setup_freeze_nunba_uses_package_prefixed_routes(self):
@@ -649,7 +648,7 @@ class TestAppPyValidationChain(unittest.TestCase):
     """Verify that app.py's validation chain uses package-prefixed module names."""
 
     def setUp(self):
-        with open(os.path.join(PROJ_ROOT, 'app.py'), 'r', encoding='utf-8') as f:
+        with open(os.path.join(PROJ_ROOT, 'app.py'), encoding='utf-8') as f:
             self.code = f.read()
 
     def test_validation_uses_package_prefixed_routes(self):
@@ -684,7 +683,7 @@ class TestRuffConfig(unittest.TestCase):
         ruff_file = os.path.join(PROJ_ROOT, 'ruff.toml')
         if not os.path.isfile(ruff_file):
             self.skipTest("ruff.toml not found")
-        with open(ruff_file, 'r') as f:
+        with open(ruff_file) as f:
             code = f.read()
         for pkg in ('routes', 'desktop', 'llama', 'tts'):
             self.assertIn(f'"{pkg}"', code,
@@ -697,14 +696,14 @@ class TestMainImportSmokeTest(unittest.TestCase):
     def test_main_syntax_valid(self):
         """main.py should have valid Python syntax (avoids full import which starts Flask)."""
         main_file = os.path.join(PROJ_ROOT, 'main.py')
-        with open(main_file, 'r', encoding='utf-8') as f:
+        with open(main_file, encoding='utf-8') as f:
             code = f.read()
         ast.parse(code)
 
     def test_main_has_create_app(self):
         """main.py should define create_app or app."""
         main_file = os.path.join(PROJ_ROOT, 'main.py')
-        with open(main_file, 'r', encoding='utf-8') as f:
+        with open(main_file, encoding='utf-8') as f:
             code = f.read()
         self.assertTrue('Flask' in code, "main.py should use Flask")
 

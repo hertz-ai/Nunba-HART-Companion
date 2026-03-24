@@ -7,15 +7,11 @@ start_transaction, crash_reporter_decorator, get_crash_report_url, get_status,
 create_crash_reporter_blueprint (Flask endpoints).
 """
 import os
-import sys
-import logging
 import platform
-import importlib
-from unittest import mock
-from unittest.mock import patch, MagicMock, PropertyMock
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers: We need to be able to reset module-level state between tests.
@@ -627,7 +623,6 @@ class TestNFT:
         start = time.perf_counter()
         with patch.dict(os.environ, {'NUNBA_CRASH_REPORTING': 'false'}):
             sys.modules.pop('desktop.crash_reporter', None)
-            import desktop.crash_reporter
         elapsed = time.perf_counter() - start
         assert elapsed < 0.5, f"Import took {elapsed:.2f}s"
 

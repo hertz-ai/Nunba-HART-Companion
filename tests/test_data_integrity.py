@@ -11,9 +11,6 @@ NFT: No hardcoded paths, all URLs HTTPS, no empty required fields,
 """
 import os
 import sys
-import json
-
-import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -148,7 +145,7 @@ class TestTTSConstantsIntegrity:
         assert 'piper' in _CATALOG_TO_BACKEND
 
     def test_backend_to_catalog_round_trips(self):
-        from tts.tts_engine import _CATALOG_TO_BACKEND, _BACKEND_TO_CATALOG
+        from tts.tts_engine import _BACKEND_TO_CATALOG, _CATALOG_TO_BACKEND
         for backend, catalog_id in _BACKEND_TO_CATALOG.items():
             resolved = _CATALOG_TO_BACKEND.get(catalog_id)
             assert resolved == backend, f"Round-trip failed: {backend}→{catalog_id}→{resolved}"
@@ -163,10 +160,12 @@ class TestVersionIntegrity:
 
     def test_deps_version_is_semver(self):
         import re
+
         from scripts.deps import VERSION
         assert re.match(r'^\d+\.\d+\.\d+', VERSION)
 
     def test_python_embed_version_valid(self):
         import re
+
         from scripts.deps import PYTHON_EMBED_VERSION
         assert re.match(r'^\d+\.\d+\.\d+', PYTHON_EMBED_VERSION)

@@ -7,15 +7,15 @@ No environment variable needed. Keys are locked to the machine.
 Vault file: ~/.nunba/ai_keys.enc
 Salt file:  ~/.nunba/vault.salt
 """
-import os
-import sys
-import json
-import uuid
 import base64
+import json
 import logging
+import os
 import platform
+import sys
+import uuid
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any, Optional
 
 logger = logging.getLogger('NunbaVault')
 
@@ -131,8 +131,8 @@ def _get_machine_identity() -> str:
 def _derive_fernet_key(salt: bytes) -> Any:
     """Derive a Fernet key from machine identity + salt."""
     from cryptography.fernet import Fernet
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
     machine_id = _get_machine_identity()
     kdf = PBKDF2HMAC(
@@ -153,7 +153,7 @@ class AIKeyVault:
     def __init__(self):
         _NUNBA_DIR.mkdir(parents=True, exist_ok=True)
         self._fernet = self._init_fernet()
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
         self._load()
 
     @classmethod
@@ -198,22 +198,22 @@ class AIKeyVault:
     # ------------------------------------------------------------------
     # Provider config CRUD
     # ------------------------------------------------------------------
-    def set_provider_config(self, provider_id: str, config: Dict[str, str]):
+    def set_provider_config(self, provider_id: str, config: dict[str, str]):
         """Store provider config (api_key, model, base_url, api_version)."""
         self._cache[provider_id] = config
         self._save()
 
-    def get_provider_config(self, provider_id: str) -> Optional[Dict[str, str]]:
+    def get_provider_config(self, provider_id: str) -> dict[str, str] | None:
         return self._cache.get(provider_id)
 
-    def get_active_provider(self) -> Optional[str]:
+    def get_active_provider(self) -> str | None:
         return self._cache.get('_active_provider')
 
     def set_active_provider(self, provider_id: str):
         self._cache['_active_provider'] = provider_id
         self._save()
 
-    def get_all_configured_providers(self) -> List[str]:
+    def get_all_configured_providers(self) -> list[str]:
         """Return provider IDs that have an api_key set."""
         return [
             k for k in self._cache
@@ -237,7 +237,7 @@ class AIKeyVault:
         tool_keys[key_name] = value
         self._save()
 
-    def get_tool_key(self, key_name: str) -> Optional[str]:
+    def get_tool_key(self, key_name: str) -> str | None:
         return self._cache.get('_tool_keys', {}).get(key_name)
 
     # ------------------------------------------------------------------
@@ -249,7 +249,7 @@ class AIKeyVault:
         channel_keys[f'{channel_type}/{key_name}'] = value
         self._save()
 
-    def get_channel_secret(self, channel_type: str, key_name: str) -> Optional[str]:
+    def get_channel_secret(self, channel_type: str, key_name: str) -> str | None:
         """Retrieve a channel secret at runtime. Returns None if not set."""
         return self._cache.get('_channel_secrets', {}).get(f'{channel_type}/{key_name}')
 
@@ -346,7 +346,7 @@ class AIKeyVault:
             return False
 
         try:
-            with open(config_json_path, 'r') as f:
+            with open(config_json_path) as f:
                 cfg = json.load(f)
         except Exception as e:
             logger.error(f"Failed to read config.json for migration: {e}")
@@ -397,7 +397,7 @@ class AIKeyVault:
     # ------------------------------------------------------------------
     @staticmethod
     def test_provider_connection(provider_id: str, api_key: str,
-                                 base_url: str = '', api_version: str = '') -> Dict:
+                                 base_url: str = '', api_version: str = '') -> dict:
         """Test connection to a cloud provider. Returns {success, message, model_count}."""
         import requests
 
@@ -449,7 +449,7 @@ class AIKeyVault:
                 return {'success': False, 'message': f'HTTP {resp.status_code}: {resp.text[:200]}'}
 
         except requests.exceptions.ConnectionError:
-            return {'success': False, 'message': f'Connection failed — check endpoint URL'}
+            return {'success': False, 'message': 'Connection failed — check endpoint URL'}
         except requests.exceptions.Timeout:
             return {'success': False, 'message': 'Connection timed out (10s)'}
         except Exception as e:

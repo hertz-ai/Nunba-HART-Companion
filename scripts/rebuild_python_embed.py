@@ -23,9 +23,9 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 import zipfile
-import tempfile
 
 # --- Config ---
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -41,8 +41,7 @@ LLM_LANGCHAIN_SRC = os.path.join(os.path.dirname(PROJECT_DIR),
 # Import version + deps from centralized deps.py
 if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
-from deps import (PYTHON_EMBED_VERSION, get_embed_install_list, get_torch_spec,
-                  TORCH_INDEX_URL, EMBED_DEPS)
+from deps import EMBED_DEPS, PYTHON_EMBED_VERSION, TORCH_INDEX_URL, get_embed_install_list, get_torch_spec
 
 PY_VERSION = PYTHON_EMBED_VERSION
 PY_EMBED_URL = f"https://www.python.org/ftp/python/{PY_VERSION}/python-{PY_VERSION}-embed-amd64.zip"
@@ -106,7 +105,7 @@ def main():
     pth_files = [f for f in os.listdir(EMBED_DIR) if f.endswith("._pth")]
     if pth_files:
         pth_path = os.path.join(EMBED_DIR, pth_files[0])
-        with open(pth_path, "r") as f:
+        with open(pth_path) as f:
             content = f.read()
         # Uncomment "import site" and add Lib path
         content = content.replace("#import site", "import site")

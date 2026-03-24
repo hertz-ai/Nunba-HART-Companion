@@ -11,10 +11,8 @@ NFT: No duplicate packages, no conflicting versions, HTTPS for torch URL,
      version strings are valid semver-ish.
 """
 import os
-import sys
 import re
-
-import pytest
+import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -171,7 +169,7 @@ class TestHelperFunctions:
         assert '==' in spec  # Should be pinned
 
     def test_get_all_deps_merges_all_sources(self):
-        from scripts.deps import get_all_deps, CORE_DEPS, EMBED_DEPS
+        from scripts.deps import get_all_deps
         all_deps = get_all_deps()
         # Should contain both core and embed
         assert 'flask' in all_deps

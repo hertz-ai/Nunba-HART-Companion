@@ -3,15 +3,15 @@
 Rewrites greeting, reveal_intro, and post_reveal across all 25 languages.
 Also checks all other lines for English code-mixing in Indic scripts.
 """
+import io
 import re
 import sys
-import io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 FILEPATH = 'scripts/generate_hart_voices.py'
 
-with open(FILEPATH, 'r', encoding='utf-8') as f:
+with open(FILEPATH, encoding='utf-8') as f:
     content = f.read()
 
 # ═══════════════════════════════════════════════════════════════

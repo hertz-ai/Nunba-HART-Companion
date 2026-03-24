@@ -17,11 +17,9 @@ Covers all public functions and route handlers:
 """
 import json
 import os
-import sys
 import sqlite3
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -50,6 +48,7 @@ def db_app(tmp_nunba_dir):
     with patch.dict(os.environ, {"NUNBA_DATA_DIR": tmp_nunba_dir}):
         # Force reload of the module so it picks up the patched env
         import importlib
+
         import routes.db_routes as db_mod
         importlib.reload(db_mod)
 
@@ -669,7 +668,7 @@ class TestAddBatchLayouts:
             "total_pages_in_book": 10,
         })
         # Verify pdf_files record was updated
-        resp = client.get(f"/db/pdf_files?user_id=1")
+        resp = client.get("/db/pdf_files?user_id=1")
         pdfs = resp.get_json()
         match = [p for p in pdfs if p["file_id"] == file_id]
         assert len(match) == 1
@@ -699,7 +698,6 @@ class TestAddBatchLayouts:
 
     def test_batch_layouts_no_file_id_fails_integrity(self, client):
         """When file_id is None, INSERT fails due to NOT NULL constraint on page_layouts.file_id."""
-        import sqlite3
         with pytest.raises(sqlite3.IntegrityError, match="NOT NULL"):
             client.post("/add_batch_layouts", json={
                 "file_id": None,

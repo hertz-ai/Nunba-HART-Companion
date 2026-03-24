@@ -7,10 +7,10 @@ a Nunba-managed server or an external llama.cpp installation.
 """
 
 import logging
-import requests
-from flask import Flask, jsonify, request
-from typing import Optional
 import time
+
+import requests
+from flask import Flask, jsonify
 
 logger = logging.getLogger('NunbaLlamaHealth')
 
@@ -18,7 +18,7 @@ logger = logging.getLogger('NunbaLlamaHealth')
 class LlamaHealthWrapper:
     """Wraps llama.cpp health endpoint with Nunba identification"""
 
-    def __init__(self, llama_port: int = 8080, wrapper_port: Optional[int] = None):
+    def __init__(self, llama_port: int = 8080, wrapper_port: int | None = None):
         """
         Initialize health wrapper
 

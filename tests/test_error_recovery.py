@@ -11,9 +11,7 @@ NFT: No unhandled exceptions, response always JSON-serializable,
 """
 import os
 import sys
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -104,7 +102,7 @@ class TestCatalogWithoutHARTOS:
 
     def test_catalog_has_llm_entries_from_local(self):
         """LLM entries come from Nunba's populate_llm_presets — always available."""
-        from models.catalog import get_catalog, ModelType
+        from models.catalog import ModelType, get_catalog
         cat = get_catalog()
         llms = cat.list_by_type(ModelType.LLM)
         assert len(llms) >= 2
@@ -120,6 +118,7 @@ class TestConfigCorruption:
     def test_llama_config_with_fresh_dir(self):
         """New config dir (first run) must create valid defaults."""
         import tempfile
+
         from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as d:
             cfg = LlamaConfig(config_dir=d)
@@ -128,8 +127,9 @@ class TestConfigCorruption:
 
     def test_media_manifest_corruption_recovery(self):
         """Corrupt manifest.json must not crash — returns empty dict."""
-        from desktop.media_classification import _load_manifest
         import tempfile
+
+        from desktop.media_classification import _load_manifest
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             f.write('CORRUPT{{{')
             f.flush()

@@ -9,13 +9,12 @@ Handles installation of all AI components during setup:
 
 Cross-platform support: Windows, macOS, Linux
 """
-import os
-import sys
-import platform
-import logging
 import argparse
+import logging
+import platform
+import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Callable, Dict, List, Tuple
 
 logger = logging.getLogger('NunbaAIInstaller')
 
@@ -36,7 +35,7 @@ def get_platform_name() -> str:
     return platform.system()
 
 
-def detect_gpu() -> Dict:
+def detect_gpu() -> dict:
     """
     Detect GPU availability and type.
 
@@ -123,8 +122,8 @@ class AIInstaller:
     """
 
     def __init__(self,
-                 base_dir: Optional[str] = None,
-                 progress_callback: Optional[Callable[[str, int], None]] = None):
+                 base_dir: str | None = None,
+                 progress_callback: Callable[[str, int], None] | None = None):
         """
         Initialize AI installer.
 
@@ -156,7 +155,7 @@ class AIInstaller:
 
     def install_llama(self,
                       force_reinstall: bool = False,
-                      skip_model: bool = False) -> Tuple[bool, str]:
+                      skip_model: bool = False) -> tuple[bool, str]:
         """
         Install llama.cpp binary and default model.
 
@@ -168,8 +167,8 @@ class AIInstaller:
             Tuple of (success, message)
         """
         try:
-            from llama_installer import LlamaInstaller, MODEL_PRESETS
             from llama_config import initialize_llama_on_first_run
+            from llama_installer import MODEL_PRESETS, LlamaInstaller
 
             self._report_progress("Checking llama.cpp installation...", 5)
 
@@ -250,7 +249,7 @@ class AIInstaller:
 
     def install_tts(self,
                     force_reinstall: bool = False,
-                    include_vibevoice: bool = None) -> Tuple[bool, str]:
+                    include_vibevoice: bool = None) -> tuple[bool, str]:
         """
         Install TTS components — pip packages + model weights for this hardware tier.
         Nothing should need downloading after installation.
@@ -308,7 +307,7 @@ class AIInstaller:
         return all_success, "; ".join(messages)
 
     def _install_backend_full(self, backend: str, force_reinstall: bool,
-                               percent: int) -> Tuple[bool, str]:
+                               percent: int) -> tuple[bool, str]:
         """Install pip packages + model weights for a TTS backend."""
         try:
             from tts.package_installer import install_backend_full
@@ -323,7 +322,7 @@ class AIInstaller:
             return self._install_model_weights_only(backend, force_reinstall)
 
     def _install_model_weights_only(self, backend: str,
-                                     force_reinstall: bool = False) -> Tuple[bool, str]:
+                                     force_reinstall: bool = False) -> tuple[bool, str]:
         """Fallback: download model weights only (when package_installer unavailable)."""
         try:
             from tts.package_installer import _download_model_weights
@@ -335,10 +334,10 @@ class AIInstaller:
             logger.warning(f"Model weight download failed for {backend}: {e}")
             return True, f"Will download on first use ({e})"
 
-    def _install_piper_voice(self, force_reinstall: bool = False) -> Tuple[bool, str]:
+    def _install_piper_voice(self, force_reinstall: bool = False) -> tuple[bool, str]:
         """Pre-download default Piper voice (CPU fallback, ~20MB)."""
         try:
-            from tts.piper_tts import PiperTTS, DEFAULT_VOICE
+            from tts.piper_tts import DEFAULT_VOICE, PiperTTS
             tts = PiperTTS()
             if tts.is_voice_installed(DEFAULT_VOICE) and not force_reinstall:
                 return True, "Already downloaded"
@@ -355,7 +354,7 @@ class AIInstaller:
                     skip_tts: bool = False,
                     skip_vibevoice: bool = False,
                     force_reinstall: bool = False,
-                    skip_endpoint_scan: bool = False) -> Tuple[bool, Dict]:
+                    skip_endpoint_scan: bool = False) -> tuple[bool, dict]:
         """
         Install all AI components — auto-downloads models based on hardware.
 
@@ -387,7 +386,7 @@ class AIInstaller:
         if not skip_llama and not force_reinstall and not skip_endpoint_scan:
             self._report_progress("Scanning for existing AI endpoints...", 5)
             try:
-                from llama_config import scan_existing_llm_endpoints, scan_openai_compatible_ports, LlamaConfig
+                from llama_config import LlamaConfig, scan_existing_llm_endpoints, scan_openai_compatible_ports
 
                 existing = scan_existing_llm_endpoints()
                 if not existing:
@@ -457,7 +456,7 @@ class AIInstaller:
 
         return overall, results
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """
         Get status of all AI components.
 
@@ -523,7 +522,7 @@ class AIInstaller:
         return status
 
 
-def install_ai_components(progress_callback: Optional[Callable] = None,
+def install_ai_components(progress_callback: Callable | None = None,
                           skip_vibevoice: bool = False) -> bool:
     """
     Convenience function to install all AI components.

@@ -7,15 +7,10 @@ migrate_from_config_json, test_provider_connection).
 """
 import json
 import os
-import sys
-import tempfile
 import threading
-from pathlib import Path
-from unittest import mock
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # We mock out cryptography so tests run even if it is not installed.
@@ -106,8 +101,9 @@ class TestMachineIdentity:
         assert len(result) > 0
 
     def test_includes_mac_address(self):
-        from desktop.ai_key_vault import _get_machine_identity
         import uuid
+
+        from desktop.ai_key_vault import _get_machine_identity
         result = _get_machine_identity()
         assert str(uuid.getnode()) in result
 

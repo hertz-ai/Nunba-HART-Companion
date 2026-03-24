@@ -7,9 +7,11 @@ and media gen under one catalog + orchestrator.
 This package re-exports from HARTOS (canonical implementation) and adds
 Nunba-specific loaders and populators.
 """
-from models.catalog import ModelCatalog, ModelEntry, ModelType, MODEL_TYPES, get_catalog
+from models.catalog import MODEL_TYPES, ModelCatalog, ModelEntry, ModelType, get_catalog
 from models.orchestrator import (
-    ModelOrchestrator, ModelLoader, get_orchestrator,
+    ModelLoader,
+    ModelOrchestrator,
+    get_orchestrator,
 )
 
 __all__ = [

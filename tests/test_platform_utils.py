@@ -9,16 +9,15 @@ get_app_data_dir, get_log_dir, open_file_browser,
 get_subprocess_flags.
 """
 import os
-import sys
 import subprocess
+import sys
 import threading
 from unittest import mock
-from unittest.mock import patch, MagicMock, PropertyMock, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import desktop.platform_utils as pu
-
 
 # ===========================================================================
 # FT — Platform constants
@@ -348,7 +347,6 @@ class TestNFT:
         import time
         sys.modules.pop('desktop.platform_utils', None)
         start = time.perf_counter()
-        import desktop.platform_utils
         elapsed = time.perf_counter() - start
         assert elapsed < 0.5
 

@@ -25,7 +25,7 @@ import tempfile
 import time
 import types
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJ_ROOT)
@@ -923,6 +923,7 @@ class TestNunbaAdapterIntegration(unittest.TestCase):
     def test_adapter_chat_signature(self):
         """chat() should accept all expected parameters."""
         import inspect
+
         from routes.hartos_backend_adapter import chat
         # Unwrap the @with_fallback decorator
         fn = chat.__wrapped__ if hasattr(chat, '__wrapped__') else chat
@@ -939,6 +940,7 @@ class TestNunbaAdapterIntegration(unittest.TestCase):
     def test_adapter_payload_mapping(self):
         """Adapter should map text→prompt, agent_id→prompt_id in payload."""
         import inspect
+
         from routes.hartos_backend_adapter import chat
         fn = chat.__wrapped__ if hasattr(chat, '__wrapped__') else chat
         source = inspect.getsource(fn)
@@ -948,6 +950,7 @@ class TestNunbaAdapterIntegration(unittest.TestCase):
     def test_adapter_has_autonomous_param(self):
         """Adapter chat() should forward autonomous flag (MEDIUM bug fix)."""
         import inspect
+
         from routes.hartos_backend_adapter import chat
         fn = chat.__wrapped__ if hasattr(chat, '__wrapped__') else chat
         sig = inspect.signature(fn)

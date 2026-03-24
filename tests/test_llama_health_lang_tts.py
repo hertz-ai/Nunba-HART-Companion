@@ -15,12 +15,7 @@ Covers:
 import os
 import sys
 import time
-import json
-import threading
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock, PropertyMock, call
-from dataclasses import asdict
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -514,7 +509,7 @@ class TestPiperTTSDownloadVoice:
             assert mock_dl.call_count == 2  # model + config
 
     def test_download_voice_failure_cleans_up(self, piper, tmp_path):
-        with patch.object(piper, "_download_file", side_effect=IOError("network error")):
+        with patch.object(piper, "_download_file", side_effect=OSError("network error")):
             result = piper.download_voice("en_US-lessac-medium")
             assert result is False
             # Partial files should be cleaned up
@@ -976,7 +971,6 @@ class TestVibeVoiceTTSSynthesize:
             return v
 
     def test_synthesize_success(self, vv, tmp_path):
-        import numpy as np
         vv._model.synthesize.return_value = MagicMock()  # fake audio array
         mock_sf = MagicMock()
         output = str(tmp_path / "out.wav")

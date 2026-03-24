@@ -15,14 +15,13 @@ Run:  python scripts/benchmark_cpu_tts.py
 """
 
 import gc
+import json
 import os
 import sys
-import time
-import json
-import wave
 import tempfile
+import time
 import traceback
-from pathlib import Path
+import wave
 
 # Test sentences (short, medium, long)
 TEST_SENTENCES = [
@@ -87,7 +86,7 @@ def benchmark_piper():
 
     try:
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from tts.piper_tts import PiperTTS, DEFAULT_VOICE
+        from tts.piper_tts import DEFAULT_VOICE, PiperTTS
 
         mem_before = get_process_memory_mb()
         t_load = time.time()
@@ -205,38 +204,38 @@ def print_summary(piper_result, pocket_result):
     if piper_result and piper_result.get('results'):
         avg_rtf = sum(r['rtf'] for r in piper_result['results']) / len(piper_result['results'])
         avg_acc = sum(r['accuracy'] for r in piper_result['results']) / len(piper_result['results'])
-        print(f"\n  Piper TTS (server CPU):")
+        print("\n  Piper TTS (server CPU):")
         print(f"    Avg RTF: {avg_rtf:.3f} (< 1.0 = faster than realtime)")
         print(f"    Avg Accuracy: {avg_acc:.0%}")
         print(f"    Load time: {piper_result['load_time']}s")
         print(f"    Memory: {piper_result['memory_mb']}MB")
-        print(f"    Languages: en (4 voices), multilingual via other models")
+        print("    Languages: en (4 voices), multilingual via other models")
     else:
         print("\n  Piper TTS: NOT AVAILABLE")
 
-    print(f"\n  PocketTTS (browser WASM):")
-    print(f"    Server CPU: 0 (runs entirely in browser)")
-    print(f"    TTFA: ~50-100ms in browser")
-    print(f"    Languages: en only")
-    print(f"    Quality: Good (24kHz, autoregressive)")
+    print("\n  PocketTTS (browser WASM):")
+    print("    Server CPU: 0 (runs entirely in browser)")
+    print("    TTFA: ~50-100ms in browser")
+    print("    Languages: en only")
+    print("    Quality: Good (24kHz, autoregressive)")
 
-    print(f"\n  RECOMMENDATION:")
+    print("\n  RECOMMENDATION:")
     print(f"  {'=' * 50}")
 
     if piper_result and piper_result.get('results'):
         avg_rtf = sum(r['rtf'] for r in piper_result['results']) / len(piper_result['results'])
         if avg_rtf < 1.0:
             print(f"    Piper achieves RTF={avg_rtf:.2f} (realtime capable on CPU)")
-            print(f"    USE BOTH:")
-            print(f"      - PocketTTS for browser clients (zero server cost)")
-            print(f"      - Piper for server-side API / non-browser clients / CPU fallback")
+            print("    USE BOTH:")
+            print("      - PocketTTS for browser clients (zero server cost)")
+            print("      - Piper for server-side API / non-browser clients / CPU fallback")
         else:
             print(f"    Piper RTF={avg_rtf:.2f} (slower than realtime on this CPU)")
-            print(f"    PREFER PocketTTS for English (browser-side)")
-            print(f"    Keep Piper only as last-resort CPU fallback")
+            print("    PREFER PocketTTS for English (browser-side)")
+            print("    Keep Piper only as last-resort CPU fallback")
     else:
-        print(f"    Piper not available — PocketTTS is the only CPU option")
-        print(f"    Install piper-tts for server-side CPU TTS")
+        print("    Piper not available — PocketTTS is the only CPU option")
+        print("    Install piper-tts for server-side CPU TTS")
 
     print()
 

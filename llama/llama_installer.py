@@ -6,18 +6,17 @@ during Nunba app first run or on-demand.
 
 Based on the implementation from TrueFlow AIExplanationPanel.kt
 """
-import os
-import sys
 import json
-import platform
-import subprocess
-import urllib.request
-import urllib.error
-import zipfile
-import shutil
 import logging
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Tuple, Callable, Dict, List
 
 logger = logging.getLogger('NunbaLlamaInstaller')
 
@@ -29,9 +28,9 @@ class ModelPreset:
     """Model configuration presets"""
     def __init__(self, display_name: str, repo_id: str, file_name: str,
                  size_mb: int, description: str, has_vision: bool = False,
-                 mmproj_file: Optional[str] = None,
-                 mmproj_source_file: Optional[str] = None,
-                 min_build: Optional[int] = None):
+                 mmproj_file: str | None = None,
+                 mmproj_source_file: str | None = None,
+                 min_build: int | None = None):
         self.display_name = display_name
         self.repo_id = repo_id
         self.file_name = file_name
@@ -151,7 +150,7 @@ _HF_CACHE_DIR = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "hugging
 class LlamaInstaller:
     """Handles Llama.cpp installation and model downloading"""
 
-    def __init__(self, install_dir: Optional[str] = None, models_dir: Optional[str] = None):
+    def __init__(self, install_dir: str | None = None, models_dir: str | None = None):
         """
         Initialize the installer
 
@@ -215,7 +214,7 @@ class LlamaInstaller:
 
         return "none"
 
-    def find_llama_server(self, check_system_first: bool = True) -> Optional[str]:
+    def find_llama_server(self, check_system_first: bool = True) -> str | None:
         """
         Find llama-server executable
 
@@ -310,7 +309,7 @@ class LlamaInstaller:
         llama_path_obj = Path(llama_path)
         return not str(llama_path_obj).startswith(str(self.install_dir))
 
-    def get_version(self, llama_server_path: Optional[str] = None) -> Optional[int]:
+    def get_version(self, llama_server_path: str | None = None) -> int | None:
         """
         Get the llama.cpp build number (e.g., 8192).
 
@@ -364,7 +363,7 @@ class LlamaInstaller:
         return None
 
     def check_version_for_model(self, preset: 'ModelPreset',
-                                llama_server_path: Optional[str] = None) -> tuple:
+                                llama_server_path: str | None = None) -> tuple:
         """
         Check if installed llama.cpp version supports the given model preset.
 
@@ -397,7 +396,7 @@ class LlamaInstaller:
         return (is_ok, current, required)
 
     def update_llama_cpp(self,
-                         progress_callback: Optional[Callable[[str], None]] = None) -> bool:
+                         progress_callback: Callable[[str], None] | None = None) -> bool:
         """
         Update llama.cpp to the latest pre-built release from GitHub.
 
@@ -469,7 +468,7 @@ class LlamaInstaller:
         self,
         url: str,
         dest_path: Path,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Callable[[int, int], None] | None = None
     ) -> None:
         """
         Download a file with progress tracking and integrity validation.
@@ -765,7 +764,7 @@ class LlamaInstaller:
             logger.error(f"Build from source failed: {e}")
             return False
 
-    def install_llama_cpp(self, progress_callback: Optional[Callable[[str], None]] = None) -> bool:
+    def install_llama_cpp(self, progress_callback: Callable[[str], None] | None = None) -> bool:
         """
         Install llama.cpp (try prebuilt first, then build from source)
 
@@ -835,7 +834,7 @@ class LlamaInstaller:
             progress_callback("Failed to install llama.cpp")
         return False
 
-    def _find_file_in_dirs(self, file_name: str, min_size: int = 1000) -> Optional[Path]:
+    def _find_file_in_dirs(self, file_name: str, min_size: int = 1000) -> Path | None:
         """
         Search for a file in Nunba's models dir, sibling dirs, and HuggingFace Hub cache.
 
@@ -885,7 +884,7 @@ class LlamaInstaller:
 
         return None
 
-    def _find_mmproj_in_dirs(self, preset: ModelPreset) -> Optional[Path]:
+    def _find_mmproj_in_dirs(self, preset: ModelPreset) -> Path | None:
         """
         Search for mmproj file, handling model-specific naming variants.
         TrueFlow renames mmproj-F16.gguf to mmproj-{ModelName}-F16.gguf.
@@ -932,7 +931,7 @@ class LlamaInstaller:
     def download_model(
         self,
         preset: ModelPreset,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Callable[[int, int, str], None] | None = None
     ) -> bool:
         """
         Download a model from HuggingFace
@@ -989,12 +988,12 @@ class LlamaInstaller:
                 progress_callback(0, 0, f"Download failed: {str(e)}")
             return False
 
-    def get_model_path(self, preset: ModelPreset) -> Optional[str]:
+    def get_model_path(self, preset: ModelPreset) -> str | None:
         """Get the full path to a downloaded model (searches Nunba + sibling dirs)"""
         result = self._find_file_in_dirs(preset.file_name, min_size=100_000_000)
         return str(result) if result else None
 
-    def get_mmproj_path(self, preset: ModelPreset) -> Optional[str]:
+    def get_mmproj_path(self, preset: ModelPreset) -> str | None:
         """Get the full path to a downloaded mmproj file (searches Nunba + sibling dirs)"""
         if preset.has_vision and preset.mmproj_file:
             result = self._find_mmproj_in_dirs(preset)
@@ -1004,8 +1003,8 @@ class LlamaInstaller:
 
 def install_on_first_run(
     default_model_index: int = 0,
-    progress_callback: Optional[Callable[[str], None]] = None
-) -> Tuple[bool, Optional[str]]:
+    progress_callback: Callable[[str], None] | None = None
+) -> tuple[bool, str | None]:
     """
     Automatically install llama.cpp and default model on first run
 

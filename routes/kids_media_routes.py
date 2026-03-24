@@ -12,8 +12,6 @@ Routes:
   GET  /api/media/asset/status/<id>  — Poll async generation jobs
 """
 
-import base64
-import hashlib
 import logging
 import os
 import re
@@ -21,7 +19,7 @@ import threading
 import time
 import uuid
 
-from flask import request, jsonify, send_file, g
+from flask import jsonify, request, send_file
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +86,7 @@ def _get_user_id_from_request():
                         )
                 secret_key = None
                 if os.path.exists(key_file):
-                    with open(key_file, 'r') as f:
+                    with open(key_file) as f:
                         k = f.read().strip()
                     if len(k) >= 32:
                         secret_key = k
@@ -118,7 +116,7 @@ def _get_tts():
     global _tts_synthesize, _tts_available
     if _tts_synthesize is None:
         try:
-            from tts.tts_engine import synthesize_text, get_tts_status
+            from tts.tts_engine import get_tts_status, synthesize_text
             _tts_synthesize = synthesize_text
             status = get_tts_status()
             _tts_available = status.get('available', False)
@@ -131,8 +129,11 @@ def _get_tts():
 def _get_classifier():
     """Lazy-load media classifier."""
     from desktop.media_classification import (
-        classifier, cache_key, register_asset, get_asset_meta,
-        MediaClassifier, MEDIA_CACHE_ROOT
+        MEDIA_CACHE_ROOT,
+        cache_key,
+        classifier,
+        get_asset_meta,
+        register_asset,
     )
     return classifier, cache_key, register_asset, get_asset_meta, MEDIA_CACHE_ROOT
 

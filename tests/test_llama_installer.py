@@ -14,12 +14,13 @@ Options:
     --all            Do all of the above
 """
 
-import sys
-import logging
 import argparse
+import logging
+import sys
 import time
-from llama.llama_installer import LlamaInstaller, MODEL_PRESETS, install_on_first_run
-from llama.llama_config import LlamaConfig, initialize_llama_on_first_run
+
+from llama.llama_config import LlamaConfig
+from llama.llama_installer import MODEL_PRESETS, LlamaInstaller, install_on_first_run
 
 # Setup logging
 logging.basicConfig(
@@ -51,7 +52,7 @@ def test_installation():
     success = installer.install_llama_cpp(progress_callback)
 
     if success:
-        print(f"\n✓ Installation successful!")
+        print("\n✓ Installation successful!")
         print(f"  Location: {installer.find_llama_server()}")
         print(f"  GPU Support: {installer.gpu_available}")
         return True
@@ -73,7 +74,7 @@ def test_model_download():
 
     # Check if already downloaded
     if installer.is_model_downloaded(preset):
-        print(f"\n✓ Model is already downloaded")
+        print("\n✓ Model is already downloaded")
         print(f"  Path: {installer.get_model_path(preset)}")
         if preset.has_vision and preset.mmproj_file:
             print(f"  Vision projector: {installer.get_mmproj_path(preset)}")
@@ -83,14 +84,14 @@ def test_model_download():
 
     # Download
     def download_progress(downloaded_mb, total_mb, status):
-        pct = int((downloaded_mb / total_mb * 100)) if total_mb > 0 else 0
+        pct = int(downloaded_mb / total_mb * 100) if total_mb > 0 else 0
         print(f"\r[Progress] {status} ({pct}%)", end='', flush=True)
 
     success = installer.download_model(preset, download_progress)
     print()  # New line after progress
 
     if success:
-        print(f"\n✓ Download successful!")
+        print("\n✓ Download successful!")
         print(f"  Path: {installer.get_model_path(preset)}")
         return True
     else:
@@ -115,7 +116,7 @@ def test_server_start():
     success = config.start_server()
 
     if success:
-        print(f"\n✓ Server started successfully!")
+        print("\n✓ Server started successfully!")
         print(f"  Port: {config.config.get('server_port', 8080)}")
         print(f"  GPU: {'Enabled' if config.config.get('use_gpu') else 'Disabled'}")
         return True
@@ -144,7 +145,7 @@ def test_chat():
     response = config.chat_completion(messages, temperature=0.7, max_tokens=100)
 
     if response:
-        print(f"\n✓ Chat completion successful!\n")
+        print("\n✓ Chat completion successful!\n")
         print(f"AI Response: {response}\n")
         return True
     else:
@@ -171,7 +172,7 @@ def test_first_run():
     success, model_path = install_on_first_run(progress_callback=progress_callback)
 
     if success:
-        print(f"\n✓ First-run initialization successful!")
+        print("\n✓ First-run initialization successful!")
         print(f"  Model path: {model_path}")
         return True
     else:

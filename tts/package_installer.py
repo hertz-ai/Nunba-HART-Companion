@@ -15,15 +15,14 @@ sees real-time download status.
 """
 import importlib
 import importlib.util
-import json
 import logging
 import os
 import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger('NunbaTTSInstaller')
 
@@ -76,7 +75,7 @@ _install_lock = threading.Lock()
 _installing = {}  # backend → True while installing
 
 
-def get_python_embed_dir() -> Optional[str]:
+def get_python_embed_dir() -> str | None:
     """Find python-embed directory relative to the running app."""
     if getattr(sys, 'frozen', False):
         # Frozen build: python-embed is sibling of the exe
@@ -91,7 +90,7 @@ def get_python_embed_dir() -> Optional[str]:
     return None
 
 
-def get_embed_python() -> Optional[str]:
+def get_embed_python() -> str | None:
     """Get path to python-embed's Python executable."""
     embed_dir = get_python_embed_dir()
     if not embed_dir:
@@ -106,7 +105,7 @@ def get_embed_python() -> Optional[str]:
     return None
 
 
-def get_embed_site_packages() -> Optional[str]:
+def get_embed_site_packages() -> str | None:
     """Get python-embed site-packages path."""
     embed_dir = get_python_embed_dir()
     if not embed_dir:
@@ -183,8 +182,8 @@ def ensure_user_site_on_path():
         sys.path.insert(0, sp)
 
 
-def _run_pip(args: List[str], progress_cb: Optional[Callable] = None,
-             timeout: int = 600) -> Tuple[bool, str]:
+def _run_pip(args: list[str], progress_cb: Callable | None = None,
+             timeout: int = 600) -> tuple[bool, str]:
     """Run pip with --target ~/.nunba/site-packages/ for user-writable installs.
 
     Uses python-embed/python.exe -m pip but targets the user-writable
@@ -234,7 +233,7 @@ def _run_pip(args: List[str], progress_cb: Optional[Callable] = None,
         return False, str(e)
 
 
-def install_cuda_torch(progress_cb: Optional[Callable] = None) -> Tuple[bool, str]:
+def install_cuda_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
     """Swap torch+cpu for torch+cu124 in python-embed.
 
     This is a ~2.5GB download. Only runs if:
@@ -287,7 +286,7 @@ def install_cuda_torch(progress_cb: Optional[Callable] = None) -> Tuple[bool, st
 
 
 def install_backend_packages(backend: str,
-                              progress_cb: Optional[Callable] = None) -> Tuple[bool, str]:
+                              progress_cb: Callable | None = None) -> tuple[bool, str]:
     """Install pip packages required for a TTS backend.
 
     Returns (success, message).
@@ -361,7 +360,7 @@ def install_backend_packages(backend: str,
 
 
 def install_backend_full(backend: str,
-                          progress_cb: Optional[Callable] = None) -> Tuple[bool, str]:
+                          progress_cb: Callable | None = None) -> tuple[bool, str]:
     """Full install: pip packages + model weights for a backend.
 
     This is the main entry point — called from ai_installer, /tts/setup-engine,
@@ -425,7 +424,7 @@ def _is_hf_model_cached(model_id: str) -> bool:
 
 
 def _download_model_weights(backend: str,
-                             progress_cb: Optional[Callable] = None) -> Tuple[bool, str]:
+                             progress_cb: Callable | None = None) -> tuple[bool, str]:
     """Download model weights from HuggingFace for a backend.
 
     Checks ~/.cache/huggingface/hub/ AND ~/.nunba/ before downloading.
@@ -545,7 +544,7 @@ def make_chat_progress_callback(user_id: str = '', job_type: str = 'tts_setup'):
     return _push_progress
 
 
-def get_backend_status() -> Dict[str, Dict]:
+def get_backend_status() -> dict[str, dict]:
     """Get installation status for all TTS backends.
 
     Returns dict of backend → {installed, has_model, display_name, packages_missing}.
@@ -567,7 +566,7 @@ def get_backend_status() -> Dict[str, Dict]:
     return status
 
 
-def get_recommended_backends(vram_gb: float = 0, has_gpu: bool = False) -> List[str]:
+def get_recommended_backends(vram_gb: float = 0, has_gpu: bool = False) -> list[str]:
     """Get list of recommended backends for this hardware."""
     from tts.tts_engine import ENGINE_CAPABILITIES
     recommended = []

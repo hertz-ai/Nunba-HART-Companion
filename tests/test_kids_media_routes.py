@@ -13,14 +13,11 @@ Covers:
   _safe_send_file, _generate_image_via_agent, _download_and_cache
 - Edge cases: path traversal, job cap, TTL expiration
 """
-import io
 import json
 import os
 import sys
-import tempfile
-import threading
 import time
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -47,7 +44,7 @@ def _make_mock_classifier(tmp_path):
 
     def _cache_key(prompt, media_type, style=''):
         import hashlib
-        raw = f"{media_type}:{prompt}:{style}".encode('utf-8')
+        raw = f"{media_type}:{prompt}:{style}".encode()
         return hashlib.sha256(raw).hexdigest()
 
     mock_register = MagicMock()
@@ -843,7 +840,6 @@ class TestGenerateImageViaAgent:
 
     def test_extracts_url_from_json_response(self):
         from routes.kids_media_routes import _generate_image_via_agent
-        import json
         mock_adapter = MagicMock()
         mock_adapter.chat.return_value = {
             "text": json.dumps({"img_url": "https://cdn.example.com/dog.png"})
@@ -887,8 +883,9 @@ class TestGetUserIdFromRequest:
 
     def test_decodes_valid_jwt(self, media_app):
         """Valid JWT with SOCIAL_SECRET_KEY should return user_id."""
-        from routes.kids_media_routes import _get_user_id_from_request
         import jwt as pyjwt
+
+        from routes.kids_media_routes import _get_user_id_from_request
         secret = "a" * 32
         token = pyjwt.encode({"user_id": "jwt_user"}, secret, algorithm="HS256")
         with patch.dict(os.environ, {"SOCIAL_SECRET_KEY": secret}):
@@ -931,7 +928,7 @@ class TestMediaAssetCacheHit:
 
         # Pre-create the cached file
         import hashlib
-        sha = hashlib.sha256("image:cached cat:cartoon".encode()).hexdigest()
+        sha = hashlib.sha256(b"image:cached cat:cartoon").hexdigest()
         cached_file = os.path.join(cache_root, "public", "image", f"{sha}.png")
         os.makedirs(os.path.dirname(cached_file), exist_ok=True)
         with open(cached_file, 'wb') as f:
@@ -960,6 +957,7 @@ class TestRegisterRoutes:
 
     def test_registers_both_routes(self):
         from flask import Flask
+
         from routes.kids_media_routes import register_routes
         app = Flask(__name__)
         register_routes(app)

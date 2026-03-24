@@ -10,20 +10,21 @@ The module supports:
 3. Local fallback for offline operation
 """
 
-from flask import request, jsonify
-import time
 import datetime
-from datetime import timezone
-from collections import deque
-import logging
-import inspect
-import random
-import json
-import os
-import sys
 import hmac
-import requests
+import inspect
+import json
+import logging
+import os
+import random
+import sys
+import time
+from collections import deque
 from functools import wraps
+
+import requests
+from flask import jsonify, request
+
 from models.catalog import ModelType
 
 # Initialize logger
@@ -68,7 +69,9 @@ HEVOLVE_PROMPTS_AVAILABLE = False
 # NOTE: Don't import hart_intelligence directly - it modifies sys.stdout/stderr
 # on Windows which can cause I/O errors if the import fails partway through
 try:
-    from routes.hartos_backend_adapter import chat as hevolve_chat, get_prompts, zeroshot as hevolve_zeroshot, drain_thinking_traces
+    from routes.hartos_backend_adapter import chat as hevolve_chat
+    from routes.hartos_backend_adapter import drain_thinking_traces, get_prompts
+    from routes.hartos_backend_adapter import zeroshot as hevolve_zeroshot
     HEVOLVE_CHAT_AVAILABLE = True
     HEVOLVE_PROMPTS_AVAILABLE = True
     logger.info("hart-backend adapter available")
@@ -104,6 +107,7 @@ except Exception as e:
 
 # Global session storage (in-memory for now - TODO: replace with persistent storage)
 import threading
+
 _sessions_lock = threading.Lock()
 sessions = {}
 custom_sessions = {}
@@ -329,12 +333,12 @@ def gpt_lang(message, user_id, prompt=None, prompt_id=None, timeout=120, probe=F
     # If image is attached, get vision description and prepend to text
     if image_url:
         try:
-            from routes.upload_routes import _describe_image_via_llm, UPLOAD_DIR
+            from routes.upload_routes import UPLOAD_DIR, _describe_image_via_llm
             # Resolve local path from /uploads/... URL
             rel = image_url.lstrip('/').replace('uploads/', '', 1)
             local_path = UPLOAD_DIR / rel
             if local_path.is_file():
-                vision_desc = _describe_image_via_llm(str(local_path), f"Describe this image in detail.")
+                vision_desc = _describe_image_via_llm(str(local_path), "Describe this image in detail.")
                 if vision_desc:
                     user_text = f"[Image attached — vision analysis: {vision_desc}]\n\n{user_text}"
                     logger.info(f'Vision context added for image: {image_url}')
@@ -608,7 +612,7 @@ def setfit(input_text, request_id=None):
     Stub for SetFit classification
     TODO: Implement actual SetFit model inference
     """
-    logger.info(f'STUB: setfit called')
+    logger.info('STUB: setfit called')
     return 'unknown'
 
 
@@ -1009,8 +1013,9 @@ def get_tts_status():
 if not os.environ.get('NUNBA_DISABLE_TTS'):
     try:
         from tts.tts_engine import (
-            get_tts_engine, synthesize_text, get_tts_status,
-            BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3
+            get_tts_engine,
+            get_tts_status,
+            synthesize_text,
         )
 
         TTS_AVAILABLE = True
@@ -1223,8 +1228,7 @@ def tts_status():
 def tts_setup_engine():
     """Install TTS engine packages + models on demand. Shows progress in chat."""
     try:
-        from tts.package_installer import (install_backend_full,
-                                            make_chat_progress_callback)
+        from tts.package_installer import install_backend_full, make_chat_progress_callback
     except ImportError:
         return jsonify({'error': 'Package installer not available'}), 503
 
@@ -1364,7 +1368,8 @@ def tts_kids_submit():
 
         mapped_voice = KIDS_VOICE_MAP.get(voice, voice)
 
-        import uuid, threading
+        import threading
+        import uuid
         job_id = f"tts_{uuid.uuid4().hex[:12]}"
 
         with _tts_jobs_lock:
@@ -1474,6 +1479,7 @@ def voice_transcribe():
         _text = result.get('text', '')
         try:
             import time as _time
+
             from core.platform.events import emit_event
             emit_event('perception.audio.present', {
                 'user_id': _uid, 'channel': 'microphone',
@@ -1535,6 +1541,7 @@ def voice_diarize():
         tmp.close()
 
         import asyncio
+
         import numpy as np
 
         # Read audio file
@@ -1832,8 +1839,8 @@ def chat_route():
         # setup card regardless of catalog state. The catalog may be out of sync
         # (e.g., server was started externally or by a previous session).
         try:
-            from models.orchestrator import get_orchestrator
             from models.catalog import ModelType
+            from models.orchestrator import get_orchestrator
 
             orch = get_orchestrator()
             missing_models = []
@@ -1841,8 +1848,8 @@ def chat_route():
             # Quick LLM health check — if server responds, LLM is ready
             _llm_reachable = False
             try:
-                from core.port_registry import get_local_llm_url
                 import requests as _req
+                from core.port_registry import get_local_llm_url
                 _health = _req.get(get_local_llm_url().replace('/v1', '/health'), timeout=2)
                 _llm_reachable = _health.status_code == 200
             except Exception:
@@ -1939,7 +1946,7 @@ def chat_route():
                 # tool handles it via LLM reasoning in hart_intelligence
                 if not already_creating and _detect_create_agent_intent(text):
                     create_agent = True
-                    logger.info(f'Deterministic: detected agent creation intent (server will generate prompt_id)')
+                    logger.info('Deterministic: detected agent creation intent (server will generate prompt_id)')
                     # Note: autonomous_creation is now detected by the LLM (Create_Agent tool)
                     # and passed back via the response from hart_intelligence, NOT by pattern matching
 
@@ -2067,9 +2074,9 @@ def chat_route():
                         import threading
                         def _post_agent_to_social(pid, uid, name):
                             try:
-                                from integrations.social.services import PostService
                                 from integrations.social.database import get_db
                                 from integrations.social.models import User
+                                from integrations.social.services import PostService
                                 db = get_db()
                                 agent_user = db.query(User).filter(User.id == int(uid)).first()
                                 if agent_user:
@@ -2096,7 +2103,7 @@ def chat_route():
 
         # --- Tier 2: Fallback to raw Llama.cpp (port 8080) ---
         try:
-            from llama.llama_config import get_llama_endpoint, check_llama_health
+            from llama.llama_config import check_llama_health, get_llama_endpoint
             if check_llama_health():
                 endpoint = get_llama_endpoint()
                 messages = [{"role": "user", "content": text}]
@@ -2344,7 +2351,7 @@ def _load_jwt_secret_key():
             )
     try:
         if os.path.exists(key_file):
-            with open(key_file, 'r') as f:
+            with open(key_file) as f:
                 key = f.read().strip()
             if len(key) >= 32:
                 return key
@@ -2418,7 +2425,7 @@ def agents_sync_get():
                 continue
             fpath = os.path.join(prompts_dir, fname)
             try:
-                with open(fpath, 'r', encoding='utf-8') as f:
+                with open(fpath, encoding='utf-8') as f:
                     data = json.load(f)
                 # Include agents owned by this user or public ones
                 creator = str(data.get('creator_user_id', data.get('user_id', '')))
@@ -2454,7 +2461,7 @@ def agents_sync_post():
 
         if os.path.exists(fpath):
             try:
-                with open(fpath, 'r', encoding='utf-8') as f:
+                with open(fpath, encoding='utf-8') as f:
                     existing = json.load(f)
                 server_ts = existing.get('updated_at', '')
                 if client_ts > server_ts:
@@ -2501,7 +2508,7 @@ def agents_migrate():
                 continue
             fpath = os.path.join(prompts_dir, fname)
             try:
-                with open(fpath, 'r', encoding='utf-8') as f:
+                with open(fpath, encoding='utf-8') as f:
                     data = json.load(f)
                 creator = str(data.get('creator_user_id', data.get('user_id', '')))
                 if creator == str(guest_user_id):
@@ -2541,9 +2548,9 @@ def agent_post(prompt_id):
     if not title:
         return jsonify({'error': 'title required'}), 400
     try:
-        from integrations.social.services import PostService
         from integrations.social.database import get_db
         from integrations.social.models import User
+        from integrations.social.services import PostService
         db = get_db()
         agent_user = db.query(User).filter(User.id == int(user_id)).first()
         if agent_user:
@@ -2561,7 +2568,7 @@ def agent_post(prompt_id):
 def llm_config_get():
     """GET /api/llm/config — Return current LLM configuration (no secrets)."""
     try:
-        from desktop.ai_key_vault import AIKeyVault, CLOUD_PROVIDERS
+        from desktop.ai_key_vault import CLOUD_PROVIDERS, AIKeyVault
         vault = AIKeyVault.get_instance()
         active = vault.get_active_provider()
 
@@ -2594,7 +2601,7 @@ def llm_config_get():
 def llm_config_update():
     """POST /api/llm/config — Update LLM provider configuration."""
     try:
-        from desktop.ai_key_vault import AIKeyVault, CLOUD_PROVIDERS
+        from desktop.ai_key_vault import CLOUD_PROVIDERS, AIKeyVault
         data = request.get_json() or {}
 
         provider_id = data.get('provider_id', '')
@@ -2743,7 +2750,8 @@ def agent_contact_request():
     if not agent_id or not target_user_id:
         return jsonify({'error': 'agent_id and user_id required'}), 400
 
-    import uuid, time as _t
+    import time as _t
+    import uuid
 
     # Check if agent is owned by this user
     agent_config = None
@@ -2753,7 +2761,7 @@ def agent_contact_request():
         for d in [prompts_dir, os.path.join(os.path.expanduser('~'), 'PycharmProjects', 'HARTOS', 'prompts')]:
             cfg_path = os.path.join(d, f'{agent_id}.json')
             if os.path.exists(cfg_path):
-                with open(cfg_path, 'r') as f:
+                with open(cfg_path) as f:
                     agent_config = json.load(f)
                 break
     except Exception:
@@ -2905,7 +2913,7 @@ def hart_advance():
 def hart_generate():
     """Generate HART name candidates from onboarding answers."""
     try:
-        from hart_onboarding import generate_hart_name, HARTNameRegistry
+        from hart_onboarding import HARTNameRegistry, generate_hart_name
         data = request.get_json(silent=True) or {}
 
         existing = HARTNameRegistry.get_all_names()
@@ -2953,7 +2961,8 @@ def hart_seal():
             remove_session(user_id)
             # Persist language preference for auto-bootstrap on next startup
             try:
-                import os, json as _json
+                import json as _json
+                import os
                 hart_dir = os.path.join(os.path.expanduser('~'), 'Documents', 'Nunba', 'data')
                 os.makedirs(hart_dir, exist_ok=True)
                 with open(os.path.join(hart_dir, 'hart_language.json'), 'w') as f:

@@ -11,11 +11,7 @@ UX: Default values sane, error messages helpful, no crash on empty input.
 import os
 import sys
 import time
-import json
-import importlib
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -32,26 +28,22 @@ class TestImportSpeed:
     def test_llama_config_imports_under_1s(self):
         """llama_config is imported early — must be fast."""
         start = time.time()
-        import llama.llama_config
         elapsed = time.time() - start
         assert elapsed < 2.0, f"llama_config import took {elapsed:.1f}s (limit: 2s)"
 
     def test_hartos_adapter_imports_under_2s(self):
         """Adapter is imported on every request — must be fast."""
         start = time.time()
-        import routes.hartos_backend_adapter
         elapsed = time.time() - start
         assert elapsed < 3.0, f"adapter import took {elapsed:.1f}s (limit: 3s)"
 
     def test_tts_engine_imports_under_1s(self):
         start = time.time()
-        import tts.tts_engine
         elapsed = time.time() - start
         assert elapsed < 2.0, f"tts_engine import took {elapsed:.1f}s"
 
     def test_models_catalog_imports_under_1s(self):
         start = time.time()
-        import models.catalog
         elapsed = time.time() - start
         assert elapsed < 2.0, f"catalog import took {elapsed:.1f}s"
 
@@ -65,7 +57,7 @@ class TestNoSecretsInSource:
 
     def _scan_file(self, filepath):
         """Scan a file for common secret patterns."""
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(filepath, encoding='utf-8', errors='ignore') as f:
             content = f.read()
         # Patterns that indicate hardcoded secrets
         secret_patterns = [
@@ -112,7 +104,7 @@ class TestPathTraversalPrevention:
     """Path traversal attacks must be blocked everywhere file paths are constructed."""
 
     def test_media_classifier_blocks_traversal(self):
-        from desktop.media_classification import MediaClassifier, MEDIA_CACHE_ROOT
+        from desktop.media_classification import MEDIA_CACHE_ROOT, MediaClassifier
         path = MediaClassifier.get_cache_path(
             sha='abc123', media_type='../../etc', label='user_private',
             owner_id='../../root', ext='png')
@@ -158,6 +150,7 @@ class TestSaneDefaults:
 
     def test_default_server_port_is_8080(self):
         import tempfile
+
         from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = LlamaConfig(config_dir=tmpdir)

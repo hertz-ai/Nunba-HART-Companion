@@ -19,13 +19,13 @@ import os
 import sys
 import threading
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from models.catalog import ModelEntry, ModelType
+from models.catalog import ModelEntry
 
 
 def _make_entry(id='test-llm', model_type='llm', name='Test LLM', **kwargs):
@@ -437,6 +437,7 @@ class TestGetOrchestrator(unittest.TestCase):
     def setUp(self):
         # Reset the singleton and loader registration state before each test
         import integrations.service_tools.model_orchestrator as hartos_mod
+
         import models.orchestrator as nunba_mod
         self._hartos_mod = hartos_mod
         self._nunba_mod = nunba_mod
@@ -490,8 +491,8 @@ class TestGetOrchestrator(unittest.TestCase):
 
     def test_existing_hartos_instance_gets_loaders(self):
         """If HARTOS already created an instance, get_orchestrator still registers loaders."""
-        from models.orchestrator import get_orchestrator, ModelOrchestrator
         from models.catalog import get_catalog
+        from models.orchestrator import ModelOrchestrator, get_orchestrator
         # Pre-set a HARTOS instance
         existing = ModelOrchestrator(catalog=get_catalog())
         self._hartos_mod._orchestrator_instance = existing
@@ -509,8 +510,8 @@ class TestRegisterLoaders(unittest.TestCase):
     def test_idempotent(self):
         """Calling _register_loaders twice doesn't double-register."""
         import models.orchestrator as mod
-        from models.orchestrator import ModelOrchestrator, _register_loaders
         from models.catalog import get_catalog
+        from models.orchestrator import ModelOrchestrator, _register_loaders
 
         old_flag = mod._loaders_registered
         mod._loaders_registered = False

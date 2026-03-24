@@ -11,9 +11,8 @@ NFT: Response time bounds (casual_conv < 1s for mock), no daemon traces leak,
 """
 import os
 import sys
-import json
 import threading
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

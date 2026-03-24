@@ -8,15 +8,15 @@ Usage:
     python setup_freeze_mac.py build       # Build .app bundle
     python setup_freeze_mac.py bdist_dmg   # Build DMG installer
 """
-import sys
-import os
 import glob
+import os
+import sys
 
 # cx_Freeze traces deep dependency chains (langchain, autogen, etc.) that
 # can exceed Python's default 1000-frame recursion limit during compilation.
 sys.setrecursionlimit(5000)
 
-from cx_Freeze import setup, Executable
+from cx_Freeze import Executable, setup
 
 # Ensure we're on macOS
 if sys.platform != "darwin":
@@ -36,6 +36,7 @@ if _project_root not in sys.path:
 
 from deps import VERSION, version_short
 
+
 def ensure_icon_exists():
     """Create .icns icon file from PNG if needed"""
     if os.path.exists("app.icns"):
@@ -46,8 +47,9 @@ def ensure_icon_exists():
     for logo_file in logo_files:
         if os.path.exists(logo_file):
             try:
-                from PIL import Image
                 import subprocess
+
+                from PIL import Image
 
                 # Create iconset directory
                 iconset_path = "app.iconset"
@@ -188,6 +190,7 @@ build_exe_options["include_files"] = list(build_exe_options["include_files"]) + 
 
 # Include agent_ledger package if not pip-installed (lives in sibling dir)
 import importlib.util as _ilu_pre
+
 if not _ilu_pre.find_spec("agent_ledger"):
     _al_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             '..', '..', 'HARTOS', 'agent-ledger-opensource', 'agent_ledger')
@@ -199,6 +202,7 @@ if not _ilu_pre.find_spec("agent_ledger"):
 
 # ── Conditionally include optional packages ──
 import importlib.util as _ilu
+
 _optional_packages = [
     "autogen", "autogen_agentchat", "apscheduler", "json_repair",
     "integrations", "integrations.social", "integrations.coding_agent",

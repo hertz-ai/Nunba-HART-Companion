@@ -13,10 +13,10 @@ Covers:
 import io
 import json
 import os
+import struct
 import sys
 import wave
-import struct
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -411,6 +411,7 @@ class TestThinkingTraces:
         """Concurrent captures from multiple threads don't corrupt the buffer."""
         self._reset_traces()
         import threading
+
         from routes.hartos_backend_adapter import _capture_thinking, drain_thinking_traces
         errors = []
 

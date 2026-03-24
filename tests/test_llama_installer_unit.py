@@ -12,17 +12,12 @@ NFT: Cross-platform path handling, download resilience, idempotent install,
 import os
 import sys
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from llama.llama_installer import ModelPreset, MODEL_PRESETS, LlamaInstaller
-
+from llama.llama_installer import MODEL_PRESETS, LlamaInstaller, ModelPreset
 
 # ============================================================
 # ModelPreset — data integrity
@@ -34,7 +29,7 @@ class TestModelPreset:
     def test_all_presets_have_required_fields(self):
         """Missing field = crash in download or UI display."""
         for preset in MODEL_PRESETS:
-            assert preset.display_name, f"Preset missing display_name"
+            assert preset.display_name, "Preset missing display_name"
             assert preset.repo_id, f"Preset '{preset.display_name}' missing repo_id"
             assert preset.file_name, f"Preset '{preset.display_name}' missing file_name"
             assert preset.size_mb > 0, f"Preset '{preset.display_name}' has invalid size_mb"

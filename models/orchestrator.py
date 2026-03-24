@@ -12,18 +12,19 @@ The singleton is shared with HARTOS so that both
 """
 
 import logging
-from typing import Optional
+
+# Access the HARTOS module for shared singleton management
+import integrations.service_tools.model_orchestrator as _hartos_mod
 
 # ── Re-export canonical types from HARTOS ─────────────────────────
-from integrations.service_tools.model_orchestrator import (    # noqa: F401
-    ModelOrchestrator, ModelLoader, ModelEntry,
+from integrations.service_tools.model_orchestrator import (  # noqa: F401
+    ModelEntry,
+    ModelLoader,
+    ModelOrchestrator,
 )
 
 # Ensure Nunba's get_catalog() (with populators) is used
 from models.catalog import ModelCatalog, ModelType, get_catalog  # noqa: F401
-
-# Access the HARTOS module for shared singleton management
-import integrations.service_tools.model_orchestrator as _hartos_mod
 
 logger = logging.getLogger('NunbaModelOrchestrator')
 
@@ -201,7 +202,7 @@ class STTLoader(ModelLoader):
     def download(self, entry: ModelEntry) -> bool:
         """Install faster-whisper + CUDA torch if needed."""
         try:
-            from tts.package_installer import is_cuda_torch, install_cuda_torch, has_nvidia_gpu
+            from tts.package_installer import has_nvidia_gpu, install_cuda_torch, is_cuda_torch
             # Ensure CUDA torch is available for GPU whisper
             if has_nvidia_gpu() and not is_cuda_torch():
                 logger.info("STT download: installing CUDA torch for faster-whisper")
@@ -212,7 +213,8 @@ class STTLoader(ModelLoader):
             # Install faster-whisper itself
             import importlib.util
             if importlib.util.find_spec('faster_whisper') is None:
-                import subprocess, sys
+                import subprocess
+                import sys
                 logger.info("STT download: installing faster-whisper")
                 result = subprocess.run(
                     [sys.executable, '-m', 'pip', 'install', 'faster-whisper', '--quiet'],

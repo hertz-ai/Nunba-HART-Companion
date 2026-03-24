@@ -5,10 +5,12 @@ This script shows the actual server output to help diagnose startup failures.
 """
 
 import subprocess
-import time
 import sys
-import requests
+import time
 from pathlib import Path
+
+import requests
+
 
 def test_server_manual():
     """Test server startup with visible output"""
@@ -34,7 +36,7 @@ def test_server_manual():
         print(f"✓ Vision projector found: {mmproj_path}")
         use_vision = True
     else:
-        print(f"✗ Vision projector not found, using text-only mode")
+        print("✗ Vision projector not found, using text-only mode")
         use_vision = False
 
     # Build command

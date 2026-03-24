@@ -6,10 +6,10 @@ Provides a unified interface for system tray functionality on:
 - macOS: Uses rumps (or pystray fallback)
 - Linux: Uses pystray
 """
+import logging
 import os
 import sys
 import threading
-import logging
 
 logger = logging.getLogger('NunbaTray')
 

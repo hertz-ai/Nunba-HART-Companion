@@ -2,15 +2,15 @@
 This script tests and logs various startup-related issues.
 Save this as debug_startup.py in the same directory as your application.
 """
+import ctypes
+import json
 import os
+import subprocess
 import sys
 import time
-import json
-import winreg
-import subprocess
 import traceback
-import ctypes
-from pathlib import Path
+import winreg
+
 
 def is_admin():
     """Check if the script is running with admin privileges"""
@@ -38,7 +38,7 @@ def get_startup_entries():
                     name, value, _ = winreg.EnumValue(key, i)
                     entries.append({"type": "registry", "location": f"{hkey}\\{path}", "name": name, "value": value})
                     i += 1
-                except WindowsError:
+                except OSError:
                     break
         except Exception as e:
             entries.append({"type": "error", "location": f"{hkey}\\{path}", "error": str(e)})
@@ -240,7 +240,7 @@ def run_diagnostics():
                 if 'error' in exe_check:
                     f.write(f"  Error: {exe_check['error']}\n")
             else:
-                f.write(f"  File exists: No\n")
+                f.write("  File exists: No\n")
                 if 'error' in exe_check:
                     f.write(f"  Error: {exe_check['error']}\n")
             

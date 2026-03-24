@@ -12,7 +12,6 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from models.catalog import ModelType
 
@@ -33,7 +32,7 @@ OPTIONAL_TYPES = {ModelType.AUDIO_GEN, ModelType.VIDEO_GEN}
 @dataclass
 class BootstrapStep:
     model_type: str
-    model_id: Optional[str] = None
+    model_id: str | None = None
     model_name: str = ''
     status: str = 'pending'       # pending | selecting | downloading | loading | ready | skipped | failed
     detail: str = ''
@@ -49,8 +48,8 @@ class BootstrapState:
     gpu_name: str = ''
     vram_total_gb: float = 0.0
     vram_free_gb: float = 0.0
-    steps: Dict[str, BootstrapStep] = field(default_factory=dict)
-    error: Optional[str] = None
+    steps: dict[str, BootstrapStep] = field(default_factory=dict)
+    error: str | None = None
     started_at: float = 0.0
     finished_at: float = 0.0
 
@@ -83,7 +82,7 @@ class BootstrapState:
 # ── Singleton state ───────────────────────────────────────────────
 _state = BootstrapState()
 _lock = threading.Lock()
-_thread: Optional[threading.Thread] = None
+_thread: threading.Thread | None = None
 
 
 def get_status() -> dict:
@@ -171,7 +170,7 @@ def _detect_hardware() -> dict:
                 'cuda_available': False}
 
 
-def _create_plan(language: str, gpu_info: dict) -> Dict[str, BootstrapStep]:
+def _create_plan(language: str, gpu_info: dict) -> dict[str, BootstrapStep]:
     """Select best model for each type given language + hardware."""
     try:
         from models.orchestrator import get_orchestrator
@@ -270,7 +269,7 @@ def _execute_plan(language: str, gpu_info: dict) -> None:
         # and CUDA torch isn't installed, use the existing package_installer.
         if model_type in (ModelType.TTS, ModelType.STT) and gpu_info.get('cuda_available', False):
             try:
-                from tts.package_installer import is_cuda_torch, install_cuda_torch, has_nvidia_gpu
+                from tts.package_installer import has_nvidia_gpu, install_cuda_torch, is_cuda_torch
                 if not is_cuda_torch() and has_nvidia_gpu():
                     _update_step(model_type, status='loading',
                                  detail='Installing CUDA PyTorch (one-time ~2.5GB)...')

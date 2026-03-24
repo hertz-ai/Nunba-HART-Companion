@@ -6,22 +6,19 @@ Captures exceptions, performance data, and user feedback.
 
 Dashboard: https://sentry.io (view your project issues)
 """
-import os
-import sys
 import logging
+import os
 import platform
-import traceback
-from typing import Optional, Dict, Any
+import sys
 from functools import wraps
+from typing import Any
 
 logger = logging.getLogger('NunbaCrashReporter')
 
 # Import from central config
 try:
-    from desktop.config import (
-        SENTRY_DSN, APP_NAME, APP_VERSION, ENVIRONMENT,
-        CRASH_REPORTING_ENABLED, PERFORMANCE_MONITORING_ENABLED as PERFORMANCE_MONITORING
-    )
+    from desktop.config import APP_NAME, APP_VERSION, CRASH_REPORTING_ENABLED, ENVIRONMENT, SENTRY_DSN
+    from desktop.config import PERFORMANCE_MONITORING_ENABLED as PERFORMANCE_MONITORING
 except ImportError:
     # Fallback if config not available
     SENTRY_DSN = os.environ.get(
@@ -39,7 +36,7 @@ _sentry_sdk = None
 _initialized = False
 
 
-def get_device_info() -> Dict[str, Any]:
+def get_device_info() -> dict[str, Any]:
     """Get device/system information for crash reports"""
     info = {
         'platform': sys.platform,
@@ -65,10 +62,10 @@ def get_device_info() -> Dict[str, Any]:
 
 
 def init_crash_reporting(
-    dsn: Optional[str] = None,
+    dsn: str | None = None,
     environment: str = "production",
-    release: Optional[str] = None,
-    user_id: Optional[str] = None,
+    release: str | None = None,
+    user_id: str | None = None,
     enable_performance: bool = True
 ) -> bool:
     """
@@ -243,7 +240,7 @@ def capture_message(message: str, level: str = "info", **extra_context):
         return None
 
 
-def set_user(user_id: str, email: Optional[str] = None, username: Optional[str] = None):
+def set_user(user_id: str, email: str | None = None, username: str | None = None):
     """
     Set user context for crash reports.
 
@@ -270,7 +267,7 @@ def clear_user():
         _sentry_sdk.set_user(None)
 
 
-def add_breadcrumb(message: str, category: str = "app", level: str = "info", data: Dict = None):
+def add_breadcrumb(message: str, category: str = "app", level: str = "info", data: dict = None):
     """
     Add a breadcrumb for debugging context.
 
@@ -299,7 +296,7 @@ def set_tag(key: str, value: str):
         _sentry_sdk.set_tag(key, value)
 
 
-def set_context(name: str, data: Dict[str, Any]):
+def set_context(name: str, data: dict[str, Any]):
     """Set additional context data for crash reports"""
     if _initialized and _sentry_sdk:
         _sentry_sdk.set_context(name, data)
@@ -358,7 +355,7 @@ def get_crash_report_url() -> str:
     return "https://sentry.io"
 
 
-def get_status() -> Dict[str, Any]:
+def get_status() -> dict[str, Any]:
     """Get crash reporting status"""
     return {
         'enabled': CRASH_REPORTING_ENABLED,

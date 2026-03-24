@@ -17,9 +17,10 @@ import os
 import threading
 import time
 import uuid
+from datetime import UTC
 from pathlib import Path
 
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
@@ -530,8 +531,8 @@ def _save_parse_to_db(file_id, pages_data, whole_text, toc_entries, book_name, u
         from routes.db_routes import _get_db
         conn = _get_db()
         try:
-            from datetime import datetime, timezone as tz
-            now = datetime.now(tz.utc).isoformat()
+            from datetime import datetime
+            now = datetime.now(UTC).isoformat()
 
             # Update PDF file record
             conn.execute(
@@ -598,8 +599,8 @@ def _run_pdf_parse(job_id, pdf_path, user_id, request_id):
         try:
             from routes.db_routes import _get_db
             conn = _get_db()
-            from datetime import datetime, timezone as tz
-            now = datetime.now(tz.utc).isoformat()
+            from datetime import datetime
+            now = datetime.now(UTC).isoformat()
             cursor = conn.execute(
                 """INSERT INTO pdf_files (user_id, filename, directory, request_id, created_date)
                    VALUES (?, ?, ?, ?, ?)""",

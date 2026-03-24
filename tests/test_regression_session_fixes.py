@@ -16,11 +16,7 @@ BUG-9: casual_conv disabling all tools for default agent
 """
 import os
 import sys
-import time
-import threading
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -84,8 +80,9 @@ class TestWarmLLMStartup:
     def test_is_llm_available_false_for_500(self):
         """is_llm_available must return False for 500 — server loading, not ready for chat."""
         import tempfile
-        from llama.llama_config import LlamaConfig
         import urllib.request
+
+        from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as d:
             cfg = LlamaConfig(config_dir=d)
             cfg.config['cloud_provider'] = None
@@ -96,8 +93,9 @@ class TestWarmLLMStartup:
     def test_is_llm_server_running_true_for_500(self):
         """is_llm_server_running must return True for 500 — server exists, don't start another."""
         import tempfile
-        from llama.llama_config import LlamaConfig
         import urllib.request
+
+        from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as d:
             cfg = LlamaConfig(config_dir=d)
             cfg.config['cloud_provider'] = None
@@ -108,6 +106,7 @@ class TestWarmLLMStartup:
     def test_is_llm_server_running_false_for_connection_refused(self):
         """ConnectionRefused = no server at all — cold start needed."""
         import tempfile
+
         from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as d:
             cfg = LlamaConfig(config_dir=d)

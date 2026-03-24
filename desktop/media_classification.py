@@ -52,7 +52,7 @@ def _ensure_dirs():
 
 def cache_key(prompt, media_type, style=''):
     """Deterministic SHA-256 cache key from prompt + type + style."""
-    raw = f"{media_type}:{prompt}:{style}".encode('utf-8')
+    raw = f"{media_type}:{prompt}:{style}".encode()
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -64,7 +64,7 @@ def _load_manifest():
     if not os.path.isfile(MANIFEST_PATH):
         return {}
     try:
-        with open(MANIFEST_PATH, 'r', encoding='utf-8') as f:
+        with open(MANIFEST_PATH, encoding='utf-8') as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         logger.warning("Corrupt manifest.json — starting fresh")

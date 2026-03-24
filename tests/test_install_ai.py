@@ -4,9 +4,9 @@ Regression tests for --install-ai CLI flag in app.py.
 Tests that the argument parser recognizes --install-ai
 and that the flag integrates correctly with the app startup flow.
 """
+import os
 import subprocess
 import sys
-import os
 
 PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_PY = os.path.join(PROJ_ROOT, 'app.py')
@@ -114,7 +114,7 @@ def test_inno_setup_script_has_setupai_task():
     iss_path = os.path.join(PROJ_ROOT, 'scripts', 'Nunba_Installer.iss')
     if not os.path.exists(iss_path):
         return  # Skip if file doesn't exist
-    with open(iss_path, 'r', encoding='utf-8') as f:
+    with open(iss_path, encoding='utf-8') as f:
         content = f.read()
     assert 'setupai' in content, "setupai task not found in Nunba_Installer.iss"
     assert '--setup-ai' in content, "--setup-ai flag not found in Nunba_Installer.iss"

@@ -12,11 +12,9 @@ NFT: Thread safety of singleton state, concurrent start_bootstrap calls,
 """
 import os
 import sys
-import time
 import threading
-from unittest.mock import patch, MagicMock
-
-import pytest
+import time
+from unittest.mock import MagicMock, patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -67,7 +65,7 @@ class TestBootstrapDataclasses:
 
     def test_step_to_dict_includes_run_mode(self):
         """Frontend shows 'GPU' or 'CPU' badge — run_mode must be in the step dict."""
-        from models.language_bootstrap import BootstrapStep, BootstrapState
+        from models.language_bootstrap import BootstrapState, BootstrapStep
         state = BootstrapState()
         state.steps['llm'] = BootstrapStep(model_type='llm', run_mode='gpu')
         d = state.to_dict()
@@ -178,7 +176,7 @@ class TestPlanCreation:
 
     def test_skips_optional_types_on_low_vram(self):
         """Users with <6GB VRAM shouldn't wait for video_gen download attempts."""
-        from models.language_bootstrap import _create_plan, ModelType
+        from models.language_bootstrap import ModelType, _create_plan
         mock_orch = MagicMock()
         mock_orch.select_best.return_value = None
         mock_mod = MagicMock()
@@ -199,7 +197,7 @@ class TestPlanCreation:
 
     def test_plan_includes_all_bootstrap_order_types(self):
         """Every type in BOOTSTRAP_ORDER must appear in the plan."""
-        from models.language_bootstrap import _create_plan, BOOTSTRAP_ORDER
+        from models.language_bootstrap import BOOTSTRAP_ORDER, _create_plan
         mock_entry = MagicMock()
         mock_entry.id = 'test-model'
         mock_entry.name = 'Test'
@@ -223,7 +221,7 @@ class TestStartBootstrap:
 
     def test_returns_dict_immediately(self):
         """Frontend needs immediate response to show the setup wizard."""
-        from models.language_bootstrap import start_bootstrap, _state, _lock
+        from models.language_bootstrap import _lock, _state, start_bootstrap
         # Reset state
         with _lock:
             _state.phase = 'idle'
@@ -236,7 +234,7 @@ class TestStartBootstrap:
 
     def test_rejects_concurrent_start(self):
         """Double-clicking 'Setup AI' must not start two bootstrap threads."""
-        from models.language_bootstrap import start_bootstrap, _state, _lock
+        from models.language_bootstrap import _lock, _state, start_bootstrap
         with _lock:
             _state.phase = 'running'
         result = start_bootstrap('en')

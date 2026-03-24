@@ -12,12 +12,8 @@ NFT: Path traversal prevention (security-critical), thread safety of manifest,
 """
 import os
 import sys
-import json
 import tempfile
-import threading
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -69,7 +65,7 @@ class TestClassificationRules:
 
     def test_all_labels_are_valid(self):
         """Every classification result must be in the LABELS tuple."""
-        from desktop.media_classification import MediaClassifier, LABELS
+        from desktop.media_classification import LABELS, MediaClassifier
         test_cases = [
             ({}, None),
             ({'game_asset': True}, None),
@@ -151,7 +147,7 @@ class TestPathTraversal:
 
     def test_cache_path_stays_within_root(self):
         """The realpath check must prevent symlink/traversal escapes."""
-        from desktop.media_classification import MediaClassifier, MEDIA_CACHE_ROOT
+        from desktop.media_classification import MEDIA_CACHE_ROOT, MediaClassifier
         path = MediaClassifier.get_cache_path(
             sha="abc123", media_type="image", label="user_private",
             owner_id="../../etc", ext="png")
@@ -159,7 +155,7 @@ class TestPathTraversal:
         assert resolved.startswith(os.path.realpath(MEDIA_CACHE_ROOT))
 
     def test_public_path_format(self):
-        from desktop.media_classification import MediaClassifier, MEDIA_CACHE_ROOT
+        from desktop.media_classification import MediaClassifier
         path = MediaClassifier.get_cache_path(
             sha="deadbeef", media_type="image", label="public_educational", ext="png")
         assert 'public' in path
@@ -206,7 +202,7 @@ class TestManifest:
     """Manifest stores asset metadata on disk — consumed by the asset API."""
 
     def test_register_and_retrieve_asset(self):
-        from desktop.media_classification import register_asset, get_asset_meta, MANIFEST_PATH
+        from desktop.media_classification import get_asset_meta, register_asset
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch('desktop.media_classification.MANIFEST_PATH',
                        os.path.join(tmpdir, 'manifest.json')), \
@@ -220,7 +216,7 @@ class TestManifest:
 
     def test_prompt_truncated_to_200(self):
         """Long prompts must be truncated — prevents manifest bloat."""
-        from desktop.media_classification import register_asset, get_asset_meta
+        from desktop.media_classification import get_asset_meta, register_asset
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch('desktop.media_classification.MANIFEST_PATH',
                        os.path.join(tmpdir, 'manifest.json')), \

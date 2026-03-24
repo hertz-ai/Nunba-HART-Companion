@@ -11,8 +11,7 @@ NFT: Thread safety of tray operations, graceful degradation when
 """
 import os
 import sys
-import threading
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -25,14 +24,14 @@ class TestPlatformDetection:
     """Platform flags drive tray backend selection — wrong detection = crash."""
 
     def test_platform_constants_are_bool(self):
-        from desktop.tray_handler import IS_MACOS, IS_WINDOWS, IS_LINUX
+        from desktop.tray_handler import IS_LINUX, IS_MACOS, IS_WINDOWS
         assert isinstance(IS_MACOS, bool)
         assert isinstance(IS_WINDOWS, bool)
         assert isinstance(IS_LINUX, bool)
 
     def test_exactly_one_platform_is_true(self):
         """Exactly one of the three should be true on any OS."""
-        from desktop.tray_handler import IS_MACOS, IS_WINDOWS, IS_LINUX
+        from desktop.tray_handler import IS_LINUX, IS_MACOS, IS_WINDOWS
         active = sum([IS_MACOS, IS_WINDOWS, IS_LINUX])
         assert active <= 1, "Multiple platform flags true simultaneously"
 
@@ -63,8 +62,8 @@ class TestTraySetup:
 
     def test_setup_returns_icon_or_none(self):
         """Must return an icon object or None — never crash."""
-        from desktop.tray_handler import TrayHandler, _tray_icon
         import desktop.tray_handler as th
+        from desktop.tray_handler import TrayHandler
         old_icon = th._tray_icon
         th._tray_icon = None  # Reset singleton
         handler = TrayHandler(MagicMock())
@@ -75,8 +74,8 @@ class TestTraySetup:
 
     def test_singleton_prevents_double_setup(self):
         """Double-clicking the tray should not create two icons."""
-        from desktop.tray_handler import TrayHandler
         import desktop.tray_handler as th
+        from desktop.tray_handler import TrayHandler
         old_icon = th._tray_icon
         fake_icon = MagicMock()
         th._tray_icon = fake_icon
@@ -87,8 +86,8 @@ class TestTraySetup:
 
     def test_macos_returns_dummy_tray(self):
         """macOS can't use pystray (AppKit threading) — returns a dummy with .notify()."""
-        from desktop.tray_handler import TrayHandler
         import desktop.tray_handler as th
+        from desktop.tray_handler import TrayHandler
         old_icon = th._tray_icon
         th._tray_icon = None
         handler = TrayHandler(MagicMock())
@@ -125,8 +124,8 @@ class TestNotifications:
 
     def test_notify_calls_pystray_notify(self):
         """Windows/Linux: notification goes through pystray icon.notify()."""
-        from desktop.tray_handler import TrayHandler
         import desktop.tray_handler as th
+        from desktop.tray_handler import TrayHandler
         old_icon = th._tray_icon
         mock_icon = MagicMock()
         th._tray_icon = mock_icon
@@ -137,8 +136,8 @@ class TestNotifications:
 
     def test_notify_graceful_when_no_icon(self):
         """If tray icon failed to create, notification must not crash."""
-        from desktop.tray_handler import TrayHandler
         import desktop.tray_handler as th
+        from desktop.tray_handler import TrayHandler
         old_icon = th._tray_icon
         th._tray_icon = None
         handler = TrayHandler(MagicMock())

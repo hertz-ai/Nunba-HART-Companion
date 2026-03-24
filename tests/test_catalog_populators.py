@@ -20,13 +20,17 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from models.catalog import (
-    ModelCatalog, ModelEntry, ModelType, MODEL_TYPES, BACKENDS, SOURCES,
-    populate_llm_presets, populate_tts_engines, populate_media_gen,
-    get_catalog,
-)
 import integrations.service_tools.model_catalog as _hartos_mod
 
+from models.catalog import (
+    ModelCatalog,
+    ModelEntry,
+    ModelType,
+    get_catalog,
+    populate_llm_presets,
+    populate_media_gen,
+    populate_tts_engines,
+)
 
 # ── Helpers ───────────────────────────────────────────────────────────
 

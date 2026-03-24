@@ -5,16 +5,13 @@ Since pywebview owns the main thread in the Nunba desktop app, this module is
 skipped on macOS (guard in app.py). On Windows/Linux, Tk tolerates background
 thread creation.
 """
-import os
-import sys
-import threading
 import logging
+import os
+import threading
 import time
 import tkinter as tk
-from tkinter import ttk
+
 import requests
-import json
-import traceback
 
 # Try to import pyautogui for screen detection
 try:

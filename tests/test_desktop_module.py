@@ -10,19 +10,16 @@ Consolidated tests for the desktop module:
 Target: 60+ tests covering happy path, error path, edge cases,
 and cross-platform behaviour (win32, darwin, linux).
 """
-import hashlib
 import json
 import os
+import platform
 import sys
 import time
-import types
-import platform
 from pathlib import Path
 from unittest import mock
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ============================================================================
 # 1. platform_utils.py  (10+ tests)
@@ -309,7 +306,6 @@ class TestTrayHandler:
         handler = th.TrayHandler(mock_win)
         # Call _on_restore; it spawns a thread — we test the internal _do directly
         handler._on_restore()
-        import time
         time.sleep(0.1)  # Let thread run
         mock_win.show.assert_called()
 
@@ -439,7 +435,7 @@ class TestConfig:
                 assert get_environment() == "development"
 
     def test_app_constants(self):
-        from desktop.config import APP_NAME, APP_VERSION, APP_IDENTIFIER
+        from desktop.config import APP_IDENTIFIER, APP_NAME, APP_VERSION
         assert APP_NAME == "Nunba"
         assert APP_VERSION == "2.0.0"
         assert APP_IDENTIFIER == "com.hevolve.nunba"

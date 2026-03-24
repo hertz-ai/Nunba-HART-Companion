@@ -4,12 +4,13 @@ fix_llama_dependencies.py - Fix missing DLL dependencies for llama.cpp
 This script helps diagnose and fix DLL dependency issues with llama-server.exe
 """
 
+import os
 import subprocess
 import sys
-import os
-from pathlib import Path
-import urllib.request
 import tempfile
+import urllib.request
+from pathlib import Path
+
 
 def check_vcredist_installed():
     """Check if Visual C++ Redistributable is installed"""
@@ -29,7 +30,7 @@ def check_vcredist_installed():
                 winreg.CloseKey(key)
                 print(f"✓ Found Visual C++ Redistributable: {version}")
                 return True
-            except WindowsError:
+            except OSError:
                 continue
 
         print("✗ Visual C++ Redistributable not found")

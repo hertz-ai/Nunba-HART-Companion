@@ -5,9 +5,10 @@ Tests model catalog, orchestrator, bootstrap planning, chat, and APIs.
 Usage: python -m pytest tests/test_e2e_live.py -v
 Requires: Flask running on localhost:5000
 """
+import time
+
 import pytest
 import requests
-import time
 
 BASE = 'http://127.0.0.1:5000'
 TIMEOUT = 30  # Waitress threads can be blocked by background retries

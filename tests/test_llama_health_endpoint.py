@@ -10,9 +10,7 @@ NFT: Response time for health checks, JSON schema stability for frontend consume
 """
 import os
 import sys
-import json
-import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,7 +19,6 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from flask import Flask
-
 
 # ============================================================
 # LlamaHealthWrapper — unit tests

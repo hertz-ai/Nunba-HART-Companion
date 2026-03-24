@@ -37,13 +37,13 @@ Developer Setup — Clone repos (sibling directories):
     locally, it falls back to pip install from GitHub (requires git credentials
     for private repos).
 """
-import os
-import sys
-import shutil
-import subprocess
 import argparse
+import os
 import platform as plat
 import re
+import shutil
+import subprocess
+import sys
 
 # Force unbuffered output so build logs appear in real time (not held until exit).
 # Critical when running from IDEs, CI, or piped environments.
@@ -303,7 +303,7 @@ def _fix_crossbarhttp(python_exe):
     init_py = os.path.join(site_pkgs, 'crossbarhttp', '__init__.py')
     if not os.path.exists(init_py):
         return
-    with open(init_py, 'r') as f:
+    with open(init_py) as f:
         content = f.read()
     old = 'from crossbarhttp import ('
     new = 'from .crossbarhttp import ('
@@ -324,7 +324,7 @@ def _stamp_version_in_file(filepath, pattern, replacement):
     if not os.path.exists(filepath):
         print_warn(f"Cannot stamp version: {filepath} not found")
         return False
-    with open(filepath, 'r', encoding='utf-8') as f:
+    with open(filepath, encoding='utf-8') as f:
         content = f.read()
     new_content = re.sub(pattern, replacement, content)
     if new_content != content:
@@ -568,7 +568,7 @@ def run_setup_wizard(python_exe, dsn=None):
 
     # If DSN provided via command line, set it directly
     if dsn:
-        print_info(f"Setting Sentry DSN from command line...")
+        print_info("Setting Sentry DSN from command line...")
         result = subprocess.run(
             [python_exe, os.path.join('desktop', 'setup_wizard.py'), '--dsn', dsn],
             capture_output=True, text=True
@@ -681,7 +681,7 @@ def slim_python_embed():
     # Remove .pth files that reference dev machine paths
     for f in _glob.glob(os.path.join(site_packages, '*.pth')):
         try:
-            with open(f, 'r') as fh:
+            with open(f) as fh:
                 content = fh.read()
             if '__editable__' in content or 'PycharmProjects' in content:
                 os.remove(f)
@@ -1254,7 +1254,6 @@ def build_linux(python_exe, app_only=False, installer_only=False):
         _hv_sp = os.path.join('build', 'Nunba', 'python-embed', 'Lib', 'site-packages')
         # Also check Linux-style path
         if not os.path.isdir(_hv_sp):
-            import sysconfig
             _pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
             _hv_sp = os.path.join('build', 'Nunba', 'python-embed', 'lib', _pyver, 'site-packages')
         _hv_dir = os.path.join(_hv_sp, 'hevolveai')
@@ -1337,8 +1336,8 @@ def print_summary():
             print(f"  Installer:  {installer_path} ({size} MB)")
 
         print("=" * 60)
-        print(f"\n  To test:    build\\Nunba\\Nunba.exe")
-        print(f"  To install: Output\\Nunba_Setup.exe")
+        print("\n  To test:    build\\Nunba\\Nunba.exe")
+        print("  To install: Output\\Nunba_Setup.exe")
 
     elif IS_MACOS:
         app_path = os.path.join('build', 'Nunba.app')
@@ -1359,8 +1358,8 @@ def print_summary():
             print(f"  Installer:   {dmg_path} ({size} MB)")
 
         print("=" * 60)
-        print(f"\n  To test:    open build/Nunba.app")
-        print(f"  To install: open Output/Nunba_Setup.dmg")
+        print("\n  To test:    open build/Nunba.app")
+        print("  To install: open Output/Nunba_Setup.dmg")
 
     elif IS_LINUX:
         exe_path = os.path.join('build', 'Nunba', 'Nunba')
@@ -1379,10 +1378,10 @@ def print_summary():
             print(f"  AppImage:   {latest} ({size} MB)")
 
         print("=" * 60)
-        print(f"\n  To test:    ./build/Nunba/Nunba")
+        print("\n  To test:    ./build/Nunba/Nunba")
         if appimages:
-            print(f"  To install: ./deploy/linux/install.sh")
-        print(f"\n  Requirements: GTK 3.0, WebKit2GTK 4.0")
+            print("  To install: ./deploy/linux/install.sh")
+        print("\n  Requirements: GTK 3.0, WebKit2GTK 4.0")
 
 
 def main():

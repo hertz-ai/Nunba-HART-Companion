@@ -11,13 +11,9 @@ NFT: Thread safety of synthesis queue, graceful degradation without piper module
 """
 import os
 import sys
-import json
 import tempfile
-import threading
 from pathlib import Path
-from unittest.mock import patch, MagicMock, PropertyMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -55,7 +51,7 @@ class TestVoicePresets:
 
     def test_default_voice_exists_in_presets(self):
         """DEFAULT_VOICE must reference an actual preset — otherwise first-run crashes."""
-        from tts.piper_tts import VOICE_PRESETS, DEFAULT_VOICE
+        from tts.piper_tts import DEFAULT_VOICE, VOICE_PRESETS
         assert DEFAULT_VOICE in VOICE_PRESETS
 
     def test_size_mb_is_positive(self):

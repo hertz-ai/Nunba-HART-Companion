@@ -14,7 +14,7 @@ NFT: Graceful degradation without pyautogui, Tk threading constraints,
 import os
 import sys
 import time
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

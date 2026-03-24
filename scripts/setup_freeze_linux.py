@@ -11,12 +11,12 @@ Usage:
 Requires: GTK3 + webkit2gtk for pywebview on Linux.
     sudo apt install libgirepository1.0-dev libwebkit2gtk-4.0-dev gir1.2-webkit2-4.0
 """
-import sys
-import os
-import glob
-import shutil
 import compileall
+import glob
+import os
 import py_compile
+import shutil
+import sys
 
 # Ensure we're on Linux
 if not sys.platform.startswith('linux'):
@@ -33,17 +33,16 @@ _hevolveai_src = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', 'hevolveai', 'src'))
 if _hevolveai_src in sys.path:
     sys.path.remove(_hevolveai_src)
-    print(f"Removed hevolveai/src from sys.path")
+    print("Removed hevolveai/src from sys.path")
 
 # 2. Block wheel-installed hevolveai/embodied_ai from being found
-import importlib
 for _block_pkg in ('hevolveai', 'embodied_ai'):
     if _block_pkg in sys.modules:
         del sys.modules[_block_pkg]
 
 sys.setrecursionlimit(5000)  # safety margin for deep import chains
 
-from cx_Freeze import setup, Executable
+from cx_Freeze import Executable, setup
 
 # Ensure current directory is in path for module discovery
 if os.getcwd() not in sys.path:
@@ -53,7 +52,7 @@ if os.getcwd() not in sys.path:
 _scripts_dir = os.path.dirname(os.path.abspath(__file__))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
-from deps import VERSION, version_short
+from deps import version_short
 
 # -- Auto-install sibling project editable deps ------
 # Ensures HARTOS, hevolveai, hevolve-database, agent-ledger are
@@ -333,6 +332,7 @@ build_exe_options["include_files"] = [item for item in build_exe_options["includ
 # Include *.libs shared library directories (numpy.libs, shapely.libs, etc.)
 # cx_Freeze traces Python modules but NOT these companion .so directories.
 import site as _site
+
 _site_packages_dirs = _site.getsitepackages() if hasattr(_site, 'getsitepackages') else []
 # Also check the venv site-packages directly
 _venv_sp = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'lib',
@@ -353,6 +353,7 @@ for _sp_dir in _site_packages_dirs:
 
 # Conditionally include optional packages that may not be installed
 import importlib.util as _ilu
+
 _optional_packages = [
     "autogen",
     "autogen_agentchat",
@@ -394,7 +395,7 @@ def find_hevolve_modules():
     if os.path.isfile(_hartos_toml):
         import re
         try:
-            with open(_hartos_toml, 'r', encoding='utf-8') as _tf:
+            with open(_hartos_toml, encoding='utf-8') as _tf:
                 _toml_text = _tf.read()
             _match = re.search(r'py-modules\s*=\s*\[(.*?)\]', _toml_text, re.DOTALL)
             if _match:
@@ -516,7 +517,7 @@ for _cfg_candidate in [
 if _langchain_config and os.path.isfile(_langchain_config):
     try:
         import json as _json_check
-        with open(_langchain_config, 'r') as _f:
+        with open(_langchain_config) as _f:
             _cfg_data = _json_check.load(_f)
         _secret_keys = [k for k in _cfg_data if 'API_KEY' in k.upper() or 'SECRET' in k.upper()]
         if _secret_keys:
@@ -559,7 +560,7 @@ def get_directory_hash(directory):
                         if not data:
                             break
                         hash_obj.update(data)
-            except (OSError, IOError):
+            except OSError:
                 pass
     return hash_obj.hexdigest()
 
@@ -573,7 +574,7 @@ if os.path.exists("python-embed"):
     hash_file = os.path.join(build_dir, "python-embed.hash")
     dest_embed = os.path.join(build_dir, "python-embed")
     if os.path.exists(hash_file) and os.path.isdir(dest_embed):
-        with open(hash_file, 'r') as f:
+        with open(hash_file) as f:
             _hash_lines = f.read().strip().splitlines()
         _old_src_hash = _hash_lines[0] if _hash_lines else ''
         _old_dest_hash = _hash_lines[1] if len(_hash_lines) > 1 else _old_src_hash
@@ -664,7 +665,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
         _src_embed = os.path.abspath("python-embed")
         _dst_embed = os.path.join(_build_dir, "python-embed")
         if os.path.isdir(_src_embed):
-            print(f"Post-build: copying python-embed via copytree...")
+            print("Post-build: copying python-embed via copytree...")
             shutil.copytree(_src_embed, _dst_embed, dirs_exist_ok=True)
 
             # Clean orphans
@@ -754,7 +755,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     _exe = os.path.join(_build_dir, "Nunba")
     if os.path.isfile(_exe):
         print(f"\n{'='*60}")
-        print(f"POST-BUILD: Running Nunba --validate")
+        print("POST-BUILD: Running Nunba --validate")
         print(f"{'='*60}")
         import subprocess as _sp
         try:
@@ -775,12 +776,12 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
             ]
             _val_log = next((p for p in _val_log_candidates if os.path.isfile(p)), None)
             if _val_log:
-                _log_text = open(_val_log, 'r', encoding='utf-8').read().strip()
+                _log_text = open(_val_log, encoding='utf-8').read().strip()
                 if _log_text and _log_text not in (_ret.stdout or ''):
                     print("\n--- validate.log ---")
                     print(_log_text)
             if _ret.returncode != 0:
-                _log_says_good = _val_log and 'Failed: 0' in open(_val_log, 'r', encoding='utf-8').read()
+                _log_says_good = _val_log and 'Failed: 0' in open(_val_log, encoding='utf-8').read()
                 if _log_says_good:
                     print(f"\n[INFO] Exe exited with code {_ret.returncode} but validate.log "
                           f"shows 0 failures -- build is good.\n")

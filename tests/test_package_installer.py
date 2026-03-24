@@ -5,15 +5,12 @@ Comprehensive coverage of all public functions with happy path,
 error path, and edge cases.  All subprocess / pip / importlib
 operations are mocked so tests run without side-effects.
 """
-import importlib
 import os
 import subprocess
 import sys
-import threading
 import types
 from pathlib import Path
-from unittest import mock
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,7 +18,6 @@ import pytest
 # Import the module under test
 # ---------------------------------------------------------------------------
 from tts import package_installer as pi
-
 
 # ========================== get_python_embed_dir ==========================
 

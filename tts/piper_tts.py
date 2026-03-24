@@ -6,22 +6,18 @@ Converts text responses to audio without requiring GPU or internet.
 
 Piper TTS: https://github.com/rhasspy/piper
 """
-import os
-import sys
-import json
-import wave
-import struct
-import logging
-import subprocess
-import urllib.request
-import zipfile
-import shutil
 import hashlib
-import threading
+import logging
+import os
 import queue
+import subprocess
+import sys
 import tempfile
+import threading
+import urllib.request
+import wave
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Callable, Dict, List, Tuple
 
 logger = logging.getLogger('NunbaPiperTTS')
 
@@ -77,8 +73,8 @@ class PiperTTS:
     """
 
     def __init__(self,
-                 voices_dir: Optional[str] = None,
-                 cache_dir: Optional[str] = None,
+                 voices_dir: str | None = None,
+                 cache_dir: str | None = None,
                  default_voice: str = DEFAULT_VOICE):
         """
         Initialize Piper TTS.
@@ -118,7 +114,7 @@ class PiperTTS:
         """Check if Piper TTS is available"""
         return self._piper_module is not None or self._find_piper_executable() is not None
 
-    def _find_piper_executable(self) -> Optional[str]:
+    def _find_piper_executable(self) -> str | None:
         """Find piper executable in system"""
         # Check common locations
         exe_name = "piper.exe" if sys.platform == "win32" else "piper"
@@ -159,7 +155,7 @@ class PiperTTS:
 
         return None
 
-    def get_voice_path(self, voice_id: str) -> Tuple[Optional[Path], Optional[Path]]:
+    def get_voice_path(self, voice_id: str) -> tuple[Path | None, Path | None]:
         """
         Get paths to voice model and config files.
 
@@ -180,7 +176,7 @@ class PiperTTS:
 
     def download_voice(self,
                        voice_id: str,
-                       progress_callback: Optional[Callable[[int, int], None]] = None) -> bool:
+                       progress_callback: Callable[[int, int], None] | None = None) -> bool:
         """
         Download a voice model.
 
@@ -225,7 +221,7 @@ class PiperTTS:
     def _download_file(self,
                        url: str,
                        dest_path: Path,
-                       progress_callback: Optional[Callable[[int, int], None]] = None):
+                       progress_callback: Callable[[int, int], None] | None = None):
         """Download a file with optional progress callback"""
         req = urllib.request.Request(url)
         req.add_header('User-Agent', 'Nunba/1.0')
@@ -245,7 +241,7 @@ class PiperTTS:
                     if progress_callback and total_size > 0:
                         progress_callback(downloaded, total_size)
 
-    def list_installed_voices(self) -> List[str]:
+    def list_installed_voices(self) -> list[str]:
         """List installed voice IDs"""
         voices = []
         for voice_id in VOICE_PRESETS:
@@ -253,7 +249,7 @@ class PiperTTS:
                 voices.append(voice_id)
         return voices
 
-    def list_available_voices(self) -> Dict[str, dict]:
+    def list_available_voices(self) -> dict[str, dict]:
         """List all available voice presets"""
         return VOICE_PRESETS.copy()
 
@@ -276,9 +272,9 @@ class PiperTTS:
 
     def synthesize(self,
                    text: str,
-                   output_path: Optional[str] = None,
-                   voice_id: Optional[str] = None,
-                   speed: float = 1.0) -> Optional[str]:
+                   output_path: str | None = None,
+                   voice_id: str | None = None,
+                   speed: float = 1.0) -> str | None:
         """
         Synthesize text to speech.
 
@@ -339,7 +335,7 @@ class PiperTTS:
                                 text: str,
                                 output_path: str,
                                 model_path: Path,
-                                speed: float) -> Optional[str]:
+                                speed: float) -> str | None:
         """Synthesize using piper-tts module"""
         from piper import PiperVoice
 
@@ -366,7 +362,7 @@ class PiperTTS:
                                     output_path: str,
                                     model_path: Path,
                                     piper_exe: str,
-                                    speed: float) -> Optional[str]:
+                                    speed: float) -> str | None:
         """Synthesize using piper executable"""
         # Create temp file for input text
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -391,7 +387,7 @@ class PiperTTS:
                 cf = subprocess.CREATE_NO_WINDOW
 
             # Pipe text to stdin
-            with open(text_file, 'r') as f:
+            with open(text_file) as f:
                 result = subprocess.run(
                     cmd,
                     stdin=f,
@@ -414,8 +410,8 @@ class PiperTTS:
 
     def synthesize_async(self,
                          text: str,
-                         callback: Callable[[Optional[str]], None],
-                         voice_id: Optional[str] = None,
+                         callback: Callable[[str | None], None],
+                         voice_id: str | None = None,
                          speed: float = 1.0):
         """
         Synthesize text asynchronously.
@@ -455,7 +451,7 @@ class PiperTTS:
 
 
 # Global TTS instance
-_tts_instance: Optional[PiperTTS] = None
+_tts_instance: PiperTTS | None = None
 
 
 def get_tts() -> PiperTTS:
@@ -467,8 +463,8 @@ def get_tts() -> PiperTTS:
 
 
 def synthesize_text(text: str,
-                    voice_id: Optional[str] = None,
-                    speed: float = 1.0) -> Optional[str]:
+                    voice_id: str | None = None,
+                    speed: float = 1.0) -> str | None:
     """
     Convenience function to synthesize text.
 
@@ -484,8 +480,8 @@ def synthesize_text(text: str,
 
 
 def synthesize_text_async(text: str,
-                          callback: Callable[[Optional[str]], None],
-                          voice_id: Optional[str] = None,
+                          callback: Callable[[str | None], None],
+                          voice_id: str | None = None,
                           speed: float = 1.0):
     """
     Convenience function for async synthesis.
@@ -504,6 +500,6 @@ def is_tts_available() -> bool:
     return get_tts().is_available()
 
 
-def install_default_voice(progress_callback: Optional[Callable[[int, int], None]] = None) -> bool:
+def install_default_voice(progress_callback: Callable[[int, int], None] | None = None) -> bool:
     """Install the default voice model"""
     return get_tts().download_voice(DEFAULT_VOICE, progress_callback)

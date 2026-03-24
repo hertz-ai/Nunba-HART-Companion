@@ -19,11 +19,10 @@ import json
 import logging
 import os
 import sqlite3
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +192,7 @@ def create_or_get_actions():
 
     conn = _get_db()
     try:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         cursor = conn.execute(
             """INSERT INTO actions (conv_id, user_id, action, zeroshot_label, gpt3_label, created_date)
                VALUES (?, ?, ?, ?, ?, ?)""",
@@ -287,7 +286,7 @@ def conversation():
 
     conn = _get_db()
     try:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         cursor = conn.execute(
             """INSERT INTO conversations
                (user_id, request, response, conv_bot_name, topic, revision,
@@ -341,7 +340,8 @@ def get_student_by_user_id():
 
     # Try to get from social DB (the user table has display_name, etc.)
     try:
-        from integrations.social.models import User as SocialUser, db_session
+        from integrations.social.models import User as SocialUser
+        from integrations.social.models import db_session
         with db_session(commit=False) as session:
             user = session.query(SocialUser).get(int(user_id))
             if user:
@@ -402,7 +402,7 @@ def create_prompt_list():
         existing = {}
         if prompt_file.exists():
             try:
-                with open(prompt_file, 'r', encoding='utf-8') as f:
+                with open(prompt_file, encoding='utf-8') as f:
                     existing = json.load(f)
             except Exception:
                 pass
@@ -415,7 +415,7 @@ def create_prompt_list():
             'name': p.get('name', existing.get('name', '')),
             'is_active': p.get('is_active', True),
             'image_url': p.get('image_url', existing.get('image_url', '')),
-            'synced_at': datetime.now(timezone.utc).isoformat(),
+            'synced_at': datetime.now(UTC).isoformat(),
         })
 
         with open(prompt_file, 'w', encoding='utf-8') as f:
@@ -442,7 +442,7 @@ def get_prompt():
         return jsonify({"error": f"Prompt {prompt_id} not found"}), 404
 
     try:
-        with open(prompt_file, 'r', encoding='utf-8') as f:
+        with open(prompt_file, encoding='utf-8') as f:
             data = json.load(f)
         return jsonify({
             "prompt_id": prompt_id,
@@ -475,7 +475,7 @@ def get_prompt_by_user():
         if not f.suffix == '.json' or '_recipe' in f.name or '_vlm_agent' in f.name:
             continue
         try:
-            with open(f, 'r', encoding='utf-8') as fh:
+            with open(f, encoding='utf-8') as fh:
                 data = json.load(fh)
             # Filter by user_id if provided
             file_user = str(data.get('user_id', ''))
@@ -512,7 +512,7 @@ def get_all_prompts():
         if not f.suffix == '.json' or '_recipe' in f.name or '_vlm_agent' in f.name:
             continue
         try:
-            with open(f, 'r', encoding='utf-8') as fh:
+            with open(f, encoding='utf-8') as fh:
                 data = json.load(fh)
             results.append({
                 "prompt_id": f.stem,
@@ -544,7 +544,7 @@ def create_pdf_file():
     data = request.get_json(force=True)
     conn = _get_db()
     try:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         cursor = conn.execute(
             """INSERT INTO pdf_files (user_id, filename, directory, request_id, created_date)
                VALUES (?, ?, ?, ?, ?)""",
@@ -566,7 +566,7 @@ def update_pdf_file(file_id):
     data = request.get_json(force=True)
     conn = _get_db()
     try:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         conn.execute(
             """UPDATE pdf_files SET
                 text_response = COALESCE(?, text_response),
@@ -603,7 +603,7 @@ def create_layout():
     conn = _get_db()
     try:
         layouts = data.get('layouts', [data])
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         ids = []
 
         for layout in layouts:
@@ -717,7 +717,7 @@ def add_batch_layouts():
 
     conn = _get_db()
     try:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         page_types = data.get('page_types', {})
         topic_names = data.get('final_topic_names', [])
         topic_page_nums = data.get('final_topic_page_numbers', [])

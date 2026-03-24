@@ -7,8 +7,8 @@ import html
 import json
 import os
 import re
-import sys
 from difflib import SequenceMatcher
+
 
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,11 +17,11 @@ def main():
     out_path = os.path.join(base_dir, 'hart_verification.html')
 
     # Load transcription results
-    with open(results_path, 'r', encoding='utf-8') as f:
+    with open(results_path, encoding='utf-8') as f:
         results = json.load(f)
 
     # Extract LINES dict from generate_hart_voices.py
-    with open(script_path, 'r', encoding='utf-8') as f:
+    with open(script_path, encoding='utf-8') as f:
         content = f.read()
 
     # Parse ALL_LANGS

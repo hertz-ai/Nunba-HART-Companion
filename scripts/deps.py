@@ -226,13 +226,12 @@ def generate_requirements(output_path='requirements.txt', platform=None):
 
     All deployment modes (dev, build, CI) use this generated file.
     """
-    import os
     if platform is None:
         platform = sys.platform
 
     lines = [
         "# AUTO-GENERATED from scripts/deps.py — DO NOT EDIT MANUALLY",
-        f"# Regenerate: python scripts/deps.py requirements",
+        "# Regenerate: python scripts/deps.py requirements",
         f"# Nunba {VERSION} | Python Embed {PYTHON_EMBED_VERSION}",
         "",
     ]

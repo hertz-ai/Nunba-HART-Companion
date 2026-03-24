@@ -12,11 +12,9 @@ Covers:
 import json
 import os
 import sys
-import time
 import threading
-from unittest.mock import patch, MagicMock, PropertyMock
-
-import pytest
+import time
+from unittest.mock import MagicMock, patch
 
 # Ensure project root is importable
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -129,7 +127,12 @@ class TestDrainThinkingTraces:
 
     def test_drain_none_preserves_daemon_traces(self):
         self._reset()
-        from routes.hartos_backend_adapter import _capture_thinking, drain_thinking_traces, _thinking_traces_by_request, _thinking_traces_lock
+        from routes.hartos_backend_adapter import (
+            _capture_thinking,
+            _thinking_traces_by_request,
+            _thinking_traces_lock,
+            drain_thinking_traces,
+        )
         _capture_thinking({'priority': 49, 'action': 'Thinking', 'request_id': 'daemon_x', 'text': 'bg'})
         _capture_thinking({'priority': 49, 'action': 'Thinking', 'request_id': 'user-1', 'text': 'u'})
         drain_thinking_traces(None)
@@ -342,13 +345,13 @@ class TestModuleConstants:
     """Verify module-level configuration is sane."""
 
     def test_timeouts_are_positive(self):
-        from routes.hartos_backend_adapter import REQUEST_TIMEOUT, CONNECT_TIMEOUT, AGENT_CREATION_TIMEOUT
+        from routes.hartos_backend_adapter import AGENT_CREATION_TIMEOUT, CONNECT_TIMEOUT, REQUEST_TIMEOUT
         assert REQUEST_TIMEOUT > 0
         assert CONNECT_TIMEOUT > 0
         assert AGENT_CREATION_TIMEOUT > REQUEST_TIMEOUT  # agent creation needs more time
 
     def test_circuit_breaker_threshold_positive(self):
-        from routes.hartos_backend_adapter import _HTTP_FAIL_THRESHOLD, _HTTP_FAIL_COOLDOWN
+        from routes.hartos_backend_adapter import _HTTP_FAIL_COOLDOWN, _HTTP_FAIL_THRESHOLD
         assert _HTTP_FAIL_THRESHOLD > 0
         assert _HTTP_FAIL_COOLDOWN > 0
 

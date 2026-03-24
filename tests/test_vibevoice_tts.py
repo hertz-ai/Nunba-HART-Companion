@@ -10,9 +10,9 @@ NFT: Graceful degradation without GPU, subprocess timeout handling,
      concurrent synthesis safety, model size constraints for download UX.
 """
 import os
-import sys
 import subprocess
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -74,7 +74,7 @@ class TestSpeakerPresets:
 
     def test_default_speaker_exists(self):
         """DEFAULT_SPEAKER must be in the presets — first-run uses it."""
-        from tts.vibevoice_tts import VIBEVOICE_SPEAKERS, DEFAULT_SPEAKER
+        from tts.vibevoice_tts import DEFAULT_SPEAKER, VIBEVOICE_SPEAKERS
         assert DEFAULT_SPEAKER in VIBEVOICE_SPEAKERS
 
     def test_english_speakers_available(self):
@@ -105,7 +105,7 @@ class TestModelVariants:
             assert not missing, f"Model '{model_id}' missing: {missing}"
 
     def test_default_model_exists(self):
-        from tts.vibevoice_tts import VIBEVOICE_MODELS, DEFAULT_MODEL
+        from tts.vibevoice_tts import DEFAULT_MODEL, VIBEVOICE_MODELS
         assert DEFAULT_MODEL in VIBEVOICE_MODELS
 
     def test_full_model_supports_voice_cloning(self):

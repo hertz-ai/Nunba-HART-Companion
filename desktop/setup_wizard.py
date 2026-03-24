@@ -13,12 +13,12 @@ Usage:
     python setup_wizard.py --skip    # Skip wizard (use defaults)
 """
 
-import os
-import sys
 import json
 import re
+import sys
 import webbrowser
 from pathlib import Path
+
 
 # Colors for terminal output
 class Colors:
@@ -267,7 +267,7 @@ def run_wizard():
                 update_json_config(dsn)
                 print()
                 print(color("  ✓ Crash reporting configured successfully!", Colors.GREEN))
-                print(f"  Dashboard: https://sentry.io")
+                print("  Dashboard: https://sentry.io")
                 print()
                 return True
             else:

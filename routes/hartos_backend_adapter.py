@@ -19,15 +19,16 @@ Usage:
     from routes.hartos_backend_adapter import chat, get_prompts, social_api
 """
 
+import logging
 import os
 import sys
-import logging
 import time
+from functools import wraps
+from typing import Any
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from typing import Optional, Dict, Any
-from functools import wraps
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ _HTTP_FAIL_COOLDOWN = 60  # Seconds before retrying after circuit breaker opens
 # We monkey-patch publish_async in all 3 modules so thinking traces are
 # captured into a thread-safe deque, then drained into the HTTP response.
 import threading as _threading
-from collections import deque as _deque, OrderedDict as _OrderedDict
+from collections import OrderedDict as _OrderedDict
 
 # Per-request thinking traces — isolated by request_id to prevent daemon
 # traces from leaking into user chat responses.
@@ -151,7 +152,7 @@ def _background_hartos_init():
         if _hartos_initialized:
             return
         try:
-            from hart_intelligence import get_ans, app as hevolve_app  # noqa: F811
+            from hart_intelligence import app as hevolve_app
             _hartos_backend_available = True
             _hevolve_app = hevolve_app
             _active_tier = "Tier-1 (direct in-process LangChain)"
@@ -210,7 +211,7 @@ _threading.Thread(target=_background_hartos_init, daemon=True,
 _first_chat_logged = False
 
 
-def _handle_response(response: requests.Response) -> Dict[str, Any]:
+def _handle_response(response: requests.Response) -> dict[str, Any]:
     """Handle HTTP response and return JSON or error dict"""
     try:
         response.raise_for_status()
@@ -241,14 +242,14 @@ def with_fallback(fallback_fn):
 
 # ============== CHAT API ==============
 
-def _fallback_chat(text: str, user_id: str = None, **kwargs) -> Dict[str, Any]:
+def _fallback_chat(text: str, user_id: str = None, **kwargs) -> dict[str, Any]:
     """Fallback chat using local llama.cpp directly (no langchain needed).
 
     Builds a minimal context with system prompt + preferred language so the
     response isn't a bare completion. Used while langchain is still loading.
     """
     try:
-        from llama.llama_config import get_llama_endpoint, check_llama_health
+        from llama.llama_config import check_llama_health, get_llama_endpoint
         if check_llama_health():
             endpoint = get_llama_endpoint()
 
@@ -325,7 +326,7 @@ def chat(
     agentic_execute: bool = False,
     agentic_plan: dict = None,
     **kwargs
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Send chat message to hart_intelligence.
 
@@ -446,7 +447,7 @@ def chat_stream(text: str, user_id: str = None, **kwargs):
 
 # ============== PROMPTS API ==============
 
-def get_prompts(user_id: str = None) -> Dict[str, Any]:
+def get_prompts(user_id: str = None) -> dict[str, Any]:
     """Get prompts/agents from hart-backend"""
     global _http_fail_count, _http_fail_time
     params = {"user_id": user_id} if user_id else {}
@@ -484,7 +485,7 @@ def get_prompts(user_id: str = None) -> Dict[str, Any]:
         return {"prompts": [], "error": "backend_unavailable"}
 
 
-def create_prompt(data: Dict[str, Any]) -> Dict[str, Any]:
+def create_prompt(data: dict[str, Any]) -> dict[str, Any]:
     """Create a new prompt/agent"""
     response = requests.post(
         f"{HARTOS_BACKEND_URL}/prompts",
@@ -494,7 +495,7 @@ def create_prompt(data: Dict[str, Any]) -> Dict[str, Any]:
     return _handle_response(response)
 
 
-def update_prompt(prompt_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+def update_prompt(prompt_id: int, data: dict[str, Any]) -> dict[str, Any]:
     """Update an existing prompt/agent"""
     response = requests.patch(
         f"{HARTOS_BACKEND_URL}/prompts/{prompt_id}",
@@ -517,14 +518,14 @@ class SocialAPI:
         """Set authentication token"""
         self._token = token
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         """Get request headers with auth token"""
         headers = {"Content-Type": "application/json"}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"
         return headers
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
         """Make HTTP request to social API"""
         url = f"{self.base_url}{endpoint}"
         kwargs.setdefault("headers", self._headers())
@@ -534,101 +535,101 @@ class SocialAPI:
         return _handle_response(response)
 
     # Auth endpoints
-    def register(self, data: Dict) -> Dict:
+    def register(self, data: dict) -> dict:
         return self._request("POST", "/auth/register", json=data)
 
-    def login(self, data: Dict) -> Dict:
+    def login(self, data: dict) -> dict:
         result = self._request("POST", "/auth/login", json=data)
         if "token" in result:
             self._token = result["token"]
         return result
 
-    def logout(self) -> Dict:
+    def logout(self) -> dict:
         result = self._request("POST", "/auth/logout")
         self._token = None
         return result
 
-    def me(self) -> Dict:
+    def me(self) -> dict:
         return self._request("GET", "/auth/me")
 
     # Users endpoints
-    def get_user(self, user_id: str) -> Dict:
+    def get_user(self, user_id: str) -> dict:
         return self._request("GET", f"/users/{user_id}")
 
-    def update_user(self, user_id: str, data: Dict) -> Dict:
+    def update_user(self, user_id: str, data: dict) -> dict:
         return self._request("PATCH", f"/users/{user_id}", json=data)
 
-    def follow_user(self, user_id: str) -> Dict:
+    def follow_user(self, user_id: str) -> dict:
         return self._request("POST", f"/users/{user_id}/follow")
 
-    def unfollow_user(self, user_id: str) -> Dict:
+    def unfollow_user(self, user_id: str) -> dict:
         return self._request("DELETE", f"/users/{user_id}/follow")
 
-    def get_followers(self, user_id: str) -> Dict:
+    def get_followers(self, user_id: str) -> dict:
         return self._request("GET", f"/users/{user_id}/followers")
 
-    def get_following(self, user_id: str) -> Dict:
+    def get_following(self, user_id: str) -> dict:
         return self._request("GET", f"/users/{user_id}/following")
 
     # Posts endpoints
-    def get_posts(self, params: Dict = None) -> Dict:
+    def get_posts(self, params: dict = None) -> dict:
         return self._request("GET", "/posts", params=params)
 
-    def create_post(self, data: Dict) -> Dict:
+    def create_post(self, data: dict) -> dict:
         return self._request("POST", "/posts", json=data)
 
-    def get_post(self, post_id: str) -> Dict:
+    def get_post(self, post_id: str) -> dict:
         return self._request("GET", f"/posts/{post_id}")
 
-    def update_post(self, post_id: str, data: Dict) -> Dict:
+    def update_post(self, post_id: str, data: dict) -> dict:
         return self._request("PATCH", f"/posts/{post_id}", json=data)
 
-    def delete_post(self, post_id: str) -> Dict:
+    def delete_post(self, post_id: str) -> dict:
         return self._request("DELETE", f"/posts/{post_id}")
 
-    def upvote_post(self, post_id: str) -> Dict:
+    def upvote_post(self, post_id: str) -> dict:
         return self._request("POST", f"/posts/{post_id}/upvote")
 
-    def downvote_post(self, post_id: str) -> Dict:
+    def downvote_post(self, post_id: str) -> dict:
         return self._request("POST", f"/posts/{post_id}/downvote")
 
-    def get_comments(self, post_id: str) -> Dict:
+    def get_comments(self, post_id: str) -> dict:
         return self._request("GET", f"/posts/{post_id}/comments")
 
-    def create_comment(self, post_id: str, data: Dict) -> Dict:
+    def create_comment(self, post_id: str, data: dict) -> dict:
         return self._request("POST", f"/posts/{post_id}/comments", json=data)
 
     # Feed endpoints
-    def get_feed(self, params: Dict = None) -> Dict:
+    def get_feed(self, params: dict = None) -> dict:
         return self._request("GET", "/feed", params=params)
 
-    def get_trending(self, params: Dict = None) -> Dict:
+    def get_trending(self, params: dict = None) -> dict:
         return self._request("GET", "/feed/trending", params=params)
 
     # Search endpoint
-    def search(self, query: str, search_type: str = "posts") -> Dict:
+    def search(self, query: str, search_type: str = "posts") -> dict:
         return self._request("GET", "/search", params={"q": query, "type": search_type})
 
     # Communities endpoints (renamed from submolts in v17)
-    def get_communities(self, params: Dict = None) -> Dict:
+    def get_communities(self, params: dict = None) -> dict:
         return self._request("GET", "/communities", params=params)
 
-    def create_community(self, data: Dict) -> Dict:
+    def create_community(self, data: dict) -> dict:
         return self._request("POST", "/communities", json=data)
 
-    def get_community(self, community_id: str) -> Dict:
+    def get_community(self, community_id: str) -> dict:
         return self._request("GET", f"/communities/{community_id}")
 
-    def get_community_posts(self, community_id: str, params: Dict = None) -> Dict:
+    def get_community_posts(self, community_id: str, params: dict = None) -> dict:
         return self._request("GET", f"/communities/{community_id}/posts", params=params)
 
-    def join_community(self, community_id: str) -> Dict:
+    def join_community(self, community_id: str) -> dict:
         return self._request("POST", f"/communities/{community_id}/join")
 
-    def leave_community(self, community_id: str) -> Dict:
+    def leave_community(self, community_id: str) -> dict:
         return self._request("DELETE", f"/communities/{community_id}/leave")
 
-    def get_community_members(self, community_id: str, params: Dict = None) -> Dict:
+    def get_community_members(self, community_id: str, params: dict = None) -> dict:
         return self._request("GET", f"/communities/{community_id}/members", params=params)
 
     # Backwards compat aliases
@@ -639,62 +640,62 @@ class SocialAPI:
     leave_submolt = leave_community
 
     # Notifications endpoints
-    def get_notifications(self, params: Dict = None) -> Dict:
+    def get_notifications(self, params: dict = None) -> dict:
         return self._request("GET", "/notifications", params=params)
 
-    def mark_notifications_read(self, ids: list) -> Dict:
+    def mark_notifications_read(self, ids: list) -> dict:
         return self._request("POST", "/notifications/read", json={"ids": ids})
 
     # Recipes endpoints
-    def get_recipes(self, params: Dict = None) -> Dict:
+    def get_recipes(self, params: dict = None) -> dict:
         return self._request("GET", "/recipes", params=params)
 
-    def share_recipe(self, data: Dict) -> Dict:
+    def share_recipe(self, data: dict) -> dict:
         return self._request("POST", "/recipes/share", json=data)
 
-    def fork_recipe(self, recipe_id: str) -> Dict:
+    def fork_recipe(self, recipe_id: str) -> dict:
         return self._request("POST", f"/recipes/{recipe_id}/fork")
 
     # Resonance/Gamification endpoints
-    def get_wallet(self) -> Dict:
+    def get_wallet(self) -> dict:
         return self._request("GET", "/resonance/wallet")
 
-    def get_achievements(self, user_id: str = None) -> Dict:
+    def get_achievements(self, user_id: str = None) -> dict:
         endpoint = f"/achievements/{user_id}" if user_id else "/achievements"
         return self._request("GET", endpoint)
 
-    def daily_checkin(self) -> Dict:
+    def daily_checkin(self) -> dict:
         return self._request("POST", "/resonance/daily-checkin")
 
     # Dashboard endpoints
-    def get_dashboard_agents(self) -> Dict:
+    def get_dashboard_agents(self) -> dict:
         return self._request("GET", "/dashboard/agents")
 
-    def get_dashboard_health(self) -> Dict:
+    def get_dashboard_health(self) -> dict:
         return self._request("GET", "/dashboard/health")
 
     # Referral endpoints
-    def get_referral_code(self) -> Dict:
+    def get_referral_code(self) -> dict:
         return self._request("GET", "/referral/code")
 
-    def use_referral_code(self, data: Dict) -> Dict:
+    def use_referral_code(self, data: dict) -> dict:
         return self._request("POST", "/referral/use", json=data)
 
-    def get_referral_stats(self) -> Dict:
+    def get_referral_stats(self) -> dict:
         return self._request("GET", "/referral/stats")
 
     # Onboarding endpoints
-    def get_onboarding_progress(self) -> Dict:
+    def get_onboarding_progress(self) -> dict:
         return self._request("GET", "/onboarding/progress")
 
-    def complete_onboarding_step(self, data: Dict) -> Dict:
+    def complete_onboarding_step(self, data: dict) -> dict:
         return self._request("POST", "/onboarding/complete-step", json=data)
 
     # Campaigns endpoints
-    def get_campaigns(self, params: Dict = None) -> Dict:
+    def get_campaigns(self, params: dict = None) -> dict:
         return self._request("GET", "/campaigns", params=params)
 
-    def create_campaign(self, data: Dict) -> Dict:
+    def create_campaign(self, data: dict) -> dict:
         return self._request("POST", "/campaigns", json=data)
 
 
@@ -715,13 +716,13 @@ class IntelligenceAPI:
     def set_api_key(self, key: str):
         self._api_key = key
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["X-API-Key"] = self._api_key
         return headers
 
-    def _auth_headers(self) -> Dict[str, str]:
+    def _auth_headers(self) -> dict[str, str]:
         """Headers using JWT (for key management, not intelligence calls)."""
         headers = {"Content-Type": "application/json"}
         token = social_api._token
@@ -729,7 +730,7 @@ class IntelligenceAPI:
             headers["Authorization"] = f"Bearer {token}"
         return headers
 
-    def _request(self, method: str, endpoint: str, auth: str = 'api_key', **kwargs) -> Dict:
+    def _request(self, method: str, endpoint: str, auth: str = 'api_key', **kwargs) -> dict:
         url = f"{self.base_url}{endpoint}"
         kwargs.setdefault("headers",
                           self._auth_headers() if auth == 'jwt' else self._headers())
@@ -741,29 +742,29 @@ class IntelligenceAPI:
             return {"error": str(e)}
 
     # Intelligence endpoints (X-API-Key)
-    def chat(self, data: Dict) -> Dict:
+    def chat(self, data: dict) -> dict:
         return self._request("POST", "/api/v1/intelligence/chat", json=data)
 
-    def analyze(self, data: Dict) -> Dict:
+    def analyze(self, data: dict) -> dict:
         return self._request("POST", "/api/v1/intelligence/analyze", json=data)
 
-    def generate(self, data: Dict) -> Dict:
+    def generate(self, data: dict) -> dict:
         return self._request("POST", "/api/v1/intelligence/generate", json=data)
 
-    def hivemind(self, params: Dict = None) -> Dict:
+    def hivemind(self, params: dict = None) -> dict:
         return self._request("GET", "/api/v1/intelligence/hivemind", params=params)
 
-    def get_usage(self, params: Dict = None) -> Dict:
+    def get_usage(self, params: dict = None) -> dict:
         return self._request("GET", "/api/v1/intelligence/usage", params=params)
 
     # Key management (JWT auth)
-    def create_key(self, data: Dict) -> Dict:
+    def create_key(self, data: dict) -> dict:
         return self._request("POST", "/api/v1/intelligence/keys", auth='jwt', json=data)
 
-    def list_keys(self) -> Dict:
+    def list_keys(self) -> dict:
         return self._request("GET", "/api/v1/intelligence/keys", auth='jwt')
 
-    def revoke_key(self, key_id: str) -> Dict:
+    def revoke_key(self, key_id: str) -> dict:
         return self._request("DELETE", f"/api/v1/intelligence/keys/{key_id}", auth='jwt')
 
 
@@ -776,14 +777,14 @@ class BuildDistributionAPI:
         self.base_url = base_url or os.environ.get(
             'HARTOS_BACKEND_URL', 'http://localhost:6777')
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         token = social_api._token
         if token:
             headers["Authorization"] = f"Bearer {token}"
         return headers
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> Dict:
+    def _request(self, method: str, endpoint: str, **kwargs) -> dict:
         url = f"{self.base_url}{endpoint}"
         kwargs.setdefault("headers", self._headers())
         kwargs.setdefault("timeout", REQUEST_TIMEOUT)
@@ -793,16 +794,16 @@ class BuildDistributionAPI:
         except Exception as e:
             return {"error": str(e)}
 
-    def purchase(self, data: Dict) -> Dict:
+    def purchase(self, data: dict) -> dict:
         return self._request("POST", "/api/v1/builds/purchase", json=data)
 
-    def get_download_url(self, license_id: str) -> Dict:
+    def get_download_url(self, license_id: str) -> dict:
         return self._request("GET", f"/api/v1/builds/download/{license_id}")
 
-    def list_licenses(self) -> Dict:
+    def list_licenses(self) -> dict:
         return self._request("GET", "/api/v1/builds/licenses")
 
-    def verify_license(self, data: Dict) -> Dict:
+    def verify_license(self, data: dict) -> dict:
         return self._request("POST", "/api/v1/builds/verify", json=data)
 
 
@@ -815,14 +816,14 @@ class IPProvenanceAPI:
         self.base_url = base_url or os.environ.get(
             'HARTOS_BACKEND_URL', 'http://localhost:6777')
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         token = social_api._token
         if token:
             headers["Authorization"] = f"Bearer {token}"
         return headers
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> Dict:
+    def _request(self, method: str, endpoint: str, **kwargs) -> dict:
         url = f"{self.base_url}{endpoint}"
         kwargs.setdefault("headers", self._headers())
         kwargs.setdefault("timeout", REQUEST_TIMEOUT)
@@ -832,16 +833,16 @@ class IPProvenanceAPI:
         except Exception as e:
             return {"error": str(e)}
 
-    def list_publications(self) -> Dict:
+    def list_publications(self) -> dict:
         return self._request("GET", "/api/ip/defensive-publications")
 
-    def create_publication(self, data: Dict) -> Dict:
+    def create_publication(self, data: dict) -> dict:
         return self._request("POST", "/api/ip/defensive-publications", json=data)
 
-    def get_provenance(self) -> Dict:
+    def get_provenance(self) -> dict:
         return self._request("GET", "/api/ip/provenance")
 
-    def get_milestone(self) -> Dict:
+    def get_milestone(self) -> dict:
         return self._request("GET", "/api/ip/milestone")
 
 
@@ -853,7 +854,7 @@ ip_api = IPProvenanceAPI()
 
 # ============== ZERO-SHOT CLASSIFICATION ==============
 
-def zeroshot(text: str, labels: list, **kwargs) -> Dict[str, Any]:
+def zeroshot(text: str, labels: list, **kwargs) -> dict[str, Any]:
     """Zero-shot classification via hart-backend"""
     global _http_fail_count, _http_fail_time
     payload = {"input_text": text, "labels": labels, **kwargs}
@@ -893,7 +894,7 @@ def zeroshot(text: str, labels: list, **kwargs) -> Dict[str, Any]:
 
 # ============== TIME-BASED AGENT ==============
 
-def time_agent(text: str, user_id: str = None, **kwargs) -> Dict[str, Any]:
+def time_agent(text: str, user_id: str = None, **kwargs) -> dict[str, Any]:
     """Time-based agent for scheduled tasks"""
     response = requests.post(
         f"{HARTOS_BACKEND_URL}/time_agent",
@@ -905,7 +906,7 @@ def time_agent(text: str, user_id: str = None, **kwargs) -> Dict[str, Any]:
 
 # ============== VISUAL AGENT ==============
 
-def visual_agent(image_data: str, text: str = None, **kwargs) -> Dict[str, Any]:
+def visual_agent(image_data: str, text: str = None, **kwargs) -> dict[str, Any]:
     """Visual agent for image understanding"""
     response = requests.post(
         f"{HARTOS_BACKEND_URL}/visual_agent",
@@ -917,7 +918,7 @@ def visual_agent(image_data: str, text: str = None, **kwargs) -> Dict[str, Any]:
 
 # ============== HEALTH CHECK ==============
 
-def check_backend_health() -> Dict[str, Any]:
+def check_backend_health() -> dict[str, Any]:
     """Check if hart-backend is healthy"""
     try:
         response = requests.get(
@@ -941,7 +942,8 @@ def check_backend_health() -> Dict[str, Any]:
 
 def create_proxy_blueprint():
     """Create Flask blueprint with proxy routes to hart-backend"""
-    from flask import Blueprint, request as flask_request, jsonify, Response
+    from flask import Blueprint, Response, jsonify
+    from flask import request as flask_request
 
     proxy_bp = Blueprint('hevolve_proxy', __name__)
 
@@ -1030,7 +1032,7 @@ def get_atom_feed(feed_type: str = 'global', limit: int = 50) -> str:
     return response.text
 
 
-def get_json_feed(feed_type: str = 'global', limit: int = 50) -> Dict[str, Any]:
+def get_json_feed(feed_type: str = 'global', limit: int = 50) -> dict[str, Any]:
     """Get JSON Feed from hart-backend"""
     response = requests.get(
         f"{HEVOLVE_SOCIAL_URL}/feeds/json",
@@ -1040,7 +1042,7 @@ def get_json_feed(feed_type: str = 'global', limit: int = 50) -> Dict[str, Any]:
     return response.json()
 
 
-def preview_feed(url: str) -> Dict[str, Any]:
+def preview_feed(url: str) -> dict[str, Any]:
     """Preview an external feed"""
     response = requests.post(
         f"{HEVOLVE_SOCIAL_URL}/feeds/preview",
@@ -1050,7 +1052,7 @@ def preview_feed(url: str) -> Dict[str, Any]:
     return _handle_response(response)
 
 
-def import_feed(url: str, submolt_id: int = None, limit: int = 10) -> Dict[str, Any]:
+def import_feed(url: str, submolt_id: int = None, limit: int = 10) -> dict[str, Any]:
     """Import items from an external feed"""
     response = requests.post(
         f"{HEVOLVE_SOCIAL_URL}/feeds/import",

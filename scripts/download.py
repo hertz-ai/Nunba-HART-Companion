@@ -1,10 +1,10 @@
 import os
+import subprocess
 import sys
-import shutil
-import zipfile
 import tempfile
 import urllib.request
-import subprocess
+import zipfile
+
 
 def download_file(url, save_path):
     """Download a file from URL to the specified path"""
@@ -37,7 +37,7 @@ def main():
         
         # Modify python310._pth to include site-packages
         pth_file = os.path.join(embed_dir, "python310._pth")
-        with open(pth_file, 'r') as f:
+        with open(pth_file) as f:
             content = f.read()
         
         # Uncomment import site

@@ -10,10 +10,7 @@ NFT: No crash on any input shape, response always JSON-serializable,
 """
 import os
 import sys
-import json
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -188,6 +185,7 @@ class TestNumericEdgeCases:
     def test_model_preset_index_bounds(self):
         """Out-of-range model index must not crash — returns None."""
         import tempfile
+
         from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as d:
             cfg = LlamaConfig(config_dir=d)
@@ -198,6 +196,7 @@ class TestNumericEdgeCases:
     def test_port_zero_handled(self):
         """Port 0 means OS picks a random port — find_available_port must handle."""
         import tempfile
+
         from llama.llama_config import LlamaConfig
         with tempfile.TemporaryDirectory() as d:
             cfg = LlamaConfig(config_dir=d)

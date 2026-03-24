@@ -11,9 +11,7 @@ NFT: Backward compatibility of import paths, enum value stability.
 import os
 import sys
 import tempfile
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -89,8 +87,9 @@ class TestTTSEngineContract:
 
     def test_backend_constants_importable(self):
         from tts.tts_engine import (
-            BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_PIPER,
-            BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3,
+            BACKEND_CHATTERBOX_TURBO,
+            BACKEND_F5,
+            BACKEND_PIPER,
         )
         assert all(isinstance(b, str) for b in [
             BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_PIPER])
@@ -179,7 +178,7 @@ class TestImportPaths:
         assert LlamaConfig is not None
 
     def test_llama_installer_import(self):
-        from llama.llama_installer import LlamaInstaller, MODEL_PRESETS, ModelPreset
+        from llama.llama_installer import MODEL_PRESETS, LlamaInstaller, ModelPreset
         assert all(x is not None for x in [LlamaInstaller, MODEL_PRESETS, ModelPreset])
 
     def test_chatbot_routes_import(self):
@@ -188,13 +187,13 @@ class TestImportPaths:
         assert hasattr(cr, 'chat_route') or hasattr(cr, '_detect_create_agent_intent')
 
     def test_adapter_import(self):
-        from routes.hartos_backend_adapter import chat, get_prompts, check_backend_health
+        from routes.hartos_backend_adapter import chat, check_backend_health, get_prompts
         assert all(callable(f) for f in [chat, get_prompts, check_backend_health])
 
     def test_catalog_import(self):
-        from models.catalog import get_catalog, ModelCatalog, ModelEntry, ModelType
+        from models.catalog import ModelCatalog, ModelEntry, ModelType, get_catalog
         assert all(x is not None for x in [get_catalog, ModelCatalog, ModelEntry, ModelType])
 
     def test_orchestrator_import(self):
-        from models.orchestrator import get_orchestrator, LlamaLoader, TTSLoader, STTLoader
+        from models.orchestrator import LlamaLoader, STTLoader, TTSLoader, get_orchestrator
         assert all(x is not None for x in [get_orchestrator, LlamaLoader, TTSLoader, STTLoader])

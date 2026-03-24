@@ -11,10 +11,8 @@ NFT: Graceful degradation without nvidia-smi, VRAM parsing edge cases,
 """
 import os
 import sys
-import platform
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -75,6 +73,7 @@ class TestGPUDetection:
     def test_nvidia_smi_timeout(self):
         """Broken drivers can hang nvidia-smi — must timeout and return no GPU."""
         import subprocess
+
         from desktop.ai_installer import detect_gpu
         with patch('desktop.ai_installer.IS_MACOS', False), \
              patch('subprocess.run', side_effect=subprocess.TimeoutExpired('nvidia-smi', 5)):

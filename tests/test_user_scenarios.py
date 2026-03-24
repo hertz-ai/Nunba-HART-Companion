@@ -13,9 +13,7 @@ of calls that represent real usage patterns:
 import os
 import sys
 import tempfile
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -120,20 +118,20 @@ class TestTTSScenario:
 
     def test_english_selects_a_backend(self):
         """English must always have a TTS backend — it's the default language."""
-        from tts.tts_engine import _get_lang_preference, BACKEND_PIPER
+        from tts.tts_engine import BACKEND_PIPER, _get_lang_preference
         prefs = _get_lang_preference('en')
         assert len(prefs) >= 1
         assert BACKEND_PIPER in prefs  # Piper always available as fallback
 
     def test_tamil_prefers_indic_parler(self):
         """Tamil users get Indic Parler (native quality) not Piper (English accent)."""
-        from tts.tts_engine import _get_lang_preference, BACKEND_INDIC_PARLER
+        from tts.tts_engine import BACKEND_INDIC_PARLER, _get_lang_preference
         prefs = _get_lang_preference('ta')
         assert prefs[0] == BACKEND_INDIC_PARLER
 
     def test_piper_always_in_english_chain(self):
         """Piper (CPU) must always be in the English fallback chain — last resort."""
-        from tts.tts_engine import _get_lang_preference, BACKEND_PIPER
+        from tts.tts_engine import BACKEND_PIPER, _get_lang_preference
         prefs = _get_lang_preference('en')
         assert BACKEND_PIPER in prefs
 
@@ -152,14 +150,14 @@ class TestModelCatalogScenario:
     """Admin views model list → selects one → checks download status."""
 
     def test_catalog_has_llm_entries(self):
-        from models.catalog import get_catalog, ModelType
+        from models.catalog import ModelType, get_catalog
         cat = get_catalog()
         llms = cat.list_by_type(ModelType.LLM)
         assert len(llms) >= 2  # At least 2 LLM models
 
     def test_catalog_has_tts_entries(self):
         """TTS entries populated by HARTOS tts_router — at least Piper."""
-        from models.catalog import get_catalog, ModelType
+        from models.catalog import ModelType, get_catalog
         cat = get_catalog()
         tts = cat.list_by_type(ModelType.TTS)
         # May be 0 if HARTOS tts_router not yet run (populate_tts_engines is now no-op)

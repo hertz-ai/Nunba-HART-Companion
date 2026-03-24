@@ -19,16 +19,16 @@ Engine lifecycle:
   - VRAM tracking and cleanup between switches
   - Hardware-aware: detects GPU/VRAM/CPU, routes to best engine that fits
 """
+import gc
 import hashlib
+import logging
 import os
 import sys
-import gc
-import logging
 import threading
-import time
 from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Dict, List, Callable, Any
+from typing import Any
 
 logger = logging.getLogger('NunbaTTSEngine')
 
@@ -168,7 +168,7 @@ _DEFAULT_PREFERENCE = [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML, BACKEND_INDIC_
 # catalog entry id (without 'tts-' prefix) → Nunba backend constant
 # Catalog IDs use hyphens (tts-f5-tts → strip prefix → f5-tts)
 # Nunba backend constants use underscores (BACKEND_F5 = "f5")
-_CATALOG_TO_BACKEND: Dict[str, str] = {
+_CATALOG_TO_BACKEND: dict[str, str] = {
     # Hyphenated form (from HARTOS tts_router.populate_tts_catalog)
     'f5-tts': BACKEND_F5,
     'chatterbox-turbo': BACKEND_CHATTERBOX_TURBO,
@@ -186,7 +186,7 @@ _CATALOG_TO_BACKEND: Dict[str, str] = {
 }
 
 # Reverse: Nunba backend constant → catalog entry id (hyphenated, without 'tts-' prefix)
-_BACKEND_TO_CATALOG: Dict[str, str] = {
+_BACKEND_TO_CATALOG: dict[str, str] = {
     BACKEND_F5:               'f5-tts',
     BACKEND_CHATTERBOX_TURBO: 'chatterbox-turbo',
     BACKEND_CHATTERBOX_ML:    'chatterbox-ml',
@@ -196,7 +196,7 @@ _BACKEND_TO_CATALOG: Dict[str, str] = {
 }
 
 
-def _entry_to_legacy_caps(entry) -> Dict:
+def _entry_to_legacy_caps(entry) -> dict:
     """Convert a ModelCatalog ModelEntry (TTS) to the legacy ENGINE_CAPABILITIES dict format.
 
     Bridges the ModelEntry structure to the flat dict shape that all call
@@ -220,7 +220,7 @@ def _entry_to_legacy_caps(entry) -> Dict:
     }
 
 
-def _get_engine_capabilities(backend=None) -> Dict:
+def _get_engine_capabilities(backend=None) -> dict:
     """Return capability dict for one backend (or all backends if backend=None).
 
     Tries ModelCatalog first (canonical, HARTOS-populated).  Falls back to
@@ -231,7 +231,7 @@ def _get_engine_capabilities(backend=None) -> Dict:
     ENGINE_CAPABILITIES — keyed by Nunba backend constant.
     """
     try:
-        from models.catalog import get_catalog, ModelType
+        from models.catalog import ModelType, get_catalog
         catalog = get_catalog()
         if backend is None:
             # Return the full dict, keyed by Nunba backend constants
@@ -257,14 +257,14 @@ def _get_engine_capabilities(backend=None) -> Dict:
     return _FALLBACK_ENGINE_CAPABILITIES.get(backend, {})
 
 
-def _get_lang_preference(language: str) -> List[str]:
+def _get_lang_preference(language: str) -> list[str]:
     """Return ordered list of preferred backends for a language.
 
     Tries ModelCatalog first (canonical).  Falls back to
     _FALLBACK_LANG_ENGINE_PREFERENCE if the catalog is unavailable.
     """
     try:
-        from models.catalog import get_catalog, ModelType
+        from models.catalog import ModelType, get_catalog
         catalog = get_catalog()
         entries = catalog.list_by_type(ModelType.TTS)
         if entries:
@@ -499,7 +499,6 @@ class SentencePipeline:
 
 # We need ThreadPoolExecutor for the pipeline
 from concurrent.futures import ThreadPoolExecutor
-
 
 # ════════════════════════════════════════════════════════════════════
 # MAIN TTS ENGINE — multi-engine routing + pre-synth
@@ -869,7 +868,7 @@ class TTSEngine:
         if self.auto_init:
             self.initialize(force_backend=new_backend)
 
-    def initialize(self, force_backend: Optional[str] = None,
+    def initialize(self, force_backend: str | None = None,
                    blocking: bool = True) -> bool:
         """Initialize the TTS backend.
 
@@ -957,7 +956,7 @@ class TTSEngine:
         self._ensure_initialized()
         return self._initialized and self._active_backend in self._backends
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         self._ensure_initialized()
         cap = _get_engine_capabilities(self._active_backend)
         return {
@@ -972,7 +971,7 @@ class TTSEngine:
             "capabilities": cap,
         }
 
-    def _get_features(self) -> List[str]:
+    def _get_features(self) -> list[str]:
         cap = _get_engine_capabilities(self._active_backend)
         features = []
         if cap.get('voice_cloning'):
@@ -987,7 +986,7 @@ class TTSEngine:
             features.append('multilingual')
         return features
 
-    def get_capabilities(self, backend=None) -> Dict:
+    def get_capabilities(self, backend=None) -> dict:
         """Get the full capability matrix for a backend or all backends.
         Converts sets to sorted lists for JSON serialization safety."""
         def _sanitize(cap_dict):
@@ -998,7 +997,7 @@ class TTSEngine:
             return _sanitize(_get_engine_capabilities(backend))
         return {name: _sanitize(cap) for name, cap in _get_engine_capabilities().items()}
 
-    def list_voices(self) -> Dict[str, dict]:
+    def list_voices(self) -> dict[str, dict]:
         self._ensure_initialized()
         inst = self._backends.get(self._active_backend)
         if inst and hasattr(inst, 'list_speakers'):
@@ -1007,7 +1006,7 @@ class TTSEngine:
             return inst.list_available_voices()
         return {}
 
-    def list_installed_voices(self) -> List[str]:
+    def list_installed_voices(self) -> list[str]:
         self._ensure_initialized()
         inst = self._backends.get(self._active_backend)
         if inst and hasattr(inst, 'list_speakers'):
@@ -1017,7 +1016,7 @@ class TTSEngine:
         return []
 
     def install_voice(self, voice_id: str,
-                      progress_callback: Optional[Callable[[int, int], None]] = None) -> bool:
+                      progress_callback: Callable[[int, int], None] | None = None) -> bool:
         self._ensure_initialized()
         inst = self._backends.get(self._active_backend)
         if inst and hasattr(inst, 'download_model'):
@@ -1037,11 +1036,11 @@ class TTSEngine:
 
     def synthesize(self,
                    text: str,
-                   output_path: Optional[str] = None,
-                   voice: Optional[str] = None,
+                   output_path: str | None = None,
+                   voice: str | None = None,
                    speed: float = 1.0,
-                   language: Optional[str] = None,
-                   **kwargs) -> Optional[str]:
+                   language: str | None = None,
+                   **kwargs) -> str | None:
         """
         Synthesize text to speech.
 
@@ -1132,8 +1131,8 @@ class TTSEngine:
         logger.error("All TTS engines failed — no audio produced")
         return None
 
-    def synthesize_to_bytes(self, text: str, voice: Optional[str] = None,
-                            speed: float = 1.0, language: Optional[str] = None) -> Optional[bytes]:
+    def synthesize_to_bytes(self, text: str, voice: str | None = None,
+                            speed: float = 1.0, language: str | None = None) -> bytes | None:
         import tempfile
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             temp_path = f.name
@@ -1147,7 +1146,7 @@ class TTSEngine:
                 os.unlink(temp_path)
         return None
 
-    def presynth_next(self, text: str, voice: Optional[str] = None):
+    def presynth_next(self, text: str, voice: str | None = None):
         """Pre-synthesize a predicted next response in background."""
         self._ensure_initialized()
 
@@ -1254,8 +1253,8 @@ class _LazyChatterboxTurbo:
 
     def _ensure_loaded(self):
         if self._model is None:
-            from chatterbox.tts_turbo import ChatterboxTurboTTS
             import torchaudio
+            from chatterbox.tts_turbo import ChatterboxTurboTTS
             self._torchaudio = torchaudio
             # Workaround: safetensors segfaults on sequential CUDA loads on Windows.
             # Patch load_file to always load to CPU first, then .to(device) handles CUDA.
@@ -1311,8 +1310,8 @@ class _LazyChatterboxMultilingual:
 
     def _ensure_loaded(self):
         if self._model is None:
-            from chatterbox.tts import ChatterboxMultilingualTTS
             import torchaudio
+            from chatterbox.tts import ChatterboxMultilingualTTS
             self._torchaudio = torchaudio
             self._model = ChatterboxMultilingualTTS.from_pretrained(device="cuda")
             self._sr = self._model.sr
@@ -1565,7 +1564,7 @@ class _LazyPiper:
     def _ensure_loaded(self):
         if self._tts is not None:
             return
-        from tts.piper_tts import PiperTTS, DEFAULT_VOICE
+        from tts.piper_tts import DEFAULT_VOICE, PiperTTS
         self._tts = PiperTTS()
         if not self._tts.is_voice_installed(DEFAULT_VOICE):
             self._tts.download_voice(DEFAULT_VOICE)
@@ -1586,7 +1585,7 @@ class _LazyPiper:
 # GLOBAL SINGLETON
 # ════════════════════════════════════════════════════════════════════
 
-_engine: Optional[TTSEngine] = None
+_engine: TTSEngine | None = None
 _engine_lock = threading.Lock()
 
 
@@ -1605,16 +1604,16 @@ def get_tts_engine(**kwargs) -> TTSEngine:
 
 
 def synthesize_text(text: str,
-                    voice: Optional[str] = None,
+                    voice: str | None = None,
                     speed: float = 1.0,
-                    output_path: Optional[str] = None,
-                    language: Optional[str] = None) -> Optional[str]:
+                    output_path: str | None = None,
+                    language: str | None = None) -> str | None:
     """Convenience function. Auto-routes to best backend for language."""
     engine = get_tts_engine()
     return engine.synthesize(text, output_path, voice, speed, language=language)
 
 
-def get_tts_status() -> Dict[str, Any]:
+def get_tts_status() -> dict[str, Any]:
     """Get TTS engine status for API responses."""
     engine = get_tts_engine()
     info = engine.get_info()

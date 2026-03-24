@@ -26,9 +26,9 @@ import gc
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 import threading
 import time
 from collections import defaultdict
@@ -785,8 +785,8 @@ class ChatterboxTurboEngine:
     name = 'chatterbox_turbo'
 
     def __init__(self, ref_voice=None):
-        from chatterbox.tts_turbo import ChatterboxTurboTTS
         import torchaudio
+        from chatterbox.tts_turbo import ChatterboxTurboTTS
         self.torchaudio = torchaudio
         # Workaround: safetensors segfaults on sequential CUDA loads on Windows.
         # Force CPU load first, then .to(device) handles CUDA transfer.
@@ -817,8 +817,8 @@ class ChatterboxMultilingualEngine:
     name = 'chatterbox_multilingual'
 
     def __init__(self, ref_voice=None):
-        from chatterbox.tts import ChatterboxMultilingualTTS
         import torchaudio
+        from chatterbox.tts import ChatterboxMultilingualTTS
         self.torchaudio = torchaudio
         self.model = ChatterboxMultilingualTTS.from_pretrained(device="cuda")
         self.ref_voice = ref_voice or DEFAULT_REF_VOICE
@@ -834,9 +834,9 @@ class IndicParlerEngine:
     name = 'indic_parler'
 
     def __init__(self, ref_voice=None):
-        import torch
-        import soundfile as _sf
         import numpy as _np
+        import soundfile as _sf
+        import torch
         self._torch, self._sf, self._np = torch, _sf, _np
         self.available = False
         try:
@@ -1160,8 +1160,9 @@ def verify_with_whisper(audio_path, expected_text, expected_lang='en'):
     """
     global _whisper_model
     try:
-        from faster_whisper import WhisperModel
         from difflib import SequenceMatcher
+
+        from faster_whisper import WhisperModel
         if _whisper_model is None:
             _whisper_model = WhisperModel('base', device='cpu', compute_type='int8')
         segments, info = _whisper_model.transcribe(audio_path)
@@ -1354,7 +1355,7 @@ def generate_all(languages=None, dry_run=False, single_line=None,
         existing = {}
         if os.path.isfile(results_path):
             try:
-                with open(results_path, 'r', encoding='utf-8') as f:
+                with open(results_path, encoding='utf-8') as f:
                     existing = json.load(f)
             except Exception:
                 pass
@@ -1376,7 +1377,7 @@ def generate_all(languages=None, dry_run=False, single_line=None,
                 vmod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(vmod)
                 vmod.build_html(existing, LINES)
-                print(f"  HTML report auto-rebuilt")
+                print("  HTML report auto-rebuilt")
         except Exception as e:
             print(f"  WARN: HTML rebuild failed: {e}")
 
@@ -1417,7 +1418,7 @@ def main():
     print("\nHART Voice Generation Pipeline")
     print(f"  Languages: {languages or 'ALL'}")
     print(f"  Engine: {args.engine or 'auto (best per language + hardware)'}")
-    print(f"  Output: landing-page/public/hart-voices/{{lang}}/{{id}}.ogg\n")
+    print("  Output: landing-page/public/hart-voices/{lang}/{id}.ogg\n")
 
     generate_all(
         languages=languages,

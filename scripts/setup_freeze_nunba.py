@@ -4,11 +4,11 @@ setup_freeze_nunba.py - Creates Nunba executable
 Nunba: A Friend, A Well Wisher, Your LocalMind
 Connect to Hivemind with your friends' agents.
 """
-import sys
-import os
-import glob
-import shutil
 import compileall
+import glob
+import os
+import shutil
+import sys
 
 # ── Fix transformers frozenset crash before cx_Freeze traces it ──
 # transformers/__init__.py line 772: import_structure[frozenset({})].update(...)
@@ -17,7 +17,7 @@ try:
     import importlib.util as _ilu_patch
     _tf_spec = _ilu_patch.find_spec('transformers')
     if _tf_spec and _tf_spec.origin:
-        with open(_tf_spec.origin, 'r', encoding='utf-8') as _f:
+        with open(_tf_spec.origin, encoding='utf-8') as _f:
             _src = _f.read()
         _bad = 'import_structure[frozenset({})].update(_import_structure)'
         if _bad in _src:
@@ -25,7 +25,7 @@ try:
                 'import_structure.setdefault(frozenset({}), {}).update(_import_structure)')
             with open(_tf_spec.origin, 'w', encoding='utf-8') as _f:
                 _f.write(_src)
-            print(f"Patched transformers/__init__.py: frozenset fix applied")
+            print("Patched transformers/__init__.py: frozenset fix applied")
 except Exception as _e:
     print(f"WARNING: Could not patch transformers: {_e}")
 import py_compile
@@ -38,11 +38,10 @@ _hevolveai_src = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', 'hevolveai', 'src'))
 if _hevolveai_src in sys.path:
     sys.path.remove(_hevolveai_src)
-    print(f"Removed hevolveai/src from sys.path")
+    print("Removed hevolveai/src from sys.path")
 
 # 2. Block wheel-installed hevolveai/embodied_ai from being found
 #    by removing their packages from sys.modules and making them unfindable
-import importlib
 for _block_pkg in ('hevolveai', 'embodied_ai'):
     if _block_pkg in sys.modules:
         del sys.modules[_block_pkg]
@@ -56,7 +55,7 @@ for _block_pkg in ('hevolveai', 'embodied_ai'):
 
 sys.setrecursionlimit(5000)  # safety margin for deep import chains
 
-from cx_Freeze import setup, Executable, bdist_msi
+from cx_Freeze import Executable, bdist_msi, setup
 
 # Ensure current directory is in path for module discovery
 if os.getcwd() not in sys.path:
@@ -66,7 +65,7 @@ if os.getcwd() not in sys.path:
 _scripts_dir = os.path.dirname(os.path.abspath(__file__))
 if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
-from deps import VERSION, version_win32, version_short
+from deps import version_short, version_win32
 
 # ── Auto-install sibling project editable deps ──────────────────
 # Ensures HARTOS, hevolveai, hevolve-database, agent-ledger are
@@ -445,6 +444,7 @@ build_exe_options["include_files"] = [item for item in build_exe_options["includ
 # cx_Freeze traces Python modules but NOT these companion DLL directories.
 # Without them, .pyd extensions fail at runtime (e.g. numpy can't find libopenblas).
 import site as _site
+
 _site_packages_dirs = _site.getsitepackages() if hasattr(_site, 'getsitepackages') else []
 # Also check the venv site-packages directly
 _venv_sp = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages')
@@ -467,6 +467,7 @@ for _sp_dir in _site_packages_dirs:
 
 # Conditionally include optional packages that may not be installed
 import importlib.util as _ilu
+
 _optional_packages = [
     "autogen",            # pyautogen 0.2.x (import autogen)
     "autogen_agentchat",  # autogen-agentchat 0.4+ (import autogen_agentchat)
@@ -523,7 +524,7 @@ def find_hevolve_modules():
     if os.path.isfile(_hartos_toml):
         import re
         try:
-            with open(_hartos_toml, 'r', encoding='utf-8') as _tf:
+            with open(_hartos_toml, encoding='utf-8') as _tf:
                 _toml_text = _tf.read()
             # Extract py-modules list: everything between py-modules = [ ... ]
             _match = re.search(r'py-modules\s*=\s*\[(.*?)\]', _toml_text, re.DOTALL)
@@ -656,7 +657,7 @@ if _langchain_config and os.path.isfile(_langchain_config):
     # Double-check file actually exists (path may resolve differently across envs)
     try:
         import json as _json_check
-        with open(_langchain_config, 'r') as _f:
+        with open(_langchain_config) as _f:
             _cfg_data = _json_check.load(_f)
         _secret_keys = [k for k in _cfg_data if 'API_KEY' in k.upper() or 'SECRET' in k.upper()]
         if _secret_keys:
@@ -702,7 +703,7 @@ def get_directory_hash(directory):
                         if not data:
                             break
                         hash_obj.update(data)
-            except (OSError, IOError):
+            except OSError:
                 pass
     return hash_obj.hexdigest()
 
@@ -718,7 +719,7 @@ if os.path.exists("python-embed"):
 
     dest_embed = os.path.join(build_dir, "python-embed")
     if os.path.exists(hash_file) and os.path.isdir(dest_embed):
-        with open(hash_file, 'r') as f:
+        with open(hash_file) as f:
             _hash_lines = f.read().strip().splitlines()
         _old_src_hash = _hash_lines[0] if _hash_lines else ''
         _old_dest_hash = _hash_lines[1] if len(_hash_lines) > 1 else _old_src_hash
@@ -836,7 +837,7 @@ class bdist_msi_custom(bdist_msi):
             "HKEY_CLASSES_ROOT",
             r"hevolveai\DefaultIcon",
             "",
-            f"[TARGETDIR]Nunba.exe,0",
+            "[TARGETDIR]Nunba.exe,0",
             False
         )
 
@@ -845,7 +846,7 @@ class bdist_msi_custom(bdist_msi):
             "HKEY_CLASSES_ROOT",
             r"hevolveai\shell\open\command",
             "",
-            f'"[TARGETDIR]Nunba.exe" --protocol "%1"',
+            '"[TARGETDIR]Nunba.exe" --protocol "%1"',
             False
         )
 
@@ -922,6 +923,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
 # python-embed's own pip is broken (distutils-precedence.pth), so we use
 # the BUILD venv's pip with --target to install into python-embed directly.
 import subprocess
+
 if ('build' in sys.argv or 'build_exe' in sys.argv):
     _embed_sp = os.path.join("python-embed", "Lib", "site-packages")
     if os.path.isdir(_embed_sp):
@@ -955,7 +957,7 @@ if ('build' in sys.argv or 'build_exe' in sys.argv) and not _skip_python_embed_c
     _src_embed = os.path.abspath("python-embed")
     _dst_embed = os.path.join(_build_dir_embed, "python-embed")
     if os.path.isdir(_src_embed):
-        print(f"Post-build: copying python-embed via copytree...")
+        print("Post-build: copying python-embed via copytree...")
 
         # Overwrite in place — avoids rmtree failures from Windows file locks.
         # Retry individual file copies that fail (locked DLLs from stale processes).
@@ -1013,7 +1015,7 @@ if ('build' in sys.argv or 'build_exe' in sys.argv) and not _skip_python_embed_c
                                      '_C.cp312-win_amd64.pyd')
         if os.path.isdir(_torch_c_dir) and os.path.isfile(_torch_c_pyd):
             shutil.rmtree(_torch_c_dir)
-            print(f"Post-build: removed torch/_C/ stub directory (keeps _C.pyd extension)")
+            print("Post-build: removed torch/_C/ stub directory (keeps _C.pyd extension)")
         # Also remove torch/_C_flatbuffer/ if present (same type-hint conflict)
         _torch_c_fb = os.path.join(_dst_embed, 'Lib', 'site-packages', 'torch', '_C_flatbuffer')
         if os.path.isdir(_torch_c_fb):
@@ -1021,7 +1023,7 @@ if ('build' in sys.argv or 'build_exe' in sys.argv) and not _skip_python_embed_c
                        if f.startswith('_C_flatbuffer') and f.endswith('.pyd')]
             if _fb_pyd:
                 shutil.rmtree(_torch_c_fb)
-                print(f"Post-build: removed torch/_C_flatbuffer/ stub directory")
+                print("Post-build: removed torch/_C_flatbuffer/ stub directory")
 
 # ── Post-build: strip HevolveAI source from python-embed ──
 # HevolveAI is proprietary — compile to .pyc and remove raw .py source.
@@ -1081,7 +1083,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     _exe = os.path.join(_build_dir, "Nunba.exe")
     if os.path.isfile(_exe):
         print(f"\n{'='*60}")
-        print(f"POST-BUILD: Running Nunba.exe --validate")
+        print("POST-BUILD: Running Nunba.exe --validate")
         print(f"{'='*60}")
         try:
             _ret = _sp.run([_exe, "--validate"], capture_output=True, text=True, timeout=300)
@@ -1098,8 +1100,8 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
             ]
             _val_log = next((p for p in _val_log_candidates if os.path.isfile(p)), None)
             if _val_log:
-                print(f"\n--- validate.log (partial) ---")
-                print(open(_val_log, 'r', encoding='utf-8').read().strip())
+                print("\n--- validate.log (partial) ---")
+                print(open(_val_log, encoding='utf-8').read().strip())
             print("\nBuild artifacts are still usable — validation is a smoke test only.")
             print("Run manually: build\\Nunba\\Nunba.exe --validate\n")
             # Don't sys.exit(1) — the build itself succeeded; only validation timed out
@@ -1117,7 +1119,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
             ]
             _val_log = next((p for p in _val_log_candidates if os.path.isfile(p)), None)
             if _val_log:
-                _log_text = open(_val_log, 'r', encoding='utf-8').read().strip()
+                _log_text = open(_val_log, encoding='utf-8').read().strip()
                 if _log_text and _log_text not in (_ret.stdout or ''):
                     print("\n--- validate.log (from inside frozen exe) ---")
                     # Replace Unicode box-drawing chars with ASCII for cp1252 consoles
@@ -1128,7 +1130,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
             if _ret.returncode != 0:
                 # Win32GUI exes often crash during Python teardown (0xC0000005 = access
                 # violation) AFTER validation completes. Check validate.log for actual results.
-                _log_says_good = _val_log and 'Failed: 0' in open(_val_log, 'r', encoding='utf-8').read()
+                _log_says_good = _val_log and 'Failed: 0' in open(_val_log, encoding='utf-8').read()
                 if _log_says_good:
                     print(f"\n[INFO] Exe exited with code {_ret.returncode} (teardown crash), "
                           f"but validate.log shows 0 failures — build is good.\n")

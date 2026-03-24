@@ -4,35 +4,39 @@ main.py -- Nunba Server
 A Friend, A Well Wisher, Your LocalMind
 Connect to Hivemind to collaborate with your friends' agents.
 """
-import os
-import logging
 import argparse
+import hmac
+import logging
+import os
 import shlex
 import subprocess
 import tempfile
-import hmac
-from flask import Flask, request, jsonify, send_file
 import threading
 import traceback
+
+from flask import Flask, jsonify, request, send_file
+
 try:
     import pyautogui
     PYAUTOGUI_AVAILABLE = True
 except Exception:
     pyautogui = None
     PYAUTOGUI_AVAILABLE = False
-from PIL import Image
-import sys
-from io import BytesIO
-import uuid
 import hashlib
-import platform
-import json
-import time
-import requests
 import ipaddress
+import json
+import platform
 import socket
+import sys
+import time
+import uuid
+from io import BytesIO
+
+import requests
+from PIL import Image
+
 try:
-    from desktop.indicator_window import initialize_indicator, toggle_indicator, get_status
+    from desktop.indicator_window import get_status, initialize_indicator, toggle_indicator
 except ImportError:
     logging.warning("Failed to import indicator_window (likely missing tkinter). UI features disabled.")
     def initialize_indicator(server_port=5000):
@@ -63,7 +67,7 @@ _splash('Configuring database...')
 # Cross-platform: Windows → ~/Documents/Nunba, macOS → ~/Library/Application Support/Nunba,
 # Linux → ~/.config/nunba, HARTOS OS → /var/lib/hartos. Override with NUNBA_DATA_DIR env var.
 try:
-    from core.platform_paths import get_data_dir, get_db_path, get_db_dir
+    from core.platform_paths import get_data_dir, get_db_dir, get_db_path
     PROGRAM_DATA_DIR = get_data_dir()
     NUNBA_DB_PATH = get_db_path('hevolve_database.db')
 except ImportError:
@@ -117,10 +121,12 @@ if not getattr(sys, 'frozen', False):
 # Try to import hart-backend adapter
 HARTOS_BACKEND_AVAILABLE = False
 try:
-    from routes.hartos_backend_adapter import create_proxy_blueprint, check_backend_health
+    from routes.hartos_backend_adapter import create_proxy_blueprint
     HARTOS_BACKEND_AVAILABLE = True
     # Register alias so HARTOS code using bare "from hartos_backend_adapter" works
-    import sys, routes.hartos_backend_adapter as _hba
+    import sys
+
+    import routes.hartos_backend_adapter as _hba
     sys.modules['hartos_backend_adapter'] = _hba
 except Exception as e:
     # Use logging (not print) — in frozen mode print goes to devnull and is lost.
@@ -135,7 +141,7 @@ _splash('Loading social platform...')
 HARTOS_BACKEND_DIRECT = False
 try:
     from integrations.social import init_social, social_bp
-    from integrations.social.models import init_db, get_engine
+    from integrations.social.models import get_engine, init_db
     HARTOS_BACKEND_DIRECT = True
 except ImportError:
     pass
@@ -143,9 +149,14 @@ except ImportError:
 # Import crash reporter
 try:
     from desktop.crash_reporter import (
-        init_crash_reporting, capture_exception, capture_message,
-        set_user, add_breadcrumb, create_crash_reporter_blueprint, get_status as get_crash_status
+        add_breadcrumb,
+        capture_exception,
+        capture_message,
+        create_crash_reporter_blueprint,
+        init_crash_reporting,
+        set_user,
     )
+    from desktop.crash_reporter import get_status as get_crash_status
     CRASH_REPORTER_AVAILABLE = True
 except ImportError:
     CRASH_REPORTER_AVAILABLE = False
@@ -233,7 +244,7 @@ if not _has_file_handler:
         _server_fh.setLevel(logging.INFO)
         _server_fh.setFormatter(logging.Formatter(_log_format))
         _root_logger.addHandler(_server_fh)
-    except Exception as e:
+    except Exception:
         temp_log_file = os.path.join(tempfile.gettempdir(), 'Nunba', 'server.log')
         os.makedirs(os.path.dirname(temp_log_file), exist_ok=True)
         _server_fh = logging.FileHandler(temp_log_file, mode='a', encoding='utf-8')
@@ -387,8 +398,8 @@ def require_local_or_token(f):
 
 # Register Nunba AI health endpoints
 try:
-    from llama.llama_health_endpoint import add_health_routes
     from llama.llama_config import LlamaConfig
+    from llama.llama_health_endpoint import add_health_routes
 
     # Initialize LlamaConfig for health endpoints
     try:
@@ -552,7 +563,7 @@ def get_device_id():
     # Read cached value — if it matches, nothing to do
     if os.path.exists(args.device_id_file):
         try:
-            with open(args.device_id_file, 'r') as f:
+            with open(args.device_id_file) as f:
                 data = json.load(f)
                 cached = data.get('device_id')
                 if cached == device_id:
@@ -587,7 +598,7 @@ def call_stop_api():
 
             if os.path.exists(DEFAULT_USER_DATA_FILE):
                 try:
-                    with open(DEFAULT_USER_DATA_FILE, 'r') as f:
+                    with open(DEFAULT_USER_DATA_FILE) as f:
                         user_data = json.load(f)
                         user_id = user_data.get('user_id')
 
@@ -877,7 +888,7 @@ def llm_status():
     and the specific action the frontend should take (start, download, upgrade, etc.).
     """
     try:
-        from llama.llama_config import LlamaConfig, MODEL_PRESETS
+        from llama.llama_config import MODEL_PRESETS, LlamaConfig
         config = LlamaConfig()
         available = config.is_llm_available()
         preset = config.get_selected_model_preset()
@@ -936,7 +947,7 @@ def llm_auto_setup():
     if not _is_local_request():
         return jsonify({"error": "local only"}), 403
     try:
-        from llama.llama_config import LlamaConfig, MODEL_PRESETS
+        from llama.llama_config import MODEL_PRESETS, LlamaConfig
         config = LlamaConfig()
         data = request.get_json(silent=True) or {}
         model_index = data.get('model_index')
@@ -944,8 +955,8 @@ def llm_auto_setup():
         # Sync catalog state so dashboard reflects the loaded model
         if result.get('success'):
             try:
-                from models.orchestrator import get_orchestrator
                 from models.catalog import ModelType
+                from models.orchestrator import get_orchestrator
                 orch = get_orchestrator()
                 idx = config.config.get('selected_model_index', 0)
                 preset = MODEL_PRESETS[idx] if idx < len(MODEL_PRESETS) else None
@@ -967,7 +978,8 @@ def llm_launch_configure():
     if not _is_local_request():
         return jsonify({"error": "local only"}), 403
     try:
-        import subprocess, sys
+        import subprocess
+        import sys
         # Launch a new process with --setup-ai flag (non-blocking)
         exe = sys.executable
         # In frozen builds, use the app executable itself
@@ -991,7 +1003,7 @@ def llm_switch_model():
     try:
         data = request.get_json()
         model_index = data.get('model_index', 0)
-        from llama.llama_config import LlamaConfig, MODEL_PRESETS
+        from llama.llama_config import MODEL_PRESETS, LlamaConfig
         config = LlamaConfig()
         if model_index < 0 or model_index >= len(MODEL_PRESETS):
             return jsonify({"error": f"Invalid index. Valid: 0-{len(MODEL_PRESETS)-1}"}), 400
@@ -1002,8 +1014,8 @@ def llm_switch_model():
         preset = MODEL_PRESETS[model_index]
         # Sync catalog: unload old, load new
         try:
-            from models.orchestrator import get_orchestrator
             from models.catalog import ModelType
+            from models.orchestrator import get_orchestrator
             orch = get_orchestrator()
             if old_preset:
                 orch.notify_unloaded(ModelType.LLM, old_preset.display_name)
@@ -1268,8 +1280,9 @@ def _is_private_ip(hostname):
 @app.route('/api/image-proxy')
 def image_proxy():
     """Proxy external images to avoid CORS issues and provide fallback"""
-    from flask import send_from_directory
     import urllib.parse
+
+    from flask import send_from_directory
 
     image_url = request.args.get('url', '')
     if not image_url:
@@ -1308,7 +1321,7 @@ def image_proxy():
             fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
             if fallback_files:
                 return send_from_directory(static_dir, fallback_files[0])
-        except (OSError, IOError):
+        except OSError:
             pass
         return jsonify({'error': 'Failed to fetch image'}), 500
 
@@ -1372,7 +1385,7 @@ def serve_landing_page_root():
 @app.route('/local')
 def serve_local_page():
     """Always serve local page (for offline use or testing)"""
-    from flask import send_from_directory, Response
+    from flask import Response, send_from_directory
     index_path = os.path.join(LANDING_PAGE_BUILD_DIR, 'index.html')
     if os.path.exists(index_path):
         return send_from_directory(LANDING_PAGE_BUILD_DIR, 'index.html')
@@ -1484,7 +1497,9 @@ def sse_event_stream():
     Frontend connects here only when the Crossbar worker reports disconnected.
     Requires a valid JWT token as ``?token=`` query parameter.
     """
-    from flask import Response, request as flask_request, jsonify as _jsonify
+    from flask import Response
+    from flask import jsonify as _jsonify
+    from flask import request as flask_request
 
     token = flask_request.args.get('token', '').strip()
     if not token:
@@ -1541,8 +1556,8 @@ def sse_event_stream():
 @app.route('/s/<token>')
 def share_redirect(token):
     """Serve OG-tagged HTML for social crawlers, redirect browsers to SPA."""
-    from flask import render_template, redirect
     import requests as req
+    from flask import redirect, render_template
 
     # Resolve share token via social API (local)
     try:
@@ -1634,7 +1649,7 @@ if CRASH_REPORTER_AVAILABLE:
     try:
         init_crash_reporting(
             environment='development' if os.environ.get('FLASK_ENV') == 'development' else 'production',
-            release=f"Nunba@1.0.0"
+            release="Nunba@1.0.0"
         )
         # Register crash reporter blueprint
         app.register_blueprint(create_crash_reporter_blueprint())
@@ -1699,8 +1714,8 @@ def _deferred_social_init():
 
         # Channel adapters (Telegram, Discord — background daemon threads)
         try:
-            from integrations.channels.flask_integration import init_channels
             from core.port_registry import get_port
+            from integrations.channels.flask_integration import init_channels
             init_channels(app, {
                 'agent_api_url': f'http://localhost:{get_port("backend")}/chat',
                 'default_user_id': 10077,
@@ -1845,7 +1860,7 @@ def view_log():
         return jsonify({'error': 'Log file not found'}), 404
 
     try:
-        with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+        with open(log_path, encoding='utf-8', errors='replace') as f:
             all_lines = f.readlines()
 
         total_lines = len(all_lines)

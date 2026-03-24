@@ -4,17 +4,18 @@ llama_config.py - Configuration and management for Llama.cpp server
 Provides configuration management, server lifecycle, and API interface
 for the Llama.cpp local AI server.
 """
-import os
-import sys
 import json
-import subprocess
-import requests
-import time
 import logging
+import os
 import socket
+import subprocess
+import sys
+import time
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple
-from llama.llama_installer import LlamaInstaller, MODEL_PRESETS, ModelPreset
+
+import requests
+
+from llama.llama_installer import MODEL_PRESETS, LlamaInstaller, ModelPreset
 
 logger = logging.getLogger('NunbaLlamaConfig')
 
@@ -47,7 +48,7 @@ KNOWN_LLM_ENDPOINTS = [
 ]
 
 
-def scan_existing_llm_endpoints() -> Optional[Dict]:
+def scan_existing_llm_endpoints() -> dict | None:
     """
     Scan for existing LLM endpoints on the system.
     Returns the first working endpoint found, or None if none found.
@@ -83,7 +84,7 @@ def scan_existing_llm_endpoints() -> Optional[Dict]:
     return None
 
 
-def scan_openai_compatible_ports(ports: List[int] = None) -> Optional[Dict]:
+def scan_openai_compatible_ports(ports: list[int] = None) -> dict | None:
     """
     Scan additional ports for OpenAI-compatible endpoints.
 
@@ -118,7 +119,7 @@ def scan_openai_compatible_ports(ports: List[int] = None) -> Optional[Dict]:
 class LlamaConfig:
     """Manages Llama.cpp configuration and server lifecycle"""
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         """
         Initialize configuration
 
@@ -132,7 +133,7 @@ class LlamaConfig:
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
         self.installer = LlamaInstaller()
-        self.server_process: Optional[subprocess.Popen] = None
+        self.server_process: subprocess.Popen | None = None
         self._server_starting = False  # Lock to prevent double start
 
         # Load or create config
@@ -141,11 +142,11 @@ class LlamaConfig:
         # Update API base with configured port
         self.api_base = f"http://127.0.0.1:{self.config.get('server_port', 8080)}/v1"
 
-    def _load_config(self) -> Dict:
+    def _load_config(self) -> dict:
         """Load configuration from file or create default"""
         if self.config_file.exists():
             try:
-                with open(self.config_file, 'r') as f:
+                with open(self.config_file) as f:
                     cfg = json.load(f)
                 # Migrate: bump context_size if still at old default (4096)
                 # Agent creation (autogen multi-turn) needs at least 8192
@@ -154,7 +155,7 @@ class LlamaConfig:
                     try:
                         with open(self.config_file, 'w') as f:
                             json.dump(cfg, f, indent=2)
-                        logger.info(f"Migrated context_size to 8192")
+                        logger.info("Migrated context_size to 8192")
                     except Exception:
                         pass
                 return cfg
@@ -219,7 +220,7 @@ class LlamaConfig:
         """Check if a cloud provider has been configured via the wizard."""
         return self.config.get('cloud_provider') is not None
 
-    def get_selected_model_preset(self) -> Optional[ModelPreset]:
+    def get_selected_model_preset(self) -> ModelPreset | None:
         """Get the currently selected model preset"""
         index = self.config.get("selected_model_index", 0)
         if 0 <= index < len(MODEL_PRESETS):
@@ -659,7 +660,7 @@ class LlamaConfig:
                 best_size = preset.size_mb
         return best_idx
 
-    def _find_best_downloaded_model(self, budget_mb: int) -> Optional[int]:
+    def _find_best_downloaded_model(self, budget_mb: int) -> int | None:
         """Find the largest already-downloaded model that fits the budget."""
         best_idx = None
         best_size = 0
@@ -727,7 +728,7 @@ class LlamaConfig:
         except Exception:
             return False  # ConnectionRefused/Timeout = no server
 
-    def detect_and_cache_version(self) -> Optional[int]:
+    def detect_and_cache_version(self) -> int | None:
         """Detect the installed llama.cpp build number and cache it in config."""
         version = self.installer.get_version()
         if version is not None:
@@ -736,7 +737,7 @@ class LlamaConfig:
             logger.info(f"Detected llama.cpp build: b{version}")
         return version
 
-    def get_cached_version(self) -> Optional[int]:
+    def get_cached_version(self) -> int | None:
         """Get the cached llama.cpp build number from config."""
         return self.config.get("llama_cpp_build")
 
@@ -758,7 +759,7 @@ class LlamaConfig:
         except Exception:
             return False
 
-    def find_available_port(self, start_port: int = 8080, max_attempts: int = 10) -> Optional[int]:
+    def find_available_port(self, start_port: int = 8080, max_attempts: int = 10) -> int | None:
         """
         Find an available port starting from start_port
 
@@ -775,7 +776,7 @@ class LlamaConfig:
                 return port
         return None
 
-    def check_server_type(self, port: int) -> Tuple[str, Optional[Dict]]:
+    def check_server_type(self, port: int) -> tuple[str, dict | None]:
         """
         Check what type of server is running on the given port
 
@@ -834,7 +835,7 @@ class LlamaConfig:
             logger.debug(f"Error checking server on port {port}: {e}")
             return ServerType.NOT_RUNNING, None
 
-    def check_server_running(self, port: Optional[int] = None) -> bool:
+    def check_server_running(self, port: int | None = None) -> bool:
         """
         Check if llama.cpp server is running on the specified port
 
@@ -850,8 +851,8 @@ class LlamaConfig:
         server_type, _ = self.check_server_type(port)
         return server_type in [ServerType.NUNBA_MANAGED, ServerType.EXTERNAL_LLAMA]
 
-    def _write_server_status(self, running: bool, pid: Optional[int] = None,
-                             model: Optional[str] = None, port: Optional[int] = None):
+    def _write_server_status(self, running: bool, pid: int | None = None,
+                             model: str | None = None, port: int | None = None):
         """Write server status to SHARED file for cross-app coordination.
 
         Written to both:
@@ -883,7 +884,7 @@ class LlamaConfig:
             except Exception as e:
                 logger.debug(f"Failed to write status to {status_path}: {e}")
 
-    def start_server(self, model_preset: Optional[ModelPreset] = None, force_new_port: bool = False) -> bool:
+    def start_server(self, model_preset: ModelPreset | None = None, force_new_port: bool = False) -> bool:
         """
         Start the llama.cpp server with automatic port conflict resolution
 
@@ -1359,8 +1360,8 @@ class LlamaConfig:
         preset = self.get_selected_model_preset()
         return preset.display_name if preset else "unknown"
 
-    def chat_completion(self, messages: List[Dict], temperature: float = 0.7,
-                       max_tokens: int = 1000) -> Optional[str]:
+    def chat_completion(self, messages: list[dict], temperature: float = 0.7,
+                       max_tokens: int = 1000) -> str | None:
         """
         Send a chat completion request to the server
 
@@ -1518,7 +1519,7 @@ def initialize_llama_on_first_run(progress_callback=None, force_install=False) -
     return False
 
 
-def get_active_llm_endpoint() -> Optional[Dict]:
+def get_active_llm_endpoint() -> dict | None:
     """
     Get the currently active LLM endpoint (external or local).
 
@@ -1601,7 +1602,7 @@ def get_llama_endpoint() -> str:
     return f"http://localhost:{port}"
 
 
-def get_llama_info() -> Dict:
+def get_llama_info() -> dict:
     """
     Get information about the running llama.cpp server.
 

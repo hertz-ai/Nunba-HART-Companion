@@ -7,14 +7,12 @@ Provides:
 - Mock LLM server fixture
 - Auth token fixture (register + login to get JWT)
 """
+import json
 import os
 import sys
-import json
-import tempfile
-import shutil
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from unittest.mock import patch, MagicMock
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from unittest.mock import patch
 
 import pytest
 

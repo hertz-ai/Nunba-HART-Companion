@@ -59,6 +59,7 @@ LOCAL_BACKEND_PORT = int(os.environ.get('NUNBA_LOCAL_PORT', 5000))
 import sys
 from pathlib import Path
 
+
 def get_app_dir():
     """Get application directory"""
     if getattr(sys, 'frozen', False):

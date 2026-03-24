@@ -16,8 +16,7 @@ import json
 import os
 import sys
 import time
-from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -757,6 +756,7 @@ class TestRegisterUploadRoutes:
 
     def test_registers_blueprint(self):
         from flask import Flask
+
         from routes.upload_routes import register_upload_routes
         app = Flask(__name__)
         register_upload_routes(app)
@@ -784,7 +784,6 @@ class TestResolveNunbaDir:
             os.environ.pop('NUNBA_DATA_DIR', None)
             with patch('routes.upload_routes._resolve_nunba_dir.__module__', 'routes.upload_routes'):
                 # Force ImportError for core.platform_paths
-                import importlib
                 with patch.dict(sys.modules, {'core': None, 'core.platform_paths': None}):
                     result = _resolve_nunba_dir()
                     expected = os.path.join(os.path.expanduser('~'), 'Documents', 'Nunba')

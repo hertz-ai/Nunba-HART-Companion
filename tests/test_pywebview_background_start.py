@@ -17,13 +17,13 @@ This test:
 
 Requires: Running on Windows with Nunba installed.
 """
+import json
 import os
+import subprocess
 import sys
 import time
-import json
-import signal
-import subprocess
 import unittest
+
 import requests
 
 NUNBA_EXE = os.path.join(
@@ -178,7 +178,7 @@ class TestBackgroundStart(unittest.TestCase):
         if not os.path.isfile(log_path):
             self.skipTest("Log file not found")
 
-        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(log_path, encoding='utf-8', errors='ignore') as f:
             content = f.read()
 
         # Should have either BACKGROUND repaint or RECOVERY log
@@ -276,7 +276,7 @@ class TestBackgroundToForeground(unittest.TestCase):
             os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
             'langchain.log'
         )
-        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(log_path, encoding='utf-8', errors='ignore') as f:
             # Read only recent entries (last 50KB)
             f.seek(max(0, f.seek(0, 2) - 50000))
             content = f.read()
@@ -301,7 +301,7 @@ class TestBackgroundToForeground(unittest.TestCase):
             os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
             'langchain.log'
         )
-        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(log_path, encoding='utf-8', errors='ignore') as f:
             f.seek(max(0, f.seek(0, 2) - 50000))
             content = f.read()
 

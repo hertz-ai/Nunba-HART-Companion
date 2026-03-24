@@ -12,15 +12,19 @@ The singleton is shared with HARTOS so that BOTH
 """
 
 import logging
-from typing import Optional
-
-# ── Re-export canonical types from HARTOS ─────────────────────────
-from integrations.service_tools.model_catalog import (       # noqa: F401
-    ModelCatalog, ModelEntry, ModelType, MODEL_TYPES, BACKENDS, SOURCES,
-)
 
 # Access the HARTOS module for shared singleton management
 import integrations.service_tools.model_catalog as _hartos_mod
+
+# ── Re-export canonical types from HARTOS ─────────────────────────
+from integrations.service_tools.model_catalog import (  # noqa: F401
+    BACKENDS,
+    MODEL_TYPES,
+    SOURCES,
+    ModelCatalog,
+    ModelEntry,
+    ModelType,
+)
 
 logger = logging.getLogger('NunbaModelCatalog')
 

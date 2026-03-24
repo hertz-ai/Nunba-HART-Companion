@@ -13,10 +13,10 @@ Architecture:
   - 10 greeting effects enter from outside the frame edges
 """
 
-import math
-import random
-import os
 import json
+import math
+import os
+import random
 
 # ═══════════════════════════════════════════════════════════════
 #  PIL RENDERING ENGINE
@@ -24,8 +24,10 @@ import json
 
 _HAS_PIL = False
 try:
-    from PIL import Image as _PILImage, ImageDraw as _PILDraw
-    from PIL import ImageFont as _PILFont, ImageTk as _PILTk
+    from PIL import Image as _PILImage
+    from PIL import ImageDraw as _PILDraw
+    from PIL import ImageFont as _PILFont
+    from PIL import ImageTk as _PILTk
     _HAS_PIL = True
 except ImportError:
     pass
@@ -397,7 +399,7 @@ def _get_next_effect_index(total):
     try:
         os.makedirs(os.path.dirname(_STATE_FILE), exist_ok=True)
         if os.path.exists(_STATE_FILE):
-            data = json.loads(open(_STATE_FILE, 'r').read())
+            data = json.loads(open(_STATE_FILE).read())
             idx = (data.get('last_effect', -1) + 1) % total
         else:
             idx = 0
