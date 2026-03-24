@@ -9,7 +9,7 @@ describe('App Navigation E2E', () => {
   });
 
   it('navigates to demo page via hash route', () => {
-    cy.visit('/#/demo');
+    cy.visit('/local');
     cy.get('#root', {timeout: 20000}).should('exist');
     cy.get('#root').invoke('html').should('not.be.empty');
   });

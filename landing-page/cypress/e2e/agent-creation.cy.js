@@ -269,7 +269,7 @@ describe('Agent Creation & Types E2E', () => {
     beforeEach(() => {
       setupIntercepts();
       seedAuth();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       // Allow React to settle; also covers cloud API calls that may or may not fire
       cy.wait(3000);
@@ -448,7 +448,7 @@ describe('Agent Creation & Types E2E', () => {
     beforeEach(() => {
       setupIntercepts();
       seedAuth();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       // Wait for cloud APIs and React to settle
       cy.wait(3000);
@@ -584,7 +584,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('local agents fetched from /prompts should be tagged with _isLocal=true', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       // Allow the merge logic to run (covers cloud API calls that may or may not fire)
       cy.wait(3000);
@@ -603,7 +603,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('cloud agents from getprompt_all should NOT have _isLocal flag', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       // Instead of waiting on the cloud intercept (which may not fire if
       // navigator.onLine is false), wait a fixed time and then check if
       // the intercept was triggered.
@@ -647,7 +647,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('GET /prompts returns agents with correct structure (prompt_id, name, prompt)', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 30000});
       cy.wait(2000);
 
@@ -672,7 +672,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('UI should show agent names from both local and cloud sources', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       // Wait for cloud fetches and React rendering
       cy.wait(4000);
@@ -726,7 +726,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('GET /prompts should return a valid agent list with success=true', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000}).then((interception) => {
         expect(interception.response.statusCode).to.eq(200);
         expect(interception.response.body.success).to.eq(true);
@@ -735,7 +735,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('each agent from /prompts should have required fields (prompt_id, name, prompt)', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000}).then((interception) => {
         const prompts = interception.response.body.prompts;
         prompts.forEach((agent) => {
@@ -749,7 +749,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should call local /prompts endpoint on page load', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       // Local prompts should always be called
       cy.wait('@getLocalPrompts', {timeout: 20000});
@@ -760,7 +760,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should attempt to fetch cloud agents (may not fire in headless mode)', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       cy.wait('@getLocalPrompts', {timeout: 20000});
       // Cloud calls depend on navigator.onLine; in headless Chrome this may
@@ -788,7 +788,7 @@ describe('Agent Creation & Types E2E', () => {
       //   Cloud user (new): 301  (101 is dup => skipped)
       //   Total unique: 5
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       cy.wait('@getLocalPrompts', {timeout: 20000});
       // Wait for cloud fetches and merge logic to complete
@@ -825,7 +825,7 @@ describe('Agent Creation & Types E2E', () => {
         forceNetworkError: true,
       }).as('getLocalPromptsOffline');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       // Cloud endpoints may or may not be called depending on navigator.onLine.
       // Wait a fixed time instead of depending on cloud intercept.
@@ -848,7 +848,7 @@ describe('Agent Creation & Types E2E', () => {
         forceNetworkError: true,
       }).as('getCloudUserAgentsOffline');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       // Local prompts should still work
       cy.wait('@getLocalPrompts', {timeout: 20000}).then((interception) => {
@@ -865,7 +865,7 @@ describe('Agent Creation & Types E2E', () => {
         body: {prompts: [], success: true, is_online: true},
       }).as('getEmptyLocalPrompts');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       cy.wait('@getEmptyLocalPrompts', {timeout: 20000});
       cy.wait(2000);
@@ -884,7 +884,7 @@ describe('Agent Creation & Types E2E', () => {
         body: {prompts: 'not-an-array', success: true},
       }).as('getMalformedPrompts');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
 
       cy.wait('@getMalformedPrompts', {timeout: 20000});
       cy.wait(2000);
@@ -904,7 +904,7 @@ describe('Agent Creation & Types E2E', () => {
     beforeEach(() => {
       setupIntercepts();
       seedAuth();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1058,7 +1058,7 @@ describe('Agent Creation & Types E2E', () => {
     beforeEach(() => {
       setupIntercepts();
       seedAuth();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
     });
@@ -1196,7 +1196,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should show "(Login required)" text next to Create button when unauthenticated', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait(3000);
 
       // The button shows "Login required" when isAuthenticated is false
@@ -1204,7 +1204,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should NOT open the CreateAgentForm when unauthenticated user clicks Create', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait(3000);
 
       // Click the Create new Agent button (it should open the login modal instead)
@@ -1218,7 +1218,7 @@ describe('Agent Creation & Types E2E', () => {
 
     it('should show Create button as active when authenticated', () => {
       seedAuth();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 

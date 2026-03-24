@@ -533,7 +533,7 @@ describe('Autonomous Agent Creation E2E', () => {
         });
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -571,7 +571,7 @@ describe('Autonomous Agent Creation E2E', () => {
         });
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -611,7 +611,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -659,7 +659,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -701,7 +701,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -744,7 +744,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -783,7 +783,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -825,7 +825,7 @@ describe('Autonomous Agent Creation E2E', () => {
         },
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -849,7 +849,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -882,7 +882,7 @@ describe('Autonomous Agent Creation E2E', () => {
         req.reply({statusCode: 200, body: resp});
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -908,7 +908,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -956,7 +956,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -987,7 +987,7 @@ describe('Autonomous Agent Creation E2E', () => {
         },
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1009,7 +1009,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -1050,7 +1050,7 @@ describe('Autonomous Agent Creation E2E', () => {
     });
 
     it('8.1 in guest mode, "Create new Agent" starts conversational flow (not cloud form)', () => {
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1072,7 +1072,7 @@ describe('Autonomous Agent Creation E2E', () => {
         body: creationModeResponse,
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1092,7 +1092,7 @@ describe('Autonomous Agent Creation E2E', () => {
         body: regularChatResponse,
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1131,7 +1131,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -1164,7 +1164,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -1207,7 +1207,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -1432,7 +1432,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -1469,7 +1469,7 @@ describe('Autonomous Agent Creation E2E', () => {
         },
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1502,7 +1502,7 @@ describe('Autonomous Agent Creation E2E', () => {
       }).as('chatRequest');
 
       cy.clock();
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.tick(5000);
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.tick(3000);
@@ -1538,7 +1538,7 @@ describe('Autonomous Agent Creation E2E', () => {
         body: creationSuggestedResponse,
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1566,7 +1566,7 @@ describe('Autonomous Agent Creation E2E', () => {
         });
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 
@@ -1613,7 +1613,7 @@ describe('Autonomous Agent Creation E2E', () => {
         req.reply({statusCode: 200, body: resp});
       }).as('chatRequest');
 
-      cy.visit('/#/demo', {timeout: 30000, failOnStatusCode: false});
+      cy.visit('/local', {timeout: 30000, failOnStatusCode: false});
       cy.wait('@getLocalPrompts', {timeout: 20000});
       cy.wait(3000);
 

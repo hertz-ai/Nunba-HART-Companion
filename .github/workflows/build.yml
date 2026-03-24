@@ -142,6 +142,28 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
 
+      - name: E2E smoke test (start server, hit health endpoint)
+        shell: bash
+        run: |
+          # Start the frozen exe as a server (background)
+          build/Nunba/Nunba.exe --server --port 5123 &
+          FLASK_PID=$!
+          # Wait for health
+          for i in $(seq 1 20); do
+            if curl -s http://localhost:5123/health > /dev/null 2>&1; then
+              echo "Server healthy (attempt $i)"
+              # Validate key endpoints
+              curl -sf http://localhost:5123/health && echo " [OK] /health"
+              curl -sf http://localhost:5123/nunba/info && echo " [OK] /nunba/info"
+              curl -sf http://localhost:5123/prompts && echo " [OK] /prompts"
+              break
+            fi
+            sleep 3
+          done
+          kill $FLASK_PID 2>/dev/null || true
+        timeout-minutes: 3
+        continue-on-error: true
+
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
@@ -242,6 +264,25 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: python scripts/build.py sign
 
+      - name: E2E smoke test (start server, hit health endpoint)
+        run: |
+          # Start the frozen app as a server (background)
+          build/Nunba.app/Contents/MacOS/Nunba --server --port 5123 &
+          FLASK_PID=$!
+          for i in $(seq 1 20); do
+            if curl -s http://localhost:5123/health > /dev/null 2>&1; then
+              echo "Server healthy (attempt $i)"
+              curl -sf http://localhost:5123/health && echo " [OK] /health"
+              curl -sf http://localhost:5123/nunba/info && echo " [OK] /nunba/info"
+              curl -sf http://localhost:5123/prompts && echo " [OK] /prompts"
+              break
+            fi
+            sleep 3
+          done
+          kill $FLASK_PID 2>/dev/null || true
+        timeout-minutes: 3
+        continue-on-error: true
+
       - name: Upload macOS installer
         uses: actions/upload-artifact@v4
         with:
@@ -314,6 +355,24 @@ jobs:
         run: python scripts/build.py app --skip-wizard
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+      - name: E2E smoke test (start server, hit health endpoint)
+        run: |
+          build/Nunba/Nunba --server --port 5123 &
+          FLASK_PID=$!
+          for i in $(seq 1 20); do
+            if curl -s http://localhost:5123/health > /dev/null 2>&1; then
+              echo "Server healthy (attempt $i)"
+              curl -sf http://localhost:5123/health && echo " [OK] /health"
+              curl -sf http://localhost:5123/nunba/info && echo " [OK] /nunba/info"
+              curl -sf http://localhost:5123/prompts && echo " [OK] /prompts"
+              break
+            fi
+            sleep 3
+          done
+          kill $FLASK_PID 2>/dev/null || true
+        timeout-minutes: 3
+        continue-on-error: true
 
       - name: Package as AppImage
         run: |
