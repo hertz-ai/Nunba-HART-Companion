@@ -22,14 +22,13 @@ if PROJECT_ROOT not in sys.path:
 from scripts.rebuild_python_embed import (
     BACKUP_DIR,
     EMBED_DIR,
+    PROJECT_DIR,
     PY_EMBED_URL,
     PY_VERSION,
-    PROJECT_DIR,
     SCRIPTS_DIR,
     run,
     step,
 )
-
 
 # ============================================================
 # Module constants

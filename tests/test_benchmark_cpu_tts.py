@@ -29,7 +29,6 @@ from scripts.benchmark_cpu_tts import (
     verify_with_whisper,
 )
 
-
 # ============================================================
 # TEST_SENTENCES data structure
 # ============================================================

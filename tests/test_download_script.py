@@ -22,7 +22,6 @@ if PROJECT_ROOT not in sys.path:
 
 from scripts.download import download_file, main
 
-
 # ============================================================
 # download_file()
 # ============================================================
