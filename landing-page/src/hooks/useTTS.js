@@ -347,7 +347,21 @@ export function useTTS(options = {}) {
         const url = URL.createObjectURL(blob);
         if (audioRef.current) {
           audioRef.current.src = url;
-          audioRef.current.play();
+          try {
+            await audioRef.current.play();
+          } catch (playErr) {
+            // macOS WebKit blocks autoplay — resume AudioContext and retry once
+            console.warn('[TTS] play() blocked, retrying after user-gesture unlock:', playErr.message);
+            try {
+              const ctx = new (window.AudioContext || window.webkitAudioContext)();
+              if (ctx.state === 'suspended') await ctx.resume();
+              await audioRef.current.play();
+            } catch (retryErr) {
+              console.error('[TTS] play() retry failed:', retryErr.message);
+              setError('Audio playback blocked — tap anywhere and try again');
+              return null;
+            }
+          }
           setIsSpeaking(true);
         }
         return url;

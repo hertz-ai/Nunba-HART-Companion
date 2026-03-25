@@ -680,6 +680,32 @@ def get_webview():
 
         import webview as _pywebview
         pywebview = _pywebview
+
+        # macOS: patch WKWebView to enable media capture (getUserMedia) and autoplay
+        # This allows mic access and audio playback on http://localhost in WKWebView.
+        # No-op on Windows/Linux — the cocoa module only exists on macOS.
+        if sys.platform == 'darwin':
+            try:
+                from webview.platforms import cocoa as _cocoa
+                _orig_init = _cocoa.BrowserView.__init__
+
+                def _patched_init(self, window, *args, **kwargs):
+                    _orig_init(self, window, *args, **kwargs)
+                    try:
+                        import WebKit as _WK
+                        config = self.webview.configuration()
+                        config.setAllowsInlineMediaPlayback_(True)
+                        config.setMediaTypesRequiringUserActionForPlayback_(0)
+                        config.preferences().setValue_forKey_(True, 'mediaDevicesEnabled')
+                        config.preferences().setValue_forKey_(False, 'mediaCaptureRequiresSecureConnection')
+                    except Exception:
+                        pass
+
+                _cocoa.BrowserView.__init__ = _patched_init
+                logging.getLogger('NunbaGUI').info("[MEDIA] Patched WKWebView for media capture + autoplay")
+            except Exception as _patch_err:
+                logging.getLogger('NunbaGUI').warning(f"[MEDIA] WKWebView patch skipped: {_patch_err}")
+
     return pywebview
 
 _pump_early_splash('Loading AI engine...')
@@ -2577,7 +2603,7 @@ def ensure_working_directory():
 # Lightweight Flask — serves React SPA immediately while main.py imports.
 # Has just enough routes for the webview to show the UI (static files + SPA catch-all).
 # The full flask_app (with chat, social, admin routes) replaces it after import.
-gui_app = Flask(__name__)
+gui_app = Flask(__name__, static_folder=None)
 
 # Serve React SPA from gui_app so webview shows UI before main.py finishes
 _gui_build_dir = os.path.join(
@@ -2691,6 +2717,16 @@ def _import_main_app():
     for h in logging.getLogger().handlers + _setup_logger.handlers:
         if hasattr(h, 'flush'):
             h.flush()
+
+    # Clear stale SQLAlchemy metadata to prevent "Table already defined" errors
+    # in frozen builds where import order differs from dev.
+    try:
+        from sqlalchemy.orm import declarative_base
+        from sql.models import Base as _sql_base
+        if hasattr(_sql_base, 'metadata'):
+            _sql_base.metadata.clear()
+    except Exception:
+        pass
 
     # Load main.py as a module
     spec = importlib.util.spec_from_file_location("main_module", main_path)
@@ -5252,6 +5288,54 @@ def main():
         _wv_elapsed = time.time() - _wv_start
         logger.info(f"[STARTUP] pywebview loaded successfully in {_wv_elapsed:.1f}s")
 
+        # ── Native mic capture API (used when getUserMedia is unavailable in WKWebView) ──
+        class NunbaNativeApi:
+            def __init__(self):
+                self._recording = False
+                self._audio_data = []
+
+            def native_mic_record(self, duration_sec=5):
+                """Record audio from mic using sounddevice and transcribe via Whisper.
+                Called from JS when getUserMedia is not available (macOS WKWebView http).
+                Returns transcribed text or error string."""
+                import tempfile, wave, struct
+                try:
+                    import sounddevice as sd
+                except ImportError:
+                    return '__ERROR__:sounddevice not installed'
+                try:
+                    sample_rate = 16000
+                    logger.info(f"[NATIVE-MIC] Recording {duration_sec}s at {sample_rate}Hz...")
+                    audio = sd.rec(int(duration_sec * sample_rate), samplerate=sample_rate,
+                                   channels=1, dtype='int16', blocking=True)
+                    logger.info(f"[NATIVE-MIC] Recorded {len(audio)} samples")
+                    # Save as WAV
+                    tmp = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+                    with wave.open(tmp.name, 'wb') as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)
+                        wf.setframerate(sample_rate)
+                        wf.writeframes(audio.tobytes())
+                    # Transcribe
+                    try:
+                        from integrations.service_tools.whisper_tool import whisper_transcribe
+                        result = json.loads(whisper_transcribe(tmp.name))
+                        text = result.get('text', '').strip()
+                        logger.info(f"[NATIVE-MIC] Transcribed: {text[:80]}")
+                        return text if text else '__ERROR__:empty transcription'
+                    except ImportError:
+                        return '__ERROR__:whisper not available'
+                    finally:
+                        try:
+                            os.unlink(tmp.name)
+                        except OSError:
+                            pass
+                except Exception as e:
+                    logger.error(f"[NATIVE-MIC] Error: {e}")
+                    return f'__ERROR__:{e}'
+
+        _native_api = NunbaNativeApi()
+
         # Create window with conditional hidden status and frameless design
         _window = webview.create_window(
             title=args.title,
@@ -5265,7 +5349,8 @@ def main():
             hidden=start_hidden,
             text_select=True,
             easy_drag=False,  # Disable since we handle dragging in custom title bar
-            background_color='#000000'
+            background_color='#000000',
+            js_api=_native_api
         )
 
         logger.info(f"Window created: {window_width}x{window_height}, hidden={start_hidden}")
@@ -5475,6 +5560,41 @@ def main():
                 pass
 
         _window.events.loaded += _on_loaded_recovery
+
+        # ── Fix: Grant mic + audio permissions for macOS WebKit ──
+        # WebKit blocks microphone access and audio autoplay by default.
+        # Inject JS on page load that:
+        # 1. Resumes AudioContext (fixes TTS playback)
+        # 2. Pre-requests mic permission (fixes STT)
+        def _on_loaded_media_permissions():
+            try:
+                _window.evaluate_js("""
+                (function() {
+                    if (window.__nunbaMediaPermsGranted) return;
+                    window.__nunbaMediaPermsGranted = true;
+
+                    // 1. Resume AudioContext on first user interaction (fixes TTS autoplay)
+                    var resumeAudio = function() {
+                        try {
+                            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            if (ctx.state === 'suspended') ctx.resume();
+                            // Also unlock any existing audio elements
+                            var audios = document.querySelectorAll('audio');
+                            audios.forEach(function(a) { a.load(); });
+                        } catch(e) {}
+                    };
+                    ['click', 'touchstart', 'keydown'].forEach(function(evt) {
+                        document.addEventListener(evt, resumeAudio, { once: true });
+                    });
+
+
+                })();
+                """)
+                logger.info("[MEDIA] Audio/mic permissions JS injected")
+            except Exception as e:
+                logger.warning(f"[MEDIA] Permission injection failed: {e}")
+
+        _window.events.loaded += _on_loaded_media_permissions
 
         # Delayed React mount check — if HTML loads but React never mounts
         # (e.g. JS bundle failed, import error), the loaded event fires but
