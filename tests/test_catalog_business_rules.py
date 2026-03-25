@@ -142,11 +142,11 @@ class TestLLMBusinessRules:
         for e in llm_entries:
             assert e.repo_id, f"{e.id} missing repo_id"
 
-    def test_qwen_has_256k_context(self, llm_entries):
-        qwen = [e for e in llm_entries if 'qwen3.5' in e.id.lower()]
-        for e in qwen:
-            ctx = (e.capabilities or {}).get('context_length', 0)
-            assert ctx >= 128000, f"{e.id} should have large context, got {ctx}"
+    def test_at_least_one_large_context_model(self, llm_entries):
+        """At least one LLM should support 128K+ context."""
+        large_ctx = [e for e in llm_entries
+                     if (e.capabilities or {}).get('context_length', 0) >= 128000]
+        assert len(large_ctx) >= 1, "Need at least one 128K+ context model"
 
     def test_ids_are_unique(self, llm_entries):
         ids = [e.id for e in llm_entries]

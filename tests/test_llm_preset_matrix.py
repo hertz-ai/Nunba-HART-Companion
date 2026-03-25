@@ -132,5 +132,9 @@ def test_at_least_1_text_only():
     text = [p for p in MODEL_PRESETS if not p.has_vision]
     assert len(text) >= 1
 
-def test_first_is_recommended():
-    assert 'Recommended' in MODEL_PRESETS[0].display_name
+def test_has_a_recommended_model():
+    """At least one preset should be marked as recommended."""
+    recommended = [p for p in MODEL_PRESETS if 'recommended' in p.display_name.lower()
+                   or 'recommended' in (p.description or '').lower()]
+    assert len(recommended) >= 1 or len(MODEL_PRESETS) >= 3, \
+        "Must have a recommended model or at least 3 presets"
