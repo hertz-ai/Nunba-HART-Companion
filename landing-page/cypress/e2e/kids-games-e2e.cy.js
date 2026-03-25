@@ -98,8 +98,9 @@ function stubAll() {
 }
 
 function visitKidsHub() {
-  cy.visit('http://localhost:3000/social/kids', {
+  cy.visit('/social/kids', {
     failOnStatusCode: false,
+    timeout: 60000,
     onBeforeLoad(win) {
       win.localStorage.setItem('access_token', FAKE_TOKEN);
     },

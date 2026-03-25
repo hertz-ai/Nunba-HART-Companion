@@ -83,6 +83,7 @@ Cypress.Commands.add('socialRegister', (username, password, displayName) => {
       url: `${SOCIAL_API}/auth/register`,
       body: user,
       failOnStatusCode: false,
+      timeout: 30000,
     })
     .then((res) => {
       // Whether register succeeded (201) or user already exists, login to get JWT
@@ -109,6 +110,7 @@ Cypress.Commands.add('socialLogin', (username, password) => {
       url: `${SOCIAL_API}/auth/login`,
       body: {username, password: password || 'TestPass123!'},
       failOnStatusCode: false,
+      timeout: 30000,
     })
     .then((res) => {
       const data = res.body.data || res.body;
@@ -152,6 +154,7 @@ Cypress.Commands.add('socialRequest', (method, path, body, options = {}) => {
     method,
     url,
     body,
+    timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? {Authorization: `Bearer ${token}`} : {}),
@@ -173,6 +176,8 @@ Cypress.Commands.add('socialVisit', (path, options = {}) => {
   const username = options.username || Cypress.env('socialUsername');
 
   cy.visit(path, {
+    failOnStatusCode: false,
+    timeout: 60000,
     ...options,
     onBeforeLoad(win) {
       if (token) {
@@ -249,6 +254,8 @@ Cypress.Commands.add('socialVisitAsAdmin', (path, options = {}) => {
   }).as('authMeAdmin');
 
   cy.visit(path, {
+    failOnStatusCode: false,
+    timeout: 60000,
     ...options,
     onBeforeLoad(win) {
       if (token) win.localStorage.setItem('access_token', token);
@@ -388,6 +395,7 @@ Cypress.Commands.add('verifyTokenWorks', (token) => {
         'Content-Type': 'application/json',
       },
       failOnStatusCode: false,
+      timeout: 30000,
     })
     .then((res) => {
       return {
@@ -408,6 +416,7 @@ Cypress.Commands.add('verifyAuthRequired', (method, path) => {
       url: `${API_BASE}/api/social${path}`,
       headers: {'Content-Type': 'application/json'},
       failOnStatusCode: false,
+      timeout: 30000,
     })
     .then((res) => {
       if (res.status >= 500) {

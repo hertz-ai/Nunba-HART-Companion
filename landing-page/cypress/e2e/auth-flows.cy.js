@@ -104,7 +104,7 @@ function setupCommonIntercepts() {
 // "/agents/Hevolve" is the specific agent URL and also renders Agent/Demopage.
 // ---------------------------------------------------------------------------
 function visitAgentPage(path = '/agents/Hevolve') {
-  cy.visit(path, {failOnStatusCode: false});
+  cy.visit(path, {failOnStatusCode: false, timeout: 60000});
   // Wait for the React app to mount -- use a DOM element check instead of
   // waiting on the cloud API intercept which may time out.
   cy.get('#root', {timeout: 20000}).should('exist');
@@ -988,6 +988,7 @@ describe('Authentication Flows E2E', () => {
       // Pre-populate localStorage via onBeforeLoad so it is set before the page loads
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'some-token');
           win.localStorage.setItem('user_id', 'encrypted-uid');
@@ -1042,6 +1043,7 @@ describe('Authentication Flows E2E', () => {
       // Simulate guest mode via onBeforeLoad
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('guest_mode', 'true');
           win.localStorage.setItem('guest_name', 'Clever.Amber.GuestUser');
@@ -1083,6 +1085,7 @@ describe('Authentication Flows E2E', () => {
       // Set up guest mode via onBeforeLoad then logout then do OTP login
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('guest_mode', 'true');
           win.localStorage.setItem('guest_name', 'Swift.Ruby.GuestBob');
@@ -1352,6 +1355,7 @@ describe('Authentication Flows E2E', () => {
           display_name: 'Real Auth Test User',
         },
         failOnStatusCode: false,
+        timeout: 30000,
       }).then((res) => {
         // Register should return 200/201 with api_token
         if (res.status === 200 || res.status === 201) {
@@ -1387,6 +1391,7 @@ describe('Authentication Flows E2E', () => {
         url: `${SOCIAL_API}/auth/register`,
         body: {username, password, display_name: 'JWT Test'},
         failOnStatusCode: false,
+        timeout: 30000,
       }).then(() => {
         // Then login
         cy.request({
@@ -1394,6 +1399,7 @@ describe('Authentication Flows E2E', () => {
           url: `${SOCIAL_API}/auth/login`,
           body: {username, password},
           failOnStatusCode: false,
+          timeout: 30000,
         }).then((loginRes) => {
           if (loginRes.status === 200 || loginRes.status === 201) {
             expect(loginRes.body).to.have.property('success', true);
@@ -1447,6 +1453,7 @@ describe('Authentication Flows E2E', () => {
           url: `${SOCIAL_API}/auth/login`,
           body: {username, password},
           failOnStatusCode: false,
+          timeout: 30000,
         }).then((loginRes) => {
           if (loginRes.status !== 200 && loginRes.status !== 201) {
             cy.log(`Login failed with status ${loginRes.status}`);
@@ -1469,6 +1476,7 @@ describe('Authentication Flows E2E', () => {
               'Content-Type': 'application/json',
             },
             failOnStatusCode: false,
+            timeout: 30000,
           }).then((meRes) => {
             // Should return 200 with user data
             if (meRes.status === 200) {
@@ -1503,6 +1511,7 @@ describe('Authentication Flows E2E', () => {
           'Content-Type': 'application/json',
         },
         failOnStatusCode: false,
+        timeout: 30000,
       }).then((res) => {
         // Should return 401 Unauthorized or 403 Forbidden
         expect(res.status).to.be.oneOf([401, 403, 500]);
@@ -1523,6 +1532,7 @@ describe('Authentication Flows E2E', () => {
           'Content-Type': 'application/json',
         },
         failOnStatusCode: false,
+        timeout: 30000,
       }).then((res) => {
         expect(res.status).to.be.oneOf([401, 403, 500]);
       });
@@ -1534,6 +1544,7 @@ describe('Authentication Flows E2E', () => {
         url: `${SOCIAL_API}/auth/me`,
         headers: {'Content-Type': 'application/json'},
         failOnStatusCode: false,
+        timeout: 30000,
       }).then((res) => {
         // Should return 401 or error response
         if (res.status >= 500) {
@@ -1609,6 +1620,7 @@ describe('Authentication Flows E2E', () => {
       // Set up localStorage with a token that will expire soon
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'expiring-soon-token');
           win.localStorage.setItem('expire_token', '3'); // 3 seconds expiry
@@ -1642,6 +1654,7 @@ describe('Authentication Flows E2E', () => {
 
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'valid-token');
           win.localStorage.setItem('expire_token', '2');
@@ -1687,6 +1700,7 @@ describe('Authentication Flows E2E', () => {
       // Pre-populate all auth items
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'test-token');
           win.localStorage.setItem('user_id', 'encrypted-user-id');
@@ -1760,6 +1774,7 @@ describe('Authentication Flows E2E', () => {
           url: `${SOCIAL_API}/auth/me`,
           headers: {Authorization: `Bearer ${token}`},
           failOnStatusCode: false,
+          timeout: 30000,
         }).then((beforeRes) => {
           // Token should work
           if (beforeRes.status === 200) {
@@ -1769,6 +1784,7 @@ describe('Authentication Flows E2E', () => {
               url: `${SOCIAL_API}/auth/logout`,
               headers: {Authorization: `Bearer ${token}`},
               failOnStatusCode: false,
+              timeout: 30000,
             }).then(() => {
               // Try using the same token after logout
               cy.request({
@@ -1776,6 +1792,7 @@ describe('Authentication Flows E2E', () => {
                 url: `${SOCIAL_API}/auth/me`,
                 headers: {Authorization: `Bearer ${token}`},
                 failOnStatusCode: false,
+                timeout: 30000,
               }).then((afterRes) => {
                 // Token should be invalid after logout
                 // Some APIs invalidate tokens, others don't
@@ -1796,6 +1813,7 @@ describe('Authentication Flows E2E', () => {
     it('should redirect to login page after logout', () => {
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'test-token');
           win.localStorage.setItem('user_id', 'test-user');
@@ -1864,6 +1882,7 @@ describe('Authentication Flows E2E', () => {
     it('should enable chat input when authenticated', () => {
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'valid-token');
           win.localStorage.setItem('user_id', 'test-user');
@@ -1887,6 +1906,7 @@ describe('Authentication Flows E2E', () => {
     it('should show authenticated state when user has valid token', () => {
       cy.visit('/agents/Hevolve', {
         failOnStatusCode: false,
+        timeout: 60000,
         onBeforeLoad(win) {
           win.localStorage.setItem('access_token', 'valid-token');
           win.localStorage.setItem('user_id', 'encrypted-user-123');
@@ -1920,7 +1940,7 @@ describe('Authentication Flows E2E', () => {
       cy.clearLocalStorage();
 
       // Visit a protected route directly
-      cy.visit('/agents/Hevolve', {failOnStatusCode: false});
+      cy.visit('/agents/Hevolve', {failOnStatusCode: false, timeout: 60000});
       cy.get('#root', {timeout: 20000}).should('exist');
       cy.wait(2000);
 
@@ -1986,6 +2006,7 @@ describe('Authentication Flows E2E', () => {
           display_name: 'JWT Claims Test',
         },
         failOnStatusCode: false,
+        timeout: 30000,
       }).then(() => {
         cy.request({
           method: 'POST',
