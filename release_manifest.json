@@ -1,0 +1,19 @@
+{
+  "product": "Nunba",
+  "publisher": "HevolveAI",
+  "version": "2.0.0",
+  "channel": "stable",
+  "build_commit": "58391ff0ae625001a62c30abe6d6c5afc2ba28aa",
+  "build_date": "2026-03-26",
+  "min_python": "3.11",
+  "features": {
+    "local_llm": false,
+    "tts": true,
+    "stt": true,
+    "social": true,
+    "agents": true,
+    "hive": false
+  },
+  "boot_verification": "pass",
+  "signature": "unsigned-dev-build"
+}

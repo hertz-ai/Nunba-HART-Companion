@@ -1,0 +1,15 @@
+{
+  "app_url_template": "http://localhost:{port}/local",
+  "api_base_url": "http://localhost:{port}",
+  "llm_proxy_url": "http://localhost:8080",
+  "hart_backend_url": "http://localhost:6777",
+  "tts_backend": "piper",
+  "stt_backend": "faster_whisper",
+  "language": "en",
+  "theme": "dark",
+  "accent_color": "#6C63FF",
+  "background_color": "#0F0E17",
+  "auto_start_llm": false,
+  "first_run": false,
+  "telemetry": false
+}

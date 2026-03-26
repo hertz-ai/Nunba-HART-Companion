@@ -704,6 +704,10 @@ def slim_python_embed():
         'lief',                            # 12 MB  - binary analysis, not needed
         'pythonwin',                       # 11 MB  - dev tool
         'grpc', 'grpcio',                  # 12 MB  - google cloud only
+        # llmlingua pulls in torch via autogen → its GPU DLLs crash on CPU-only
+        # machines (WinError 126: torch_python.dll not found). Stripped here so
+        # autogen.agentchat.contrib.capabilities.transforms imports cleanly.
+        'llmlingua',                       # removes torch GPU DLL crash
     ]
     for pkg in unused_packages:
         pkg_dir = os.path.join(site_packages, pkg)
