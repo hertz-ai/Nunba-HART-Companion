@@ -263,6 +263,7 @@ build_exe_options = {
         "threading",
         "logging",
         "webview",
+        "proxy_tools",
         "argparse",
         "importlib",
         "traceback",
@@ -596,6 +597,8 @@ if True:
         os.path.join(os.path.dirname(os.path.abspath(__file__)),
                      '..', '..', 'HARTOS', 'agent-ledger-opensource', 'agent_ledger'),
         os.path.join('hartos_backend_src', 'agent_ledger'),
+        # Stub bundled with Nunba repo (fallback when HARTOS sibling not present)
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'agent_ledger'),
     ]
     for _al_path in _agent_ledger_candidates:
         if os.path.isdir(_al_path) and os.path.isfile(os.path.join(_al_path, '__init__.py')):
