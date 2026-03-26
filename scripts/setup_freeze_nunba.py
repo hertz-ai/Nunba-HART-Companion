@@ -877,14 +877,27 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     if os.path.isdir(_build_lib):
         _compiled = 0
         for _py_file in glob.glob(os.path.join(_build_lib, "*.py")):
+            # cx_Freeze may have already compiled and removed this .py file
+            # (it does its own compilation pass). Skip if file is gone.
+            if not os.path.isfile(_py_file):
+                continue
             _base = os.path.splitext(_py_file)[0]
             _pyc_file = _base + ".pyc"
+            # Also skip if cx_Freeze already produced a .pyc for this module
+            if os.path.isfile(_pyc_file):
+                try:
+                    os.remove(_py_file)
+                except OSError:
+                    pass
+                continue
             try:
                 py_compile.compile(_py_file, cfile=_pyc_file, doraise=True)
                 os.remove(_py_file)
                 _compiled += 1
             except py_compile.PyCompileError as _pce:
                 print(f"  WARNING: Failed to compile {os.path.basename(_py_file)}: {_pce}")
+            except FileNotFoundError:
+                pass  # cx_Freeze compiled it between glob and compile — harmless
         if _compiled:
             print(f"Post-build: compiled {_compiled} HARTOS .py files to .pyc in lib/")
     # Also remove any raw .py files in root (leftover from previous builds)
