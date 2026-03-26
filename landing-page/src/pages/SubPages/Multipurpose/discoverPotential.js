@@ -1,12 +1,12 @@
-import React, {useState, useEffect} from 'react';
-import Grid from '@mui/material/Grid';
-import Typography from '@mui/material/Typography';
 import EmojiEventsSharpIcon from '@mui/icons-material/EmojiEventsSharp';
+import GraphicEqSharpIcon from '@mui/icons-material/GraphicEqSharp';
+import GroupWorkSharpIcon from '@mui/icons-material/GroupWorkSharp';
 import RotateRightSharpIcon from '@mui/icons-material/RotateRightSharp';
 import EmojiPeopleSharpIcon from '@mui/icons-material/RotateRightSharp';
-import GraphicEqSharpIcon from '@mui/icons-material/GraphicEqSharp';
 import SentimentVerySatisfiedSharpIcon from '@mui/icons-material/SentimentVerySatisfiedSharp';
-import GroupWorkSharpIcon from '@mui/icons-material/GroupWorkSharp';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import React, {useState, useEffect} from 'react';
 // import './parallax.scss';
 import {Parallax} from 'react-parallax';
 const image1 =
@@ -116,7 +116,7 @@ export default function DiscoverPotential() {
                 </Typography>
               </Grid>
             </Grid>
-            {/*container-1*/}
+            {/* container-1*/}
           </Grid>
           <Grid item xs={12} md={4} lg={4} id="midSec" />
           <Grid item xs={12} md={4} lg={4}>
@@ -166,7 +166,7 @@ export default function DiscoverPotential() {
                 </Typography>
               </Grid>
             </Grid>
-            {/*container-2*/}
+            {/* container-2*/}
           </Grid>
         </Grid>
       </div>

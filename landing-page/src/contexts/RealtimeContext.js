@@ -1,3 +1,5 @@
+import realtimeService from '../services/realtimeService';
+
 import React, {
   createContext,
   useContext,
@@ -5,7 +7,6 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
-import realtimeService from '../services/realtimeService';
 
 const RealtimeContext = createContext();
 

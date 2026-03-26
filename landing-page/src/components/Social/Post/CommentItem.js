@@ -1,8 +1,6 @@
 import CommentForm from './CommentForm';
 
 import {commentsApi} from '../../../services/socialApi';
-import UserChip from '../shared/UserChip';
-import VoteButtons from '../shared/VoteButtons';
 import {
   socialTokens,
   RADIUS,
@@ -10,10 +8,12 @@ import {
   EASINGS,
   GRADIENTS,
 } from '../../../theme/socialTokens';
+import UserChip from '../shared/UserChip';
+import VoteButtons from '../shared/VoteButtons';
 
+import ReplyIcon from '@mui/icons-material/Reply';
 import {Typography, Button, Collapse, Box, useTheme} from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ReplyIcon from '@mui/icons-material/Reply';
 import React, {useState} from 'react';
 
 export default function CommentItem({comment, onReplyAdded}) {

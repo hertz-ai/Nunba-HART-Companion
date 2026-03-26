@@ -5,9 +5,9 @@
  * agent vs user author display, bookmark toggle, share dialog,
  * optimistic update rollback on error, and double-tap HART.
  */
-import React from 'react';
-import {render, screen, fireEvent, act, waitFor} from '@testing-library/react';
 import {ThemeProvider, createTheme} from '@mui/material/styles';
+import {render, screen, fireEvent, act, waitFor} from '@testing-library/react';
+import React from 'react';
 import {BrowserRouter} from 'react-router-dom';
 
 // ── Mocks ────────────────────────────────────────────────────────────────

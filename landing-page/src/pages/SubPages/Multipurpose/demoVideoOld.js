@@ -1,5 +1,6 @@
-import React, {Component} from 'react';
 import {logger} from '../../../utils/logger';
+
+import React, {Component} from 'react';
 
 class DemoVideoOld extends Component {
   constructor(props) {
@@ -52,7 +53,7 @@ class DemoVideoOld extends Component {
                 className="bg-video undefined"
                 style={{position: 'relative', width: '100%', height: 'auto'}}
               >
-                <video id="videoBg" autoplay loop muted>
+                <video id="videoBg" autoPlay loop muted>
                   <source src="//videos.ctfassets.net/2y9b3o528xhq/QeyKsisb75P3H4UpRHarg/f7ced8c53e7807a371ff28411253088c/GPMND_C2_Hero_loop_v2.mp4"></source>
                 </video>
               </div>

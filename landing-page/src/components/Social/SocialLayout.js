@@ -1,6 +1,22 @@
-import React from 'react';
-import {useNavigate, useLocation} from 'react-router-dom';
+import {logActivity} from './Autopilot/autopilotStore';
+import {
+  NunbaChatProvider,
+  NunbaChatPill,
+  NunbaChatPanel,
+} from './shared/NunbaChat';
+
+import {useSocial} from '../../contexts/SocialContext';
+import {useNunbaTheme} from '../../contexts/ThemeContext';
+import {usePageObserver} from '../../hooks/useAgentObserver';
 import {prefetchRoute} from '../../services/routePrefetcher';
+import {evolutionApi} from '../../services/socialApi';
+import {
+  GRADIENTS,
+  EASINGS,
+  RADIUS,
+  socialTokens,
+} from '../../theme/socialTokens';
+import {useRoleAccess} from '../RoleGuard';
 import ErrorBoundary from '../shared/ErrorBoundary';
 import {
   Drawer,
@@ -53,23 +69,10 @@ import HiveIcon from '@mui/icons-material/Hive';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import {alpha} from '@mui/material/styles';
-import {useSocial} from '../../contexts/SocialContext';
-import {useRoleAccess} from '../RoleGuard';
-import {useNunbaTheme} from '../../contexts/ThemeContext';
-import {logActivity} from './Autopilot/autopilotStore';
-import {
-  GRADIENTS,
-  EASINGS,
-  RADIUS,
-  socialTokens,
-} from '../../theme/socialTokens';
-import {usePageObserver} from '../../hooks/useAgentObserver';
-import {
-  NunbaChatProvider,
-  NunbaChatPill,
-  NunbaChatPanel,
-} from './shared/NunbaChat';
-import {evolutionApi} from '../../services/socialApi';
+
+
+import React from 'react';
+import {useNavigate, useLocation} from 'react-router-dom';
 
 const DRAWER_WIDTH = 260;
 

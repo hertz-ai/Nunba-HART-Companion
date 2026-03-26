@@ -1,5 +1,16 @@
 import {settingsApi, chatApi} from '../../services/socialApi';
 
+import ChatIcon from '@mui/icons-material/Chat';
+import CloseIcon from '@mui/icons-material/Close';
+import ImageIcon from '@mui/icons-material/Image';
+import MemoryIcon from '@mui/icons-material/Memory';
+import SaveIcon from '@mui/icons-material/Save';
+import SecurityIcon from '@mui/icons-material/Security';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {
   Typography,
   Card,
@@ -16,30 +27,20 @@ import {
   Fade,
   Grow,
 } from '@mui/material';
-import SecurityIcon from '@mui/icons-material/Security';
-import ImageIcon from '@mui/icons-material/Image';
-import ChatIcon from '@mui/icons-material/Chat';
-import MemoryIcon from '@mui/icons-material/Memory';
-import SettingsIcon from '@mui/icons-material/Settings';
-import SaveIcon from '@mui/icons-material/Save';
-import CloseIcon from '@mui/icons-material/Close';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import IconButton from '@mui/material/IconButton';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import InputAdornment from '@mui/material/InputAdornment';
 import Alert from '@mui/material/Alert';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
 import Chip from '@mui/material/Chip';
+import FormControl from '@mui/material/FormControl';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import React, {useState, useEffect} from 'react';
 
 // Card style
 const cardStyle = {
-  background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
+  background:
+    'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
   backdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.05)',
   borderRadius: 3,
@@ -109,14 +110,32 @@ function SettingsSkeleton() {
   return (
     <Card sx={cardStyle}>
       <CardContent sx={{p: 3}}>
-        <Skeleton variant="text" width={150} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 3}} />
+        <Skeleton
+          variant="text"
+          width={150}
+          height={32}
+          sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 3}}
+        />
         {[1, 2, 3].map((i) => (
           <Box key={i} sx={{mb: 3}}>
-            <Skeleton variant="text" width={200} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-            <Skeleton variant="rounded" height={40} sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 1}} />
+            <Skeleton
+              variant="text"
+              width={200}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+            />
+            <Skeleton
+              variant="rounded"
+              height={40}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 1}}
+            />
           </Box>
         ))}
-        <Skeleton variant="rounded" width={120} height={40} sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 2}} />
+        <Skeleton
+          variant="rounded"
+          width={120}
+          height={40}
+          sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 2}}
+        />
       </CardContent>
     </Card>
   );
@@ -147,12 +166,48 @@ export default function SettingsPage() {
   const [aiTesting, setAiTesting] = useState(false);
 
   const CLOUD_PROVIDERS = {
-    openai: {name: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gpt-3.5-turbo'], default: 'gpt-4o-mini', needsEndpoint: false, needsApiVersion: false},
-    anthropic: {name: 'Anthropic Claude', models: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'], default: 'claude-sonnet-4-20250514', needsEndpoint: false, needsApiVersion: false},
-    azure_openai: {name: 'Azure OpenAI', models: [], default: '', needsEndpoint: true, needsApiVersion: true},
-    google_gemini: {name: 'Google Gemini', models: ['gemini-2.0-flash', 'gemini-2.5-pro'], default: 'gemini-2.0-flash', needsEndpoint: false, needsApiVersion: false},
-    groq: {name: 'Groq', models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'], default: 'llama-3.3-70b-versatile', needsEndpoint: false, needsApiVersion: false},
-    custom_openai: {name: 'Custom OpenAI-compatible', models: [], default: '', needsEndpoint: true, needsApiVersion: false},
+    openai: {
+      name: 'OpenAI',
+      models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gpt-3.5-turbo'],
+      default: 'gpt-4o-mini',
+      needsEndpoint: false,
+      needsApiVersion: false,
+    },
+    anthropic: {
+      name: 'Anthropic Claude',
+      models: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'],
+      default: 'claude-sonnet-4-20250514',
+      needsEndpoint: false,
+      needsApiVersion: false,
+    },
+    azure_openai: {
+      name: 'Azure OpenAI',
+      models: [],
+      default: '',
+      needsEndpoint: true,
+      needsApiVersion: true,
+    },
+    google_gemini: {
+      name: 'Google Gemini',
+      models: ['gemini-2.0-flash', 'gemini-2.5-pro'],
+      default: 'gemini-2.0-flash',
+      needsEndpoint: false,
+      needsApiVersion: false,
+    },
+    groq: {
+      name: 'Groq',
+      models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
+      default: 'llama-3.3-70b-versatile',
+      needsEndpoint: false,
+      needsApiVersion: false,
+    },
+    custom_openai: {
+      name: 'Custom OpenAI-compatible',
+      models: [],
+      default: '',
+      needsEndpoint: true,
+      needsApiVersion: false,
+    },
   };
 
   useEffect(() => {
@@ -174,7 +229,11 @@ export default function SettingsPage() {
         console.error('[SettingsPage] Failed to load settings:', err);
         const msg = err?.error || err?.message || '';
         if (msg.includes('Authorization') || msg.includes('token')) {
-          setFeedback({type: 'error', message: 'Authentication required. Please log in with an admin account.'});
+          setFeedback({
+            type: 'error',
+            message:
+              'Authentication required. Please log in with an admin account.',
+          });
         }
       }
       // Load LLM config separately (may not have backend running)
@@ -187,7 +246,10 @@ export default function SettingsPage() {
         if (cfg.base_url) setAiEndpoint(cfg.base_url);
         if (cfg.api_version) setAiApiVersion(cfg.api_version);
       } catch (err) {
-        console.warn('[SettingsPage] LLM config unavailable (backend may not be running):', err?.message || err);
+        console.warn(
+          '[SettingsPage] LLM config unavailable (backend may not be running):',
+          err?.message || err
+        );
       }
       setLoading(false);
     };
@@ -206,10 +268,16 @@ export default function SettingsPage() {
         embodied: settingsApi.updateEmbodiedAI,
       };
       await api[section](data);
-      setFeedback({type: 'success', message: `${section.charAt(0).toUpperCase() + section.slice(1)} settings saved`});
+      setFeedback({
+        type: 'success',
+        message: `${section.charAt(0).toUpperCase() + section.slice(1)} settings saved`,
+      });
     } catch (err) {
       console.error(`[SettingsPage] Failed to save ${section}:`, err);
-      setFeedback({type: 'error', message: `Failed to save ${section} settings. ${err?.message || ''}`});
+      setFeedback({
+        type: 'error',
+        message: `Failed to save ${section} settings. ${err?.message || ''}`,
+      });
     }
     setSaving(null);
   };
@@ -245,9 +313,15 @@ export default function SettingsPage() {
         base_url: aiEndpoint || undefined,
         api_version: aiApiVersion || undefined,
       });
-      setAiTestResult({success: true, message: res.data?.message || 'Connection successful'});
+      setAiTestResult({
+        success: true,
+        message: res.data?.message || 'Connection successful',
+      });
     } catch (err) {
-      setAiTestResult({success: false, message: err.response?.data?.error || 'Connection failed'});
+      setAiTestResult({
+        success: false,
+        message: err.response?.data?.error || 'Connection failed',
+      });
     }
     setAiTesting(false);
   };
@@ -268,7 +342,10 @@ export default function SettingsPage() {
       setFeedback({type: 'success', message: 'AI Provider saved successfully'});
     } catch (err) {
       console.error('[SettingsPage] Failed to save AI provider:', err);
-      setFeedback({type: 'error', message: err.response?.data?.error || 'Failed to save AI provider'});
+      setFeedback({
+        type: 'error',
+        message: err.response?.data?.error || 'Failed to save AI provider',
+      });
     }
     setSaving(null);
   };
@@ -288,29 +365,39 @@ export default function SettingsPage() {
         {/* Page Header */}
         <Box sx={{mb: 4}}>
           <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-            <Box sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 3,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(255, 107, 107, 0.15) 100%)',
-            }}>
-              <SettingsIcon sx={{
-                fontSize: 24,
-                background: 'linear-gradient(135deg, #6C63FF 0%, #FF6B6B 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }} />
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background:
+                  'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(255, 107, 107, 0.15) 100%)',
+              }}
+            >
+              <SettingsIcon
+                sx={{
+                  fontSize: 24,
+                  background:
+                    'linear-gradient(135deg, #6C63FF 0%, #FF6B6B 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  background:
+                    'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
                 Settings
               </Typography>
               <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
@@ -322,13 +409,15 @@ export default function SettingsPage() {
 
         {/* Tabs */}
         <Grow in={true} timeout={400}>
-          <Box sx={{
-            background: 'rgba(255,255,255,0.03)',
-            borderRadius: 3,
-            p: 0.5,
-            mb: 3,
-            display: 'inline-flex',
-          }}>
+          <Box
+            sx={{
+              background: 'rgba(255,255,255,0.03)',
+              borderRadius: 3,
+              p: 0.5,
+              mb: 3,
+              display: 'inline-flex',
+            }}
+          >
             <Tabs
               value={tab}
               onChange={(e, v) => setTab(v)}
@@ -351,17 +440,22 @@ export default function SettingsPage() {
                     textTransform: 'none',
                     fontWeight: 500,
                     color: tab === index ? '#fff' : 'rgba(255,255,255,0.5)',
-                    background: tab === index
-                      ? `linear-gradient(135deg, ${t.color}30 0%, ${t.color}10 100%)`
-                      : 'transparent',
-                    border: tab === index ? `1px solid ${t.color}40` : '1px solid transparent',
+                    background:
+                      tab === index
+                        ? `linear-gradient(135deg, ${t.color}30 0%, ${t.color}10 100%)`
+                        : 'transparent',
+                    border:
+                      tab === index
+                        ? `1px solid ${t.color}40`
+                        : '1px solid transparent',
                     transition: 'all 0.3s ease',
                     mx: 0.5,
                     '&:hover': {
                       color: '#fff',
-                      background: tab === index
-                        ? `linear-gradient(135deg, ${t.color}30 0%, ${t.color}10 100%)`
-                        : 'rgba(255,255,255,0.05)',
+                      background:
+                        tab === index
+                          ? `linear-gradient(135deg, ${t.color}30 0%, ${t.color}10 100%)`
+                          : 'rgba(255,255,255,0.05)',
                     },
                     '& .MuiSvgIcon-root': {
                       color: tab === index ? t.color : 'inherit',
@@ -376,19 +470,39 @@ export default function SettingsPage() {
         {/* Feedback Banner */}
         {feedback && (
           <Fade in={true} timeout={200}>
-            <Box sx={{
-              mb: 2, p: 2, borderRadius: 2,
-              background: feedback.type === 'success'
-                ? 'linear-gradient(135deg, rgba(108,99,255,0.1) 0%, rgba(155,148,255,0.1) 100%)'
-                : 'linear-gradient(135deg, rgba(255,68,68,0.1) 0%, rgba(255,100,100,0.1) 100%)',
-              border: `1px solid ${feedback.type === 'success' ? 'rgba(108,99,255,0.3)' : 'rgba(255,68,68,0.3)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <Typography variant="body2" sx={{color: feedback.type === 'success' ? '#6C63FF' : '#ff4444'}}>
+            <Box
+              sx={{
+                mb: 2,
+                p: 2,
+                borderRadius: 2,
+                background:
+                  feedback.type === 'success'
+                    ? 'linear-gradient(135deg, rgba(108,99,255,0.1) 0%, rgba(155,148,255,0.1) 100%)'
+                    : 'linear-gradient(135deg, rgba(255,68,68,0.1) 0%, rgba(255,100,100,0.1) 100%)',
+                border: `1px solid ${feedback.type === 'success' ? 'rgba(108,99,255,0.3)' : 'rgba(255,68,68,0.3)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  color: feedback.type === 'success' ? '#6C63FF' : '#ff4444',
+                }}
+              >
                 {feedback.message}
               </Typography>
-              <IconButton size="small" onClick={() => setFeedback(null)}
-                sx={{color: feedback.type === 'success' ? 'rgba(108,99,255,0.7)' : 'rgba(255,68,68,0.7)'}}>
+              <IconButton
+                size="small"
+                onClick={() => setFeedback(null)}
+                sx={{
+                  color:
+                    feedback.type === 'success'
+                      ? 'rgba(108,99,255,0.7)'
+                      : 'rgba(255,68,68,0.7)',
+                }}
+              >
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -404,9 +518,19 @@ export default function SettingsPage() {
               <Grow in={true} timeout={500}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5, mb: 4}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        mb: 4,
+                      }}
+                    >
                       <SecurityIcon sx={{color: '#ff9800'}} />
-                      <Typography variant="h6" sx={{color: '#fff', fontWeight: 600}}>
+                      <Typography
+                        variant="h6"
+                        sx={{color: '#fff', fontWeight: 600}}
+                      >
                         Security Settings
                       </Typography>
                     </Box>
@@ -417,7 +541,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={security.require_auth || false}
                             onChange={(e) =>
-                              setSecurity({...security, require_auth: e.target.checked})
+                              setSecurity({
+                                ...security,
+                                require_auth: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                           />
@@ -427,8 +554,12 @@ export default function SettingsPage() {
                             <Typography sx={{color: '#fff', fontWeight: 500}}>
                               Require Authentication
                             </Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
-                              Users must be authenticated to interact with the agent
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
+                              Users must be authenticated to interact with the
+                              agent
                             </Typography>
                           </Box>
                         }
@@ -442,7 +573,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={security.rate_limiting || false}
                             onChange={(e) =>
-                              setSecurity({...security, rate_limiting: e.target.checked})
+                              setSecurity({
+                                ...security,
+                                rate_limiting: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                           />
@@ -452,8 +586,12 @@ export default function SettingsPage() {
                             <Typography sx={{color: '#fff', fontWeight: 500}}>
                               Enable Rate Limiting
                             </Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
-                              Protect against abuse by limiting request frequency
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
+                              Protect against abuse by limiting request
+                              frequency
                             </Typography>
                           </Box>
                         }
@@ -467,7 +605,10 @@ export default function SettingsPage() {
                       type="number"
                       value={security.rate_limit || 60}
                       onChange={(e) =>
-                        setSecurity({...security, rate_limit: parseInt(e.target.value)})
+                        setSecurity({
+                          ...security,
+                          rate_limit: parseInt(e.target.value),
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                     />
@@ -490,9 +631,19 @@ export default function SettingsPage() {
               <Grow in={true} timeout={500}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5, mb: 4}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        mb: 4,
+                      }}
+                    >
                       <ImageIcon sx={{color: '#9c27b0'}} />
-                      <Typography variant="h6" sx={{color: '#fff', fontWeight: 600}}>
+                      <Typography
+                        variant="h6"
+                        sx={{color: '#fff', fontWeight: 600}}
+                      >
                         Media Settings
                       </Typography>
                     </Box>
@@ -503,7 +654,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={media.image_generation_enabled || false}
                             onChange={(e) =>
-                              setMedia({...media, image_generation_enabled: e.target.checked})
+                              setMedia({
+                                ...media,
+                                image_generation_enabled: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                           />
@@ -513,7 +667,10 @@ export default function SettingsPage() {
                             <Typography sx={{color: '#fff', fontWeight: 500}}>
                               Enable Image Generation
                             </Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
                               Allow the agent to generate images using AI
                             </Typography>
                           </Box>
@@ -528,7 +685,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={media.tts_enabled || false}
                             onChange={(e) =>
-                              setMedia({...media, tts_enabled: e.target.checked})
+                              setMedia({
+                                ...media,
+                                tts_enabled: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                           />
@@ -538,7 +698,10 @@ export default function SettingsPage() {
                             <Typography sx={{color: '#fff', fontWeight: 500}}>
                               Enable Text-to-Speech
                             </Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
                               Convert agent responses to audio
                             </Typography>
                           </Box>
@@ -553,7 +716,10 @@ export default function SettingsPage() {
                       type="number"
                       value={media.max_file_size_mb || 25}
                       onChange={(e) =>
-                        setMedia({...media, max_file_size_mb: parseInt(e.target.value)})
+                        setMedia({
+                          ...media,
+                          max_file_size_mb: parseInt(e.target.value),
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                     />
@@ -576,55 +742,94 @@ export default function SettingsPage() {
               <Grow in={true} timeout={500}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5, mb: 4}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        mb: 4,
+                      }}
+                    >
                       <ChatIcon sx={{color: '#6C63FF'}} />
-                      <Typography variant="h6" sx={{color: '#fff', fontWeight: 600}}>
+                      <Typography
+                        variant="h6"
+                        sx={{color: '#fff', fontWeight: 600}}
+                      >
                         Response Settings
                       </Typography>
                     </Box>
 
                     <Box sx={{mb: 4}}>
-                      <Box sx={{display: 'flex', justifyContent: 'space-between', mb: 1}}>
-                        <Typography sx={{color: '#fff', fontWeight: 500}}>Temperature</Typography>
-                        <Typography sx={{
-                          color: '#6C63FF',
-                          fontWeight: 600,
-                          background: 'rgba(108, 99, 255, 0.1)',
-                          px: 1.5,
-                          py: 0.25,
-                          borderRadius: 1,
-                        }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          mb: 1,
+                        }}
+                      >
+                        <Typography sx={{color: '#fff', fontWeight: 500}}>
+                          Temperature
+                        </Typography>
+                        <Typography
+                          sx={{
+                            color: '#6C63FF',
+                            fontWeight: 600,
+                            background: 'rgba(108, 99, 255, 0.1)',
+                            px: 1.5,
+                            py: 0.25,
+                            borderRadius: 1,
+                          }}
+                        >
                           {response.temperature || 0.7}
                         </Typography>
                       </Box>
-                      <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)', mb: 2}}>
-                        Controls randomness: lower is more focused, higher is more creative
+                      <Typography
+                        variant="body2"
+                        sx={{color: 'rgba(255,255,255,0.5)', mb: 2}}
+                      >
+                        Controls randomness: lower is more focused, higher is
+                        more creative
                       </Typography>
                       <Slider
                         value={response.temperature || 0.7}
                         min={0}
                         max={2}
                         step={0.1}
-                        onChange={(e, v) => setResponse({...response, temperature: v})}
+                        onChange={(e, v) =>
+                          setResponse({...response, temperature: v})
+                        }
                         sx={sliderStyle}
                       />
                     </Box>
 
                     <Box sx={{mb: 4}}>
-                      <Box sx={{display: 'flex', justifyContent: 'space-between', mb: 1}}>
-                        <Typography sx={{color: '#fff', fontWeight: 500}}>Max Tokens</Typography>
-                        <Typography sx={{
-                          color: '#6C63FF',
-                          fontWeight: 600,
-                          background: 'rgba(108, 99, 255, 0.1)',
-                          px: 1.5,
-                          py: 0.25,
-                          borderRadius: 1,
-                        }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          mb: 1,
+                        }}
+                      >
+                        <Typography sx={{color: '#fff', fontWeight: 500}}>
+                          Max Tokens
+                        </Typography>
+                        <Typography
+                          sx={{
+                            color: '#6C63FF',
+                            fontWeight: 600,
+                            background: 'rgba(108, 99, 255, 0.1)',
+                            px: 1.5,
+                            py: 0.25,
+                            borderRadius: 1,
+                          }}
+                        >
                           {response.max_tokens || 2048}
                         </Typography>
                       </Box>
-                      <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)', mb: 2}}>
+                      <Typography
+                        variant="body2"
+                        sx={{color: 'rgba(255,255,255,0.5)', mb: 2}}
+                      >
                         Maximum length of generated responses
                       </Typography>
                       <Slider
@@ -632,7 +837,9 @@ export default function SettingsPage() {
                         min={256}
                         max={8192}
                         step={256}
-                        onChange={(e, v) => setResponse({...response, max_tokens: v})}
+                        onChange={(e, v) =>
+                          setResponse({...response, max_tokens: v})
+                        }
                         sx={sliderStyle}
                       />
                     </Box>
@@ -655,9 +862,19 @@ export default function SettingsPage() {
               <Grow in={true} timeout={500}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5, mb: 4}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        mb: 4,
+                      }}
+                    >
                       <MemoryIcon sx={{color: '#7C4DFF'}} />
-                      <Typography variant="h6" sx={{color: '#fff', fontWeight: 600}}>
+                      <Typography
+                        variant="h6"
+                        sx={{color: '#fff', fontWeight: 600}}
+                      >
                         Memory Settings
                       </Typography>
                     </Box>
@@ -668,7 +885,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={memory.long_term || false}
                             onChange={(e) =>
-                              setMemory({...memory, long_term: e.target.checked})
+                              setMemory({
+                                ...memory,
+                                long_term: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                           />
@@ -678,7 +898,10 @@ export default function SettingsPage() {
                             <Typography sx={{color: '#fff', fontWeight: 500}}>
                               Enable Long-term Memory
                             </Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
                               Agent remembers information across conversations
                             </Typography>
                           </Box>
@@ -693,11 +916,16 @@ export default function SettingsPage() {
                       type="number"
                       value={memory.context_window || 10}
                       onChange={(e) =>
-                        setMemory({...memory, context_window: parseInt(e.target.value)})
+                        setMemory({
+                          ...memory,
+                          context_window: parseInt(e.target.value),
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                       helperText="Number of recent messages to include in context"
-                      FormHelperTextProps={{sx: {color: 'rgba(255,255,255,0.4)'}}}
+                      FormHelperTextProps={{
+                        sx: {color: 'rgba(255,255,255,0.4)'},
+                      }}
                     />
 
                     <TextField
@@ -706,11 +934,16 @@ export default function SettingsPage() {
                       type="number"
                       value={memory.retention_days || 30}
                       onChange={(e) =>
-                        setMemory({...memory, retention_days: parseInt(e.target.value)})
+                        setMemory({
+                          ...memory,
+                          retention_days: parseInt(e.target.value),
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                       helperText="How long to retain long-term memories"
-                      FormHelperTextProps={{sx: {color: 'rgba(255,255,255,0.4)'}}}
+                      FormHelperTextProps={{
+                        sx: {color: 'rgba(255,255,255,0.4)'},
+                      }}
                     />
 
                     <Button
@@ -731,40 +964,79 @@ export default function SettingsPage() {
               <Grow in={true} timeout={500}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4}}>
-                      <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 4,
+                      }}
+                    >
+                      <Box
+                        sx={{display: 'flex', alignItems: 'center', gap: 1.5}}
+                      >
                         <VisibilityIcon sx={{color: '#e91e63'}} />
-                        <Typography variant="h6" sx={{color: '#fff', fontWeight: 600}}>
+                        <Typography
+                          variant="h6"
+                          sx={{color: '#fff', fontWeight: 600}}
+                        >
                           Embodied AI Settings
                         </Typography>
                       </Box>
                       {embodiedStatus && (
                         <Chip
-                          label={embodiedStatus.hevolveai_health?.status === 'healthy' ? 'Connected' : 'Offline'}
+                          label={
+                            embodiedStatus.hevolveai_health?.status ===
+                            'healthy'
+                              ? 'Connected'
+                              : 'Offline'
+                          }
                           size="small"
                           sx={{
-                            bgcolor: embodiedStatus.hevolveai_health?.status === 'healthy'
-                              ? 'rgba(108,99,255,0.15)' : 'rgba(244,67,54,0.15)',
-                            color: embodiedStatus.hevolveai_health?.status === 'healthy'
-                              ? '#6C63FF' : '#f44336',
+                            bgcolor:
+                              embodiedStatus.hevolveai_health?.status ===
+                              'healthy'
+                                ? 'rgba(108,99,255,0.15)'
+                                : 'rgba(244,67,54,0.15)',
+                            color:
+                              embodiedStatus.hevolveai_health?.status ===
+                              'healthy'
+                                ? '#6C63FF'
+                                : '#f44336',
                             fontWeight: 600,
                           }}
                         />
                       )}
                     </Box>
 
-                    <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)', mb: 3}}>
-                      Configure HevolveAI's continuous learning feeds — screen capture, camera, microphone, and learning modes. Changes propagate to the learning engine.
+                    <Typography
+                      variant="body2"
+                      sx={{color: 'rgba(255,255,255,0.5)', mb: 3}}
+                    >
+                      Configure HevolveAI's continuous learning feeds — screen
+                      capture, camera, microphone, and learning modes. Changes
+                      propagate to the learning engine.
                     </Typography>
 
                     {/* Master toggle */}
-                    <Box sx={{mb: 3, p: 2, borderRadius: 2, background: 'rgba(233,30,99,0.08)', border: '1px solid rgba(233,30,99,0.2)'}}>
+                    <Box
+                      sx={{
+                        mb: 3,
+                        p: 2,
+                        borderRadius: 2,
+                        background: 'rgba(233,30,99,0.08)',
+                        border: '1px solid rgba(233,30,99,0.2)',
+                      }}
+                    >
                       <FormControlLabel
                         control={
                           <Switch
                             checked={embodied.enabled !== false}
                             onChange={(e) =>
-                              setEmbodied({...embodied, enabled: e.target.checked})
+                              setEmbodied({
+                                ...embodied,
+                                enabled: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                           />
@@ -774,8 +1046,12 @@ export default function SettingsPage() {
                             <Typography sx={{color: '#fff', fontWeight: 500}}>
                               Enable Embodied Learning
                             </Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
-                              Master switch for all sensory feeds and continuous learning
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
+                              Master switch for all sensory feeds and continuous
+                              learning
                             </Typography>
                           </Box>
                         }
@@ -784,7 +1060,10 @@ export default function SettingsPage() {
                     </Box>
 
                     {/* Screen Capture */}
-                    <Typography variant="subtitle2" sx={{color: '#e91e63', fontWeight: 600, mb: 2, mt: 3}}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{color: '#e91e63', fontWeight: 600, mb: 2, mt: 3}}
+                    >
                       Screen Capture
                     </Typography>
                     <Box sx={{mb: 2}}>
@@ -793,7 +1072,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={embodied.screen_capture_enabled !== false}
                             onChange={(e) =>
-                              setEmbodied({...embodied, screen_capture_enabled: e.target.checked})
+                              setEmbodied({
+                                ...embodied,
+                                screen_capture_enabled: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                             disabled={!embodied.enabled}
@@ -801,8 +1083,13 @@ export default function SettingsPage() {
                         }
                         label={
                           <Box>
-                            <Typography sx={{color: '#fff', fontWeight: 500}}>Enable Screen Capture</Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                            <Typography sx={{color: '#fff', fontWeight: 500}}>
+                              Enable Screen Capture
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
                               Captures screenshots for reality-grounded learning
                             </Typography>
                           </Box>
@@ -811,26 +1098,49 @@ export default function SettingsPage() {
                       />
                     </Box>
                     <Box sx={{mb: 3}}>
-                      <Box sx={{display: 'flex', justifyContent: 'space-between', mb: 1}}>
-                        <Typography sx={{color: '#fff', fontWeight: 500}}>Screen Capture FPS</Typography>
-                        <Typography sx={{
-                          color: '#e91e63', fontWeight: 600,
-                          background: 'rgba(233,30,99,0.1)', px: 1.5, py: 0.25, borderRadius: 1,
-                        }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          mb: 1,
+                        }}
+                      >
+                        <Typography sx={{color: '#fff', fontWeight: 500}}>
+                          Screen Capture FPS
+                        </Typography>
+                        <Typography
+                          sx={{
+                            color: '#e91e63',
+                            fontWeight: 600,
+                            background: 'rgba(233,30,99,0.1)',
+                            px: 1.5,
+                            py: 0.25,
+                            borderRadius: 1,
+                          }}
+                        >
                           {embodied.screen_capture_fps || 0.5}
                         </Typography>
                       </Box>
                       <Slider
                         value={embodied.screen_capture_fps || 0.5}
-                        min={0.1} max={5} step={0.1}
-                        onChange={(e, v) => setEmbodied({...embodied, screen_capture_fps: v})}
+                        min={0.1}
+                        max={5}
+                        step={0.1}
+                        onChange={(e, v) =>
+                          setEmbodied({...embodied, screen_capture_fps: v})
+                        }
                         sx={sliderStyle}
-                        disabled={!embodied.enabled || !embodied.screen_capture_enabled}
+                        disabled={
+                          !embodied.enabled || !embodied.screen_capture_enabled
+                        }
                       />
                     </Box>
 
                     {/* Camera */}
-                    <Typography variant="subtitle2" sx={{color: '#e91e63', fontWeight: 600, mb: 2}}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{color: '#e91e63', fontWeight: 600, mb: 2}}
+                    >
                       Camera Feed
                     </Typography>
                     <Box sx={{mb: 2}}>
@@ -839,7 +1149,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={embodied.camera_enabled !== false}
                             onChange={(e) =>
-                              setEmbodied({...embodied, camera_enabled: e.target.checked})
+                              setEmbodied({
+                                ...embodied,
+                                camera_enabled: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                             disabled={!embodied.enabled}
@@ -847,8 +1160,13 @@ export default function SettingsPage() {
                         }
                         label={
                           <Box>
-                            <Typography sx={{color: '#fff', fontWeight: 500}}>Enable Camera</Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                            <Typography sx={{color: '#fff', fontWeight: 500}}>
+                              Enable Camera
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
                               Webcam feed for embodied visual learning
                             </Typography>
                           </Box>
@@ -858,21 +1176,41 @@ export default function SettingsPage() {
                     </Box>
                     <Box sx={{display: 'flex', gap: 2, mb: 3}}>
                       <Box sx={{flex: 1}}>
-                        <Box sx={{display: 'flex', justifyContent: 'space-between', mb: 1}}>
-                          <Typography sx={{color: '#fff', fontWeight: 500}}>Camera FPS</Typography>
-                          <Typography sx={{
-                            color: '#e91e63', fontWeight: 600,
-                            background: 'rgba(233,30,99,0.1)', px: 1.5, py: 0.25, borderRadius: 1,
-                          }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            mb: 1,
+                          }}
+                        >
+                          <Typography sx={{color: '#fff', fontWeight: 500}}>
+                            Camera FPS
+                          </Typography>
+                          <Typography
+                            sx={{
+                              color: '#e91e63',
+                              fontWeight: 600,
+                              background: 'rgba(233,30,99,0.1)',
+                              px: 1.5,
+                              py: 0.25,
+                              borderRadius: 1,
+                            }}
+                          >
                             {embodied.camera_fps || 2.0}
                           </Typography>
                         </Box>
                         <Slider
                           value={embodied.camera_fps || 2.0}
-                          min={0.5} max={30} step={0.5}
-                          onChange={(e, v) => setEmbodied({...embodied, camera_fps: v})}
+                          min={0.5}
+                          max={30}
+                          step={0.5}
+                          onChange={(e, v) =>
+                            setEmbodied({...embodied, camera_fps: v})
+                          }
                           sx={sliderStyle}
-                          disabled={!embodied.enabled || !embodied.camera_enabled}
+                          disabled={
+                            !embodied.enabled || !embodied.camera_enabled
+                          }
                         />
                       </Box>
                       <TextField
@@ -880,7 +1218,10 @@ export default function SettingsPage() {
                         type="number"
                         value={embodied.camera_id || 0}
                         onChange={(e) =>
-                          setEmbodied({...embodied, camera_id: parseInt(e.target.value)})
+                          setEmbodied({
+                            ...embodied,
+                            camera_id: parseInt(e.target.value),
+                          })
                         }
                         sx={{...inputStyle, width: 120}}
                         disabled={!embodied.enabled || !embodied.camera_enabled}
@@ -888,7 +1229,10 @@ export default function SettingsPage() {
                     </Box>
 
                     {/* Audio */}
-                    <Typography variant="subtitle2" sx={{color: '#e91e63', fontWeight: 600, mb: 2}}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{color: '#e91e63', fontWeight: 600, mb: 2}}
+                    >
                       Microphone
                     </Typography>
                     <Box sx={{mb: 2}}>
@@ -897,7 +1241,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={embodied.audio_enabled !== false}
                             onChange={(e) =>
-                              setEmbodied({...embodied, audio_enabled: e.target.checked})
+                              setEmbodied({
+                                ...embodied,
+                                audio_enabled: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                             disabled={!embodied.enabled}
@@ -905,9 +1252,15 @@ export default function SettingsPage() {
                         }
                         label={
                           <Box>
-                            <Typography sx={{color: '#fff', fontWeight: 500}}>Enable Microphone</Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
-                              Audio-visual correlation learning (typing sounds, system sounds)
+                            <Typography sx={{color: '#fff', fontWeight: 500}}>
+                              Enable Microphone
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
+                              Audio-visual correlation learning (typing sounds,
+                              system sounds)
                             </Typography>
                           </Box>
                         }
@@ -920,80 +1273,146 @@ export default function SettingsPage() {
                         type="number"
                         value={embodied.audio_sample_rate || 16000}
                         onChange={(e) =>
-                          setEmbodied({...embodied, audio_sample_rate: parseInt(e.target.value)})
+                          setEmbodied({
+                            ...embodied,
+                            audio_sample_rate: parseInt(e.target.value),
+                          })
                         }
                         sx={{...inputStyle, flex: 1}}
                         disabled={!embodied.enabled || !embodied.audio_enabled}
                       />
                       <Box sx={{flex: 1}}>
-                        <Box sx={{display: 'flex', justifyContent: 'space-between', mb: 1}}>
-                          <Typography sx={{color: '#fff', fontWeight: 500}}>Chunk Duration (s)</Typography>
-                          <Typography sx={{
-                            color: '#e91e63', fontWeight: 600,
-                            background: 'rgba(233,30,99,0.1)', px: 1.5, py: 0.25, borderRadius: 1,
-                          }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            mb: 1,
+                          }}
+                        >
+                          <Typography sx={{color: '#fff', fontWeight: 500}}>
+                            Chunk Duration (s)
+                          </Typography>
+                          <Typography
+                            sx={{
+                              color: '#e91e63',
+                              fontWeight: 600,
+                              background: 'rgba(233,30,99,0.1)',
+                              px: 1.5,
+                              py: 0.25,
+                              borderRadius: 1,
+                            }}
+                          >
                             {embodied.audio_chunk_duration || 1.0}
                           </Typography>
                         </Box>
                         <Slider
                           value={embodied.audio_chunk_duration || 1.0}
-                          min={0.1} max={5} step={0.1}
-                          onChange={(e, v) => setEmbodied({...embodied, audio_chunk_duration: v})}
+                          min={0.1}
+                          max={5}
+                          step={0.1}
+                          onChange={(e, v) =>
+                            setEmbodied({...embodied, audio_chunk_duration: v})
+                          }
                           sx={sliderStyle}
-                          disabled={!embodied.enabled || !embodied.audio_enabled}
+                          disabled={
+                            !embodied.enabled || !embodied.audio_enabled
+                          }
                         />
                       </Box>
                     </Box>
 
                     {/* Learning Mode */}
-                    <Typography variant="subtitle2" sx={{color: '#e91e63', fontWeight: 600, mb: 2}}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{color: '#e91e63', fontWeight: 600, mb: 2}}
+                    >
                       Learning Configuration
                     </Typography>
                     <Box sx={{display: 'flex', gap: 2, mb: 3}}>
                       <FormControl sx={{flex: 1}} disabled={!embodied.enabled}>
-                        <InputLabel sx={{color: 'rgba(255,255,255,0.5)', '&.Mui-focused': {color: '#e91e63'}}}>
+                        <InputLabel
+                          sx={{
+                            color: 'rgba(255,255,255,0.5)',
+                            '&.Mui-focused': {color: '#e91e63'},
+                          }}
+                        >
                           Learning Mode
                         </InputLabel>
                         <Select
                           value={embodied.learning_mode || 'hybrid'}
                           onChange={(e) =>
-                            setEmbodied({...embodied, learning_mode: e.target.value})
+                            setEmbodied({
+                              ...embodied,
+                              learning_mode: e.target.value,
+                            })
                           }
                           label="Learning Mode"
                           sx={{
                             color: '#fff',
                             background: 'rgba(0,0,0,0.2)',
-                            '& .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(255,255,255,0.1)'},
-                            '&:hover .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(233,30,99,0.3)'},
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#e91e63'},
-                            '& .MuiSvgIcon-root': {color: 'rgba(255,255,255,0.5)'},
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.1)',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(233,30,99,0.3)',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#e91e63',
+                            },
+                            '& .MuiSvgIcon-root': {
+                              color: 'rgba(255,255,255,0.5)',
+                            },
                           }}
                         >
-                          <MenuItem value="passive">Passive (observe only)</MenuItem>
-                          <MenuItem value="active">Active (explore + act)</MenuItem>
-                          <MenuItem value="hybrid">Hybrid (observe + explore)</MenuItem>
+                          <MenuItem value="passive">
+                            Passive (observe only)
+                          </MenuItem>
+                          <MenuItem value="active">
+                            Active (explore + act)
+                          </MenuItem>
+                          <MenuItem value="hybrid">
+                            Hybrid (observe + explore)
+                          </MenuItem>
                         </Select>
                       </FormControl>
                       <FormControl sx={{flex: 1}} disabled={!embodied.enabled}>
-                        <InputLabel sx={{color: 'rgba(255,255,255,0.5)', '&.Mui-focused': {color: '#e91e63'}}}>
+                        <InputLabel
+                          sx={{
+                            color: 'rgba(255,255,255,0.5)',
+                            '&.Mui-focused': {color: '#e91e63'},
+                          }}
+                        >
                           Visual Source
                         </InputLabel>
                         <Select
                           value={embodied.visual_source_mode || 'auto'}
                           onChange={(e) =>
-                            setEmbodied({...embodied, visual_source_mode: e.target.value})
+                            setEmbodied({
+                              ...embodied,
+                              visual_source_mode: e.target.value,
+                            })
                           }
                           label="Visual Source"
                           sx={{
                             color: '#fff',
                             background: 'rgba(0,0,0,0.2)',
-                            '& .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(255,255,255,0.1)'},
-                            '&:hover .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(233,30,99,0.3)'},
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#e91e63'},
-                            '& .MuiSvgIcon-root': {color: 'rgba(255,255,255,0.5)'},
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.1)',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(233,30,99,0.3)',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#e91e63',
+                            },
+                            '& .MuiSvgIcon-root': {
+                              color: 'rgba(255,255,255,0.5)',
+                            },
                           }}
                         >
-                          <MenuItem value="auto">Auto (intelligent switching)</MenuItem>
+                          <MenuItem value="auto">
+                            Auto (intelligent switching)
+                          </MenuItem>
                           <MenuItem value="screen">Screen only</MenuItem>
                           <MenuItem value="camera">Camera only</MenuItem>
                         </Select>
@@ -1001,7 +1420,10 @@ export default function SettingsPage() {
                     </Box>
 
                     {/* Exploration Safety */}
-                    <Typography variant="subtitle2" sx={{color: '#e91e63', fontWeight: 600, mb: 2}}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{color: '#e91e63', fontWeight: 600, mb: 2}}
+                    >
                       Exploration Safety
                     </Typography>
                     <Box sx={{mb: 2}}>
@@ -1010,7 +1432,10 @@ export default function SettingsPage() {
                           <Switch
                             checked={embodied.exploration_safe_mode !== false}
                             onChange={(e) =>
-                              setEmbodied({...embodied, exploration_safe_mode: e.target.checked})
+                              setEmbodied({
+                                ...embodied,
+                                exploration_safe_mode: e.target.checked,
+                              })
                             }
                             sx={switchStyle}
                             disabled={!embodied.enabled}
@@ -1018,9 +1443,15 @@ export default function SettingsPage() {
                         }
                         label={
                           <Box>
-                            <Typography sx={{color: '#fff', fontWeight: 500}}>Safe Mode</Typography>
-                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
-                              Restricts exploration actions (no file writes, limited rate)
+                            <Typography sx={{color: '#fff', fontWeight: 500}}>
+                              Safe Mode
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{color: 'rgba(255,255,255,0.5)'}}
+                            >
+                              Restricts exploration actions (no file writes,
+                              limited rate)
                             </Typography>
                           </Box>
                         }
@@ -1033,16 +1464,26 @@ export default function SettingsPage() {
                       type="number"
                       value={embodied.exploration_max_actions_per_min || 10}
                       onChange={(e) =>
-                        setEmbodied({...embodied, exploration_max_actions_per_min: parseInt(e.target.value)})
+                        setEmbodied({
+                          ...embodied,
+                          exploration_max_actions_per_min: parseInt(
+                            e.target.value
+                          ),
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                       helperText="Rate limit for active exploration actions"
-                      FormHelperTextProps={{sx: {color: 'rgba(255,255,255,0.4)'}}}
+                      FormHelperTextProps={{
+                        sx: {color: 'rgba(255,255,255,0.4)'},
+                      }}
                       disabled={!embodied.enabled}
                     />
 
                     {/* HevolveAI URL */}
-                    <Typography variant="subtitle2" sx={{color: '#e91e63', fontWeight: 600, mb: 2}}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{color: '#e91e63', fontWeight: 600, mb: 2}}
+                    >
                       Connection
                     </Typography>
                     <TextField
@@ -1050,11 +1491,16 @@ export default function SettingsPage() {
                       label="HevolveAI API URL"
                       value={embodied.hevolveai_url || 'http://localhost:8000'}
                       onChange={(e) =>
-                        setEmbodied({...embodied, hevolveai_url: e.target.value})
+                        setEmbodied({
+                          ...embodied,
+                          hevolveai_url: e.target.value,
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                       helperText="Base URL for the HevolveAI embodied learning server"
-                      FormHelperTextProps={{sx: {color: 'rgba(255,255,255,0.4)'}}}
+                      FormHelperTextProps={{
+                        sx: {color: 'rgba(255,255,255,0.4)'},
+                      }}
                     />
 
                     <Box sx={{display: 'flex', gap: 2}}>
@@ -1065,7 +1511,9 @@ export default function SettingsPage() {
                         disabled={saving === 'embodied'}
                         sx={saveButtonStyle}
                       >
-                        {saving === 'embodied' ? 'Saving...' : 'Save Embodied AI'}
+                        {saving === 'embodied'
+                          ? 'Saving...'
+                          : 'Save Embodied AI'}
                       </Button>
                       <Button
                         variant="outlined"
@@ -1093,8 +1541,18 @@ export default function SettingsPage() {
               <Grow in={true} timeout={400}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 3}}>
-                    <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3}}>
-                      <Typography variant="h6" sx={{color: '#fff', fontWeight: 600}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 3,
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{color: '#fff', fontWeight: 600}}
+                      >
                         AI Provider Configuration
                       </Typography>
                       {llmConfig?.provider && (
@@ -1123,31 +1581,56 @@ export default function SettingsPage() {
                         }}
                       >
                         Current mode: <strong>{llmConfig.llm_mode}</strong>
-                        {llmConfig.model && <> &middot; Model: <strong>{llmConfig.model}</strong></>}
+                        {llmConfig.model && (
+                          <>
+                            {' '}
+                            &middot; Model: <strong>{llmConfig.model}</strong>
+                          </>
+                        )}
                       </Alert>
                     )}
 
                     <FormControl fullWidth sx={{mb: 3}}>
-                      <InputLabel sx={{color: 'rgba(255,255,255,0.5)'}}>Provider</InputLabel>
+                      <InputLabel sx={{color: 'rgba(255,255,255,0.5)'}}>
+                        Provider
+                      </InputLabel>
                       <Select
                         value={aiProvider}
                         label="Provider"
                         onChange={(e) => handleProviderChange(e.target.value)}
                         sx={{
                           color: '#fff',
-                          '& .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(255,255,255,0.1)'},
-                          '&:hover .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(255,255,255,0.3)'},
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#4CAF50'},
-                          '& .MuiSvgIcon-root': {color: 'rgba(255,255,255,0.5)'},
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255,255,255,0.1)',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255,255,255,0.3)',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#4CAF50',
+                          },
+                          '& .MuiSvgIcon-root': {
+                            color: 'rgba(255,255,255,0.5)',
+                          },
                         }}
                         MenuProps={{
                           PaperProps: {
-                            sx: {background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)'},
+                            sx: {
+                              background: '#1a1a2e',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                            },
                           },
                         }}
                       >
                         {Object.entries(CLOUD_PROVIDERS).map(([id, p]) => (
-                          <MenuItem key={id} value={id} sx={{color: '#fff', '&:hover': {background: 'rgba(108,99,255,0.15)'}}}>
+                          <MenuItem
+                            key={id}
+                            value={id}
+                            sx={{
+                              color: '#fff',
+                              '&:hover': {background: 'rgba(108,99,255,0.15)'},
+                            }}
+                          >
                             {p.name}
                           </MenuItem>
                         ))}
@@ -1160,7 +1643,11 @@ export default function SettingsPage() {
                       type={showApiKey ? 'text' : 'password'}
                       value={aiApiKey}
                       onChange={(e) => setAiApiKey(e.target.value)}
-                      placeholder={llmConfig?.has_key ? '••••••••  (key saved — enter new to replace)' : 'Enter API key'}
+                      placeholder={
+                        llmConfig?.has_key
+                          ? '••••••••  (key saved — enter new to replace)'
+                          : 'Enter API key'
+                      }
                       sx={{...inputStyle, mb: 3}}
                       InputProps={{
                         endAdornment: (
@@ -1179,26 +1666,48 @@ export default function SettingsPage() {
 
                     {CLOUD_PROVIDERS[aiProvider]?.models?.length > 0 ? (
                       <FormControl fullWidth sx={{mb: 3}}>
-                        <InputLabel sx={{color: 'rgba(255,255,255,0.5)'}}>Model</InputLabel>
+                        <InputLabel sx={{color: 'rgba(255,255,255,0.5)'}}>
+                          Model
+                        </InputLabel>
                         <Select
                           value={aiModel}
                           label="Model"
                           onChange={(e) => setAiModel(e.target.value)}
                           sx={{
                             color: '#fff',
-                            '& .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(255,255,255,0.1)'},
-                            '&:hover .MuiOutlinedInput-notchedOutline': {borderColor: 'rgba(255,255,255,0.3)'},
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {borderColor: '#4CAF50'},
-                            '& .MuiSvgIcon-root': {color: 'rgba(255,255,255,0.5)'},
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.1)',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.3)',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#4CAF50',
+                            },
+                            '& .MuiSvgIcon-root': {
+                              color: 'rgba(255,255,255,0.5)',
+                            },
                           }}
                           MenuProps={{
                             PaperProps: {
-                              sx: {background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)'},
+                              sx: {
+                                background: '#1a1a2e',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                              },
                             },
                           }}
                         >
                           {CLOUD_PROVIDERS[aiProvider].models.map((m) => (
-                            <MenuItem key={m} value={m} sx={{color: '#fff', '&:hover': {background: 'rgba(108,99,255,0.15)'}}}>
+                            <MenuItem
+                              key={m}
+                              value={m}
+                              sx={{
+                                color: '#fff',
+                                '&:hover': {
+                                  background: 'rgba(108,99,255,0.15)',
+                                },
+                              }}
+                            >
                               {m}
                             </MenuItem>
                           ))}
@@ -1221,10 +1730,20 @@ export default function SettingsPage() {
                         label="Endpoint URL"
                         value={aiEndpoint}
                         onChange={(e) => setAiEndpoint(e.target.value)}
-                        placeholder={aiProvider === 'azure_openai' ? 'https://your-resource.openai.azure.com' : 'https://api.example.com/v1'}
+                        placeholder={
+                          aiProvider === 'azure_openai'
+                            ? 'https://your-resource.openai.azure.com'
+                            : 'https://api.example.com/v1'
+                        }
                         sx={{...inputStyle, mb: 3}}
-                        helperText={aiProvider === 'azure_openai' ? 'Your Azure OpenAI resource endpoint' : 'Base URL for the OpenAI-compatible API'}
-                        FormHelperTextProps={{sx: {color: 'rgba(255,255,255,0.4)'}}}
+                        helperText={
+                          aiProvider === 'azure_openai'
+                            ? 'Your Azure OpenAI resource endpoint'
+                            : 'Base URL for the OpenAI-compatible API'
+                        }
+                        FormHelperTextProps={{
+                          sx: {color: 'rgba(255,255,255,0.4)'},
+                        }}
                       />
                     )}
 
@@ -1237,7 +1756,9 @@ export default function SettingsPage() {
                         placeholder="2024-02-15-preview"
                         sx={{...inputStyle, mb: 3}}
                         helperText="Azure API version string"
-                        FormHelperTextProps={{sx: {color: 'rgba(255,255,255,0.4)'}}}
+                        FormHelperTextProps={{
+                          sx: {color: 'rgba(255,255,255,0.4)'},
+                        }}
                       />
                     )}
 
@@ -1246,10 +1767,14 @@ export default function SettingsPage() {
                         severity={aiTestResult.success ? 'success' : 'error'}
                         sx={{
                           mb: 3,
-                          background: aiTestResult.success ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)',
+                          background: aiTestResult.success
+                            ? 'rgba(76,175,80,0.08)'
+                            : 'rgba(244,67,54,0.08)',
                           border: `1px solid ${aiTestResult.success ? 'rgba(76,175,80,0.3)' : 'rgba(244,67,54,0.3)'}`,
                           color: '#fff',
-                          '& .MuiAlert-icon': {color: aiTestResult.success ? '#4CAF50' : '#f44336'},
+                          '& .MuiAlert-icon': {
+                            color: aiTestResult.success ? '#4CAF50' : '#f44336',
+                          },
                         }}
                       >
                         {aiTestResult.message}
@@ -1264,7 +1789,9 @@ export default function SettingsPage() {
                         disabled={saving === 'ai_provider' || !aiApiKey}
                         sx={saveButtonStyle}
                       >
-                        {saving === 'ai_provider' ? 'Saving...' : 'Save AI Provider'}
+                        {saving === 'ai_provider'
+                          ? 'Saving...'
+                          : 'Save AI Provider'}
                       </Button>
                       <Button
                         variant="outlined"

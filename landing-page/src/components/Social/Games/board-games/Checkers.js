@@ -1,6 +1,6 @@
-import React, {useState, useMemo, useCallback} from 'react';
 import {Box, Typography} from '@mui/material';
 import {INVALID_MOVE} from 'boardgame.io/core';
+import React, {useState, useMemo, useCallback} from 'react';
 
 const SIZE = 8;
 

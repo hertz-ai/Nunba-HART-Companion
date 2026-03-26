@@ -1,4 +1,16 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import {shareApi} from '../../../services/socialApi';
+
+import CloseIcon from '@mui/icons-material/Close';
+import CodeIcon from '@mui/icons-material/Code';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import RedditIcon from '@mui/icons-material/Reddit';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import EmailIcon from '@mui/icons-material/Email';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import ShareIcon from '@mui/icons-material/Share';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Dialog,
   DialogTitle,
@@ -15,18 +27,7 @@ import {
   Snackbar,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CloseIcon from '@mui/icons-material/Close';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
-import RedditIcon from '@mui/icons-material/Reddit';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import EmailIcon from '@mui/icons-material/Email';
-import ShareIcon from '@mui/icons-material/Share';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import CodeIcon from '@mui/icons-material/Code';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import {shareApi} from '../../../services/socialApi';
+import React, {useState, useEffect, useCallback} from 'react';
 
 /**
  * ShareDialog — Universal share dialog for any resource.

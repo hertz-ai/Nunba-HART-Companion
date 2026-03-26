@@ -6,7 +6,6 @@
  * original theme.js are preserved but parameterized by the config.
  */
 
-import {createTheme, responsiveFontSizes, alpha} from '@mui/material/styles';
 import {
   GRADIENTS,
   EASINGS,
@@ -17,6 +16,8 @@ import {
   INTENT_COLORS,
 } from './socialTokens';
 import {DEFAULT_THEME_CONFIG} from './themePresets';
+
+import {createTheme, responsiveFontSizes, alpha} from '@mui/material/styles';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

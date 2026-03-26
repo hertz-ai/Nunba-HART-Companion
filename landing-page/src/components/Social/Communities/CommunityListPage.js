@@ -1,11 +1,21 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import CreateCommunityDialog from './CreateCommunityDialog';
 
-import { communitiesApi } from '../../../services/socialApi';
-import { useSocial } from '../../../contexts/SocialContext';
+import {useSocial} from '../../../contexts/SocialContext';
+import {communitiesApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  GRADIENTS,
+  EASINGS,
+  SHADOWS,
+  RADIUS,
+} from '../../../theme/socialTokens';
 import EmptyState from '../shared/EmptyState';
 import InfiniteScroll from '../shared/InfiniteScroll';
 
+import AddIcon from '@mui/icons-material/Add';
+import ArticleIcon from '@mui/icons-material/Article';
+import PeopleIcon from '@mui/icons-material/People';
 import {
   Card,
   CardContent,
@@ -18,13 +28,9 @@ import {
   keyframes,
   useTheme,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
-import AddIcon from '@mui/icons-material/Add';
-import PeopleIcon from '@mui/icons-material/People';
-import ArticleIcon from '@mui/icons-material/Article';
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { socialTokens, GRADIENTS, EASINGS, SHADOWS, RADIUS } from '../../../theme/socialTokens';
+import {alpha} from '@mui/material/styles';
+import React, {useState, useEffect} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 /* ── Deterministic gradient header from community name ── */
 const HEADER_PALETTES = [
@@ -40,7 +46,8 @@ const HEADER_PALETTES = [
 function headerGradient(name) {
   if (!name) return HEADER_PALETTES[0];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return HEADER_PALETTES[Math.abs(hash) % HEADER_PALETTES.length];
 }
 
@@ -63,7 +70,7 @@ const cardReveal = keyframes`
 export default function CommunityListPage() {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { isAuthenticated } = useSocial();
+  const {isAuthenticated} = useSocial();
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -76,9 +83,10 @@ export default function CommunityListPage() {
     e.stopPropagation();
     const wasJoined = joinedSet.has(id);
     // Optimistic toggle
-    setJoinedSet(prev => {
+    setJoinedSet((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
     try {
@@ -89,9 +97,10 @@ export default function CommunityListPage() {
       }
     } catch {
       // Rollback on failure
-      setJoinedSet(prev => {
+      setJoinedSet((prev) => {
         const next = new Set(prev);
-        if (wasJoined) next.add(id); else next.delete(id);
+        if (wasJoined) next.add(id);
+        else next.delete(id);
         return next;
       });
     }
@@ -101,7 +110,7 @@ export default function CommunityListPage() {
     const o = reset ? 0 : offset;
     setLoading(true);
     try {
-      const res = await communitiesApi.list({ limit, offset: o });
+      const res = await communitiesApi.list({limit, offset: o});
       const items = res.data || [];
       setCommunities(reset ? items : (prev) => [...prev, ...items]);
       setHasMore(res.meta ? res.meta.has_more : items.length === limit);
@@ -124,13 +133,16 @@ export default function CommunityListPage() {
   return (
     <>
       {/* Premium heading */}
-      <Typography variant="h5" sx={{
-        fontWeight: 700,
-        mb: 2,
-        background: `linear-gradient(to right, ${alpha(theme.palette.common.white, 0.95)}, ${alpha(theme.palette.common.white, 0.6)})`,
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-      }}>
+      <Typography
+        variant="h5"
+        sx={{
+          fontWeight: 700,
+          mb: 2,
+          background: `linear-gradient(to right, ${alpha(theme.palette.common.white, 0.95)}, ${alpha(theme.palette.common.white, 0.6)})`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}
+      >
         Communities
       </Typography>
 
@@ -159,7 +171,8 @@ export default function CommunityListPage() {
                       ...socialTokens.glass.subtle(theme),
                       borderRadius: RADIUS.lg,
                       animation: `${cardReveal} 400ms cubic-bezier(0.16, 1, 0.3, 1) ${Math.min(idx * 60, 360)}ms both`,
-                      transition: 'box-shadow 250ms ease, border-color 250ms ease, transform 250ms ease',
+                      transition:
+                        'box-shadow 250ms ease, border-color 250ms ease, transform 250ms ease',
                       '&:hover': {
                         borderColor: alpha(theme.palette.primary.main, 0.2),
                         boxShadow: `0 12px 40px rgba(0,0,0,0.4), 0 0 0 1px ${alpha(theme.palette.primary.main, 0.08)}, ${SHADOWS.inset}`,
@@ -175,58 +188,95 @@ export default function CommunityListPage() {
                     onClick={() => navigate(`/social/h/${s.id}`)}
                   >
                     {/* Gradient header */}
-                    <Box sx={{
-                      height: 60,
-                      background: `linear-gradient(135deg, ${gradA}, ${gradB})`,
-                      position: 'relative',
-                    }}>
+                    <Box
+                      sx={{
+                        height: 60,
+                        background: `linear-gradient(135deg, ${gradA}, ${gradB})`,
+                        position: 'relative',
+                      }}
+                    >
                       {/* Shine overlay */}
-                      <Box className="community-shine" sx={{
-                        position: 'absolute', top: 0, bottom: 0,
-                        width: '50%', left: '-75%',
-                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)',
-                        transform: 'skewX(-15deg)',
-                        pointerEvents: 'none',
-                      }} />
+                      <Box
+                        className="community-shine"
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          width: '50%',
+                          left: '-75%',
+                          background:
+                            'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)',
+                          transform: 'skewX(-15deg)',
+                          pointerEvents: 'none',
+                        }}
+                      />
                     </Box>
 
-                    <CardContent sx={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="subtitle1" sx={{
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        background: `linear-gradient(to right, ${alpha(theme.palette.common.white, 0.95)}, ${alpha(theme.palette.common.white, 0.7)})`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        mb: 0.75,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
+                    <CardContent
+                      sx={{
+                        position: 'relative',
+                        zIndex: 2,
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        p: 1.5,
+                        '&:last-child': {pb: 1.5},
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          background: `linear-gradient(to right, ${alpha(theme.palette.common.white, 0.95)}, ${alpha(theme.palette.common.white, 0.7)})`,
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          mb: 0.75,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         h/{s.name}
                       </Typography>
 
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
-                        <Box sx={{
-                          display: 'flex', alignItems: 'center', gap: 0.5,
-                          color: alpha(theme.palette.common.white, 0.45),
-                          fontSize: '0.72rem',
-                          fontWeight: 500,
-                        }}>
-                          <PeopleIcon sx={{ fontSize: 14 }} />
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.5,
+                          mb: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            color: alpha(theme.palette.common.white, 0.45),
+                            fontSize: '0.72rem',
+                            fontWeight: 500,
+                          }}
+                        >
+                          <PeopleIcon sx={{fontSize: 14}} />
                           {s.member_count || 0} members
                         </Box>
-                        <Box sx={{
-                          display: 'flex', alignItems: 'center', gap: 0.5,
-                          color: alpha(theme.palette.common.white, 0.45),
-                          fontSize: '0.72rem',
-                          fontWeight: 500,
-                        }}>
-                          <ArticleIcon sx={{ fontSize: 14 }} />
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            color: alpha(theme.palette.common.white, 0.45),
+                            fontSize: '0.72rem',
+                            fontWeight: 500,
+                          }}
+                        >
+                          <ArticleIcon sx={{fontSize: 14}} />
                           {s.post_count || 0} posts
                         </Box>
                       </Box>
 
-                      <Box sx={{ mt: 'auto' }}>
+                      <Box sx={{mt: 'auto'}}>
                         <Chip
                           label={isJoined ? 'Joined' : 'Join'}
                           size="small"
@@ -236,12 +286,18 @@ export default function CommunityListPage() {
                             fontSize: '0.7rem',
                             borderRadius: RADIUS.pill,
                             width: '100%',
-                            background: isJoined ? alpha(gradA, 0.15) : `linear-gradient(135deg, ${gradA}, ${gradB})`,
+                            background: isJoined
+                              ? alpha(gradA, 0.15)
+                              : `linear-gradient(135deg, ${gradA}, ${gradB})`,
                             color: isJoined ? gradA : '#fff',
-                            border: isJoined ? `1px solid ${alpha(gradA, 0.3)}` : 'none',
+                            border: isJoined
+                              ? `1px solid ${alpha(gradA, 0.3)}`
+                              : 'none',
                             transition: 'all 0.2s ease',
                             '&:hover': {
-                              background: isJoined ? alpha(gradA, 0.25) : `linear-gradient(135deg, ${gradB}, ${gradA})`,
+                              background: isJoined
+                                ? alpha(gradA, 0.25)
+                                : `linear-gradient(135deg, ${gradB}, ${gradA})`,
                             },
                           }}
                         />
@@ -260,7 +316,7 @@ export default function CommunityListPage() {
         <Fab
           sx={{
             position: 'fixed',
-            bottom: { xs: 120, md: 80 },
+            bottom: {xs: 120, md: 80},
             right: 24,
             background: GRADIENTS.primary,
             color: theme.palette.primary.contrastText,

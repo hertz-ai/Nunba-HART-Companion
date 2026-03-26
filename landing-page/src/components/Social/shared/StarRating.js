@@ -1,5 +1,5 @@
-import React from 'react';
 import {Box, Typography, Rating} from '@mui/material';
+import React from 'react';
 
 const DIMENSIONS = [
   {key: 'skill', label: 'Skill'},

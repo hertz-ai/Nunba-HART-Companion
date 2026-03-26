@@ -1,5 +1,4 @@
 /* eslint-disable no-unused-vars */
-import React from 'react';
 import {
   SendHorizontal,
   Image,
@@ -12,6 +11,7 @@ import {
   Brain,
   Ear,
 } from 'lucide-react';
+import React from 'react';
 
 /**
  * ChatInputBar -- message input area with queue, file uploads, TTS, mic, and send.
@@ -291,33 +291,48 @@ const ChatInputBar = ({
 
         {/* Clipboard paste */}
         {onClipboardPaste && (
-          <button onClick={onClipboardPaste}
-            className="text-gray-400 hover:text-purple-400 p-1 btn-press" title="Paste from clipboard">
+          <button
+            onClick={onClipboardPaste}
+            className="text-gray-400 hover:text-purple-400 p-1 btn-press"
+            title="Paste from clipboard"
+          >
             <ClipboardPaste className="w-4 h-4" />
           </button>
         )}
 
         {/* Camera capture */}
         {onCameraCapture && (
-          <button onClick={onCameraCapture}
-            className="text-gray-400 hover:text-blue-400 p-1 btn-press" title="Take photo">
+          <button
+            onClick={onCameraCapture}
+            className="text-gray-400 hover:text-blue-400 p-1 btn-press"
+            title="Take photo"
+          >
             <Camera className="w-4 h-4" />
           </button>
         )}
 
         {/* Memory panel */}
         {onMemoryOpen && (
-          <button onClick={onMemoryOpen}
-            className="text-gray-400 hover:text-pink-400 p-1 btn-press" title="Memories">
+          <button
+            onClick={onMemoryOpen}
+            className="text-gray-400 hover:text-pink-400 p-1 btn-press"
+            title="Memories"
+          >
             <Brain className="w-4 h-4" />
           </button>
         )}
 
         {/* Always-listening toggle */}
         {onToggleAlwaysListening && (
-          <button onClick={onToggleAlwaysListening}
+          <button
+            onClick={onToggleAlwaysListening}
             className={`p-1 btn-press ${alwaysListening ? 'text-green-400' : 'text-gray-500 hover:text-gray-300'}`}
-            title={alwaysListening ? 'Stop listening for "Hey Nunba"' : 'Listen for "Hey Nunba"'}>
+            title={
+              alwaysListening
+                ? 'Stop listening for "Hey Nunba"'
+                : 'Listen for "Hey Nunba"'
+            }
+          >
             <Ear className="w-4 h-4" />
             {alwaysListening && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />

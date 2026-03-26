@@ -1,22 +1,29 @@
-import React, {useState, useEffect} from 'react';
-import {withStyles, useTheme} from '@mui/material/styles';
+import logo_dark from './../images/logo-dark.png';
+import DynamicElementHandler from './DynamicElementHandler';
+import Spacer from './Spacer';
+
+import {useForm} from './useForm';
+import {logger} from '../utils/logger';
+import AppBar from '@mui/material/AppBar';
+import Button from '@mui/material/Button';
+import {green, purple} from '@mui/material/colors';
 import Container from '@mui/material/Container';
+import {withStyles, useTheme} from '@mui/material/styles';
+import React, {useState, useEffect} from 'react';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
-import {green, purple} from '@mui/material/colors';
-import Button from '@mui/material/Button';
-import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Checkbox from '@mui/material/Checkbox';
 import Link from '@mui/material/Link';
 import Box from '@mui/material/Box';
-import DynamicElementHandler from './DynamicElementHandler';
-import {logger} from '../utils/logger';
-import Spacer from './Spacer';
-import logo_dark from './../images/logo-dark.png';
-import {useForm} from './useForm';
+
+
+
+
 import {useNavigate} from 'react-router-dom';
+
 import {CREATE_BOOK_SUBJECT_URL} from '../config/apiBase';
+
 import Header from './TeacherLanding/Header';
 import './TeacherLanding/TeacherHome.css';
 // Styles migrated from makeStyles to sx/inline
@@ -50,7 +57,7 @@ function Copyright() {
   );
 }
 
-//####
+// ####
 export default function CreateBook() {
   const navigate = useNavigate();
 
@@ -85,8 +92,8 @@ export default function CreateBook() {
     setCourseBatchBookList(data);
   };
   useEffect(() => {
-    let access_token = localStorage.getItem('hevolve_access_token');
-    //TODO - verify the access token
+    const access_token = localStorage.getItem('hevolve_access_token');
+    // TODO - verify the access token
     if (access_token != null) {
       if (access_token.trim().length == 0) {
         navigate('/teacher/signin');
@@ -119,8 +126,8 @@ export default function CreateBook() {
         return null;
       }
     }
-    var url = CREATE_BOOK_SUBJECT_URL;
-    var bookObj = {
+    const url = CREATE_BOOK_SUBJECT_URL;
+    const bookObj = {
       courseBatchBooks_offered: courseBatchBooks.data,
       user_id: 1,
     };
@@ -157,7 +164,7 @@ export default function CreateBook() {
             client_id: data.client_id,
           },
         });
-        //toggleModal();
+        // toggleModal();
       });
     });
   };

@@ -4,8 +4,9 @@
  * Preserves backward-compatible import path for existing code that imports CreatePostDialog.
  */
 
-import React from 'react';
 import CreateThoughtExperimentDialog from './CreateThoughtExperimentDialog';
+
+import React from 'react';
 
 export default function CreatePostDialog({
   open,

@@ -5,9 +5,9 @@
  * infinite scroll setup, interest filter chips, FAB visibility,
  * error banner, and Nunba Daily card.
  */
-import React from 'react';
-import {render, screen, fireEvent, act, waitFor} from '@testing-library/react';
 import {ThemeProvider, createTheme} from '@mui/material/styles';
+import {render, screen, fireEvent, act, waitFor} from '@testing-library/react';
+import React from 'react';
 import {MemoryRouter} from 'react-router-dom';
 
 // ── Mocks ────────────────────────────────────────────────────────────────

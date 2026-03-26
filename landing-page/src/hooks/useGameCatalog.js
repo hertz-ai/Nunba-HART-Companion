@@ -1,5 +1,6 @@
-import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import {gamesApi} from '../services/socialApi';
+
+import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 
 // ── Client-side game catalog (fallback when backend catalog is unavailable) ──
 export const LOCAL_CATALOG = [

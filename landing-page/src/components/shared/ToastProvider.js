@@ -1,3 +1,9 @@
+import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import InfoIcon from '@mui/icons-material/Info';
+import {Snackbar, Box, Typography, IconButton} from '@mui/material';
 import React, {
   createContext,
   useContext,
@@ -5,12 +11,6 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import {Snackbar, Box, Typography, IconButton} from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import InfoIcon from '@mui/icons-material/Info';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
 
 const ToastContext = createContext();
 

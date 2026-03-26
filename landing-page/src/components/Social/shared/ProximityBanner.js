@@ -1,6 +1,6 @@
-import React from 'react';
-import {Box, Typography, Chip} from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import {Box, Typography, Chip} from '@mui/material';
+import React from 'react';
 
 export default function ProximityBanner({nearbyCount, isTracking}) {
   if (!isTracking) return null;

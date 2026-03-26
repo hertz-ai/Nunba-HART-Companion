@@ -1,7 +1,9 @@
+import PageSkeleton from './shared/PageSkeleton';
+
+import {useSocial} from '../contexts/SocialContext';
+
 import React from 'react';
 import {Navigate, useLocation} from 'react-router-dom';
-import {useSocial} from '../contexts/SocialContext';
-import PageSkeleton from './shared/PageSkeleton';
 
 // Role hierarchy: central > regional > flat > guest > anonymous
 const ROLE_LEVELS = {

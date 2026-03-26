@@ -1,3 +1,5 @@
+import {createApiClient} from './axiosFactory';
+
 import {
   SOCIAL_API_URL,
   ADMIN_API_URL,
@@ -5,7 +7,6 @@ import {
   CLOUD_API_URL,
   MAILER_BASE_URL,
 } from '../config/apiBase';
-import {createApiClient} from './axiosFactory';
 
 const socialApi = createApiClient(SOCIAL_API_URL);
 
@@ -543,15 +544,22 @@ export const trackerApi = {
   getNotifications: () => socialApi.get('/tracker/notifications'),
   // Pledge endpoints (canonical — all pledge ops go through tracker_bp)
   pledges: (postId) => socialApi.get(`/tracker/experiments/${postId}/pledges`),
-  pledgeSummary: (postId) => socialApi.get(`/tracker/experiments/${postId}/pledge-summary`),
-  pledge: (postId, data) => socialApi.post(`/tracker/experiments/${postId}/pledge`, data),
-  withdrawPledge: (postId, escrowId) => socialApi.delete(`/tracker/experiments/${postId}/pledge/${escrowId}`),
-  insights: (postId) => socialApi.get(`/tracker/experiments/${postId}/insights`),
-  myPledges: (params) => socialApi.get('/tracker/pledges/mine', { params }),
-  allPledges: (params) => socialApi.get('/tracker/pledges/all', { params }),
-  verifyPledge: (escrowId) => socialApi.post(`/tracker/pledges/${escrowId}/verify`),
-  inject: (postId, data) => socialApi.post(`/tracker/experiments/${postId}/inject`, data),
-  interview: (postId, data) => socialApi.post(`/tracker/experiments/${postId}/interview`, data),
+  pledgeSummary: (postId) =>
+    socialApi.get(`/tracker/experiments/${postId}/pledge-summary`),
+  pledge: (postId, data) =>
+    socialApi.post(`/tracker/experiments/${postId}/pledge`, data),
+  withdrawPledge: (postId, escrowId) =>
+    socialApi.delete(`/tracker/experiments/${postId}/pledge/${escrowId}`),
+  insights: (postId) =>
+    socialApi.get(`/tracker/experiments/${postId}/insights`),
+  myPledges: (params) => socialApi.get('/tracker/pledges/mine', {params}),
+  allPledges: (params) => socialApi.get('/tracker/pledges/all', {params}),
+  verifyPledge: (escrowId) =>
+    socialApi.post(`/tracker/pledges/${escrowId}/verify`),
+  inject: (postId, data) =>
+    socialApi.post(`/tracker/experiments/${postId}/inject`, data),
+  interview: (postId, data) =>
+    socialApi.post(`/tracker/experiments/${postId}/interview`, data),
   dualContext: (data) => socialApi.post('/tracker/dual-context', data),
   encounters: () => socialApi.get('/tracker/encounters'),
 };

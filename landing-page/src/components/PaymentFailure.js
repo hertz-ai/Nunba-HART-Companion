@@ -1,5 +1,6 @@
-import React, {useEffect, useState} from 'react';
 import {logger} from '../utils/logger';
+
+import React, {useEffect, useState} from 'react';
 
 const PaymentFailure = () => {
   const [plan_name, setPlan_name] = useState();
@@ -23,7 +24,7 @@ const PaymentFailure = () => {
 
   useEffect(() => {
     if (hevolvedroid) {
-      var myVariable = {
+      const myVariable = {
         HEVOLVEAIPLUS_PLAN_NAME: plan_name,
         PAYMENT_STATUS: status,
         TRANSACTION_ID: transaction_id,

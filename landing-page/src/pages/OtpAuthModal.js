@@ -4,18 +4,18 @@ import {
   AZURE_LOGIN_URL,
   AZURE_OTP_VERIFY_URL,
 } from '../config/apiBase';
-
+import {agentApi, authApi, chatApi, mailerApi} from '../services/socialApi';
 import {encrypt} from '../utils/encryption';
+import {logger} from '../utils/logger';
+
+import axios from 'axios';
 import {getCountries, getCountryCallingCode} from 'libphonenumber-js';
 import {X, User, ChevronDown, Mail, Phone, Search} from 'lucide-react';
+import {RefreshCw, Wifi, WifiOff} from 'lucide-react';
 import React, {useState, useEffect} from 'react';
 import {createPortal} from 'react-dom';
 import {useNavigate} from 'react-router-dom';
 import {v4 as uuidv4} from 'uuid';
-import axios from 'axios';
-import {RefreshCw, Wifi, WifiOff} from 'lucide-react';
-import {agentApi, authApi, chatApi, mailerApi} from '../services/socialApi';
-import {logger} from '../utils/logger';
 
 /**
  * Get a stable, hardware-based device ID from the local backend.

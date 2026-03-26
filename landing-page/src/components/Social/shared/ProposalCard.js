@@ -1,4 +1,5 @@
-import React from 'react';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import {
   Card,
   CardContent,
@@ -10,8 +11,7 @@ import {
   Box,
   Avatar,
 } from '@mui/material';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import React from 'react';
 
 const STATUS_COLORS = {
   active: 'info',

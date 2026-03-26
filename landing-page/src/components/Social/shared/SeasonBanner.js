@@ -1,4 +1,6 @@
-import React, {useState, useEffect} from 'react';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CloseIcon from '@mui/icons-material/Close';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import {
   Paper,
   Typography,
@@ -12,9 +14,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import React, {useState, useEffect} from 'react';
 
 // Shimmer animation for the banner
 const shimmer = keyframes`

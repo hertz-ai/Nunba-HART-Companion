@@ -1,5 +1,5 @@
-import React from 'react';
 import {Box, Skeleton} from '@mui/material';
+import React from 'react';
 
 const darkSkel = {bgcolor: 'rgba(255,255,255,0.06)'};
 

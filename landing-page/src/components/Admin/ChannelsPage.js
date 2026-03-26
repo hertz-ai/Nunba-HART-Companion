@@ -1,7 +1,18 @@
 import {channelsApi} from '../../services/socialApi';
-import ChannelSetupWizard from '../Channels/ChannelSetupWizard';
 import ChannelPresenceIndicator from '../Channels/ChannelPresenceIndicator';
+import ChannelSetupWizard from '../Channels/ChannelSetupWizard';
 
+import AddIcon from '@mui/icons-material/Add';
+import ChatIcon from '@mui/icons-material/Chat';
+import CloseIcon from '@mui/icons-material/Close';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import StorageIcon from '@mui/icons-material/Storage';
+import TelegramIcon from '@mui/icons-material/Telegram';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   Typography,
   Card,
@@ -23,17 +34,6 @@ import {
   TextField,
   MenuItem,
 } from '@mui/material';
-import TelegramIcon from '@mui/icons-material/Telegram';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import ChatIcon from '@mui/icons-material/Chat';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import StorageIcon from '@mui/icons-material/Storage';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import React, {useState, useEffect} from 'react';
 
 const CHANNEL_TYPES = [
@@ -89,7 +89,8 @@ const STATUS_CONFIG = {
 
 // Card style
 const cardStyle = {
-  background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
+  background:
+    'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
   backdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.05)',
   borderRadius: 3,
@@ -118,19 +119,55 @@ function ChannelSkeleton() {
   return (
     <Card sx={{...cardStyle, '&:hover': {}}}>
       <CardContent sx={{p: 3}}>
-        <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2}}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            mb: 2,
+          }}
+        >
           <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-            <Skeleton variant="rounded" width={48} height={48} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+            <Skeleton
+              variant="rounded"
+              width={48}
+              height={48}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+            />
             <Box>
-              <Skeleton variant="text" width={120} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-              <Skeleton variant="rounded" width={80} height={20} sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 0.5}} />
+              <Skeleton
+                variant="text"
+                width={120}
+                sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+              />
+              <Skeleton
+                variant="rounded"
+                width={80}
+                height={20}
+                sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 0.5}}
+              />
             </Box>
           </Box>
-          <Skeleton variant="rounded" width={40} height={24} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+          <Skeleton
+            variant="rounded"
+            width={40}
+            height={24}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
         </Box>
         <Box sx={{display: 'flex', gap: 1}}>
-          <Skeleton variant="circular" width={32} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-          <Skeleton variant="circular" width={32} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+          <Skeleton
+            variant="circular"
+            width={32}
+            height={32}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
+          <Skeleton
+            variant="circular"
+            width={32}
+            height={32}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
         </Box>
       </CardContent>
     </Card>
@@ -144,7 +181,11 @@ export default function ChannelsPage() {
   const [actionLoading, setActionLoading] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [newChannel, setNewChannel] = useState({type: 'telegram', name: '', token: ''});
+  const [newChannel, setNewChannel] = useState({
+    type: 'telegram',
+    name: '',
+    token: '',
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -164,7 +205,9 @@ export default function ChannelsPage() {
         console.error('[ChannelsPage] Failed to load channels:', err);
         const msg = err?.error || err?.message || '';
         if (msg.includes('Authorization') || msg.includes('token')) {
-          setError('Authentication required. Please log in with an admin account.');
+          setError(
+            'Authentication required. Please log in with an admin account.'
+          );
         }
         setChannels([]);
       }
@@ -197,7 +240,11 @@ export default function ChannelsPage() {
     } catch (err) {
       console.error('[ChannelsPage] Failed to create channel:', err);
       const msg = err?.error || err?.message || 'Failed to create channel';
-      setError(msg.includes('Authorization') ? 'Admin authentication required to create channels.' : msg);
+      setError(
+        msg.includes('Authorization')
+          ? 'Admin authentication required to create channels.'
+          : msg
+      );
     }
     setActionLoading(null);
   };
@@ -211,11 +258,15 @@ export default function ChannelsPage() {
         await channelsApi.disable(channelId);
       }
       setChannels((prev) =>
-        (Array.isArray(prev) ? prev : []).map((c) => (c.id === channelId ? {...c, enabled} : c))
+        (Array.isArray(prev) ? prev : []).map((c) =>
+          c.id === channelId ? {...c, enabled} : c
+        )
       );
     } catch (err) {
       console.error('[ChannelsPage] Toggle failed:', err);
-      setError(`Failed to ${enabled ? 'enable' : 'disable'} channel. ${err?.message || ''}`);
+      setError(
+        `Failed to ${enabled ? 'enable' : 'disable'} channel. ${err?.message || ''}`
+      );
     }
     setActionLoading(null);
   };
@@ -227,12 +278,16 @@ export default function ChannelsPage() {
       setError(null);
       // Use inline message instead of alert (pywebview-safe)
       setChannels((prev) =>
-        (Array.isArray(prev) ? prev : []).map((c) => (c.id === channelId ? {...c, _lastTest: 'Test message sent'} : c))
+        (Array.isArray(prev) ? prev : []).map((c) =>
+          c.id === channelId ? {...c, _lastTest: 'Test message sent'} : c
+        )
       );
     } catch (err) {
       console.error('[ChannelsPage] Test failed:', err);
       setChannels((prev) =>
-        (Array.isArray(prev) ? prev : []).map((c) => (c.id === channelId ? {...c, _lastTest: 'Test failed'} : c))
+        (Array.isArray(prev) ? prev : []).map((c) =>
+          c.id === channelId ? {...c, _lastTest: 'Test failed'} : c
+        )
       );
     }
     setActionLoading(null);
@@ -243,7 +298,9 @@ export default function ChannelsPage() {
     try {
       await channelsApi.reconnect(channelId);
       setChannels((prev) =>
-        (Array.isArray(prev) ? prev : []).map((c) => (c.id === channelId ? {...c, status: 'connected'} : c))
+        (Array.isArray(prev) ? prev : []).map((c) =>
+          c.id === channelId ? {...c, status: 'connected'} : c
+        )
       );
     } catch (err) {
       console.error('[ChannelsPage] Reconnect failed:', err);
@@ -260,34 +317,55 @@ export default function ChannelsPage() {
       <Box>
         {/* Page Header */}
         <Box sx={{mb: 4}}>
-          <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2}}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+            }}
+          >
             <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-              <Box sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(155, 148, 255, 0.15) 100%)',
-              }}>
-                <StorageIcon sx={{
-                  fontSize: 24,
-                  background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }} />
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background:
+                    'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(155, 148, 255, 0.15) 100%)',
+                }}
+              >
+                <StorageIcon
+                  sx={{
+                    fontSize: 24,
+                    background:
+                      'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                />
               </Box>
               <Box>
-                <Typography variant="h4" sx={{
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    background:
+                      'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
                   Channel Integrations
                 </Typography>
-                <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                <Typography
+                  variant="body2"
+                  sx={{color: 'rgba(255,255,255,0.5)'}}
+                >
                   Connect your agent to messaging platforms
                 </Typography>
               </Box>
@@ -317,16 +395,27 @@ export default function ChannelsPage() {
         {/* Error Banner */}
         {error && (
           <Fade in={true} timeout={200}>
-            <Box sx={{
-              mb: 3, p: 2, borderRadius: 2,
-              background: 'linear-gradient(135deg, rgba(255,152,0,0.1) 0%, rgba(255,200,0,0.1) 100%)',
-              border: '1px solid rgba(255,152,0,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
+            <Box
+              sx={{
+                mb: 3,
+                p: 2,
+                borderRadius: 2,
+                background:
+                  'linear-gradient(135deg, rgba(255,152,0,0.1) 0%, rgba(255,200,0,0.1) 100%)',
+                border: '1px solid rgba(255,152,0,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
               <Typography variant="body2" sx={{color: '#ff9800'}}>
                 {error}
               </Typography>
-              <IconButton size="small" onClick={() => setError(null)} sx={{color: 'rgba(255,152,0,0.7)'}}>
+              <IconButton
+                size="small"
+                onClick={() => setError(null)}
+                sx={{color: 'rgba(255,152,0,0.7)'}}
+              >
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -344,30 +433,40 @@ export default function ChannelsPage() {
           </Grid>
         ) : channelsList.length === 0 ? (
           <Grow in={true} timeout={400}>
-            <Box sx={{
-              textAlign: 'center',
-              py: 8,
-              background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6) 0%, rgba(15, 15, 26, 0.6) 100%)',
-              borderRadius: 3,
-              border: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              <StorageIcon sx={{
-                fontSize: 64,
-                color: 'rgba(255,255,255,0.2)',
-                mb: 2,
-              }} />
-              <Typography variant="h6" sx={{color: '#fff', fontWeight: 600, mb: 1}}>
+            <Box
+              sx={{
+                textAlign: 'center',
+                py: 8,
+                background:
+                  'linear-gradient(135deg, rgba(26, 26, 46, 0.6) 0%, rgba(15, 15, 26, 0.6) 100%)',
+                borderRadius: 3,
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              <StorageIcon
+                sx={{
+                  fontSize: 64,
+                  color: 'rgba(255,255,255,0.2)',
+                  mb: 2,
+                }}
+              />
+              <Typography
+                variant="h6"
+                sx={{color: '#fff', fontWeight: 600, mb: 1}}
+              >
                 No Channels Configured
               </Typography>
               <Typography sx={{color: 'rgba(255,255,255,0.5)', mb: 3}}>
-                Connect your first messaging platform to enable multi-channel engagement
+                Connect your first messaging platform to enable multi-channel
+                engagement
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setDialogOpen(true)}
                 sx={{
-                  background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                  background:
+                    'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                   borderRadius: 2,
                   textTransform: 'none',
                   fontWeight: 600,
@@ -381,7 +480,8 @@ export default function ChannelsPage() {
         ) : (
           <Grid container spacing={3}>
             {channelsList.map((channel, index) => {
-              const statusConfig = STATUS_CONFIG[channel.status] || STATUS_CONFIG.disconnected;
+              const statusConfig =
+                STATUS_CONFIG[channel.status] || STATUS_CONFIG.disconnected;
               const channelColor = CHANNEL_COLORS[channel.type] || '#6C63FF';
 
               return (
@@ -389,44 +489,62 @@ export default function ChannelsPage() {
                   <Grow in={true} timeout={400 + index * 100}>
                     <Card sx={cardStyle}>
                       <CardContent sx={{p: 3}}>
-                        <Box sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          mb: 2,
-                        }}>
-                          <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-                            <Box sx={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: 2,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: `${channelColor}20`,
-                              transition: 'all 0.3s ease',
-                              '& svg': {
-                                fontSize: 24,
-                                color: channelColor,
-                              },
-                            }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            mb: 2,
+                          }}
+                        >
+                          <Box
+                            sx={{display: 'flex', alignItems: 'center', gap: 2}}
+                          >
+                            <Box
+                              sx={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 2,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: `${channelColor}20`,
+                                transition: 'all 0.3s ease',
+                                '& svg': {
+                                  fontSize: 24,
+                                  color: channelColor,
+                                },
+                              }}
+                            >
                               {CHANNEL_ICONS[channel.type] || <ChatIcon />}
                             </Box>
                             <Box>
-                              <Typography variant="subtitle1" sx={{
-                                fontWeight: 600,
-                                color: '#fff',
-                              }}>
+                              <Typography
+                                variant="subtitle1"
+                                sx={{
+                                  fontWeight: 600,
+                                  color: '#fff',
+                                }}
+                              >
                                 {channel.name}
                               </Typography>
-                              <Box sx={{display: 'flex', alignItems: 'center', gap: 1, mt: 0.5}}>
-                                <Box sx={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: '50%',
-                                  background: statusConfig.color,
-                                  boxShadow: statusConfig.glow,
-                                }} />
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  mt: 0.5,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: '50%',
+                                    background: statusConfig.color,
+                                    boxShadow: statusConfig.glow,
+                                  }}
+                                />
                                 <Chip
                                   size="small"
                                   label={channel.status || 'disconnected'}
@@ -441,40 +559,54 @@ export default function ChannelsPage() {
                                   }}
                                 />
                               </Box>
-                              <ChannelPresenceIndicator channelType={channel.type} size={8} />
+                              <ChannelPresenceIndicator
+                                channelType={channel.type}
+                                size={8}
+                              />
                             </Box>
                           </Box>
                           <Switch
                             checked={!!channel.enabled}
-                            onChange={(e) => handleToggle(channel.id, e.target.checked)}
+                            onChange={(e) =>
+                              handleToggle(channel.id, e.target.checked)
+                            }
                             disabled={actionLoading === channel.id}
                             sx={{
                               '& .MuiSwitch-switchBase.Mui-checked': {
                                 color: '#6C63FF',
                               },
-                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                backgroundColor: '#6C63FF',
-                              },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track':
+                                {
+                                  backgroundColor: '#6C63FF',
+                                },
                             }}
                           />
                         </Box>
 
                         {/* Test result message */}
                         {channel._lastTest && (
-                          <Typography variant="caption" sx={{
-                            color: channel._lastTest.includes('failed') ? '#ff4444' : '#6C63FF',
-                            display: 'block', mb: 1,
-                          }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: channel._lastTest.includes('failed')
+                                ? '#ff4444'
+                                : '#6C63FF',
+                              display: 'block',
+                              mb: 1,
+                            }}
+                          >
                             {channel._lastTest}
                           </Typography>
                         )}
 
-                        <Box sx={{
-                          display: 'flex',
-                          gap: 1,
-                          pt: 2,
-                          borderTop: '1px solid rgba(255,255,255,0.05)',
-                        }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            gap: 1,
+                            pt: 2,
+                            borderTop: '1px solid rgba(255,255,255,0.05)',
+                          }}
+                        >
                           <Tooltip title="Test Connection" arrow>
                             <IconButton
                               size="small"
@@ -498,7 +630,9 @@ export default function ChannelsPage() {
                             <IconButton
                               size="small"
                               onClick={() => handleReconnect(channel.id)}
-                              disabled={actionLoading === `reconnect-${channel.id}`}
+                              disabled={
+                                actionLoading === `reconnect-${channel.id}`
+                              }
                               sx={{
                                 background: 'rgba(255,255,255,0.05)',
                                 color: 'rgba(255,255,255,0.7)',
@@ -509,7 +643,10 @@ export default function ChannelsPage() {
                                   transform: 'scale(1.1)',
                                 },
                                 '& svg': {
-                                  animation: actionLoading === `reconnect-${channel.id}` ? 'spin 1s linear infinite' : 'none',
+                                  animation:
+                                    actionLoading === `reconnect-${channel.id}`
+                                      ? 'spin 1s linear infinite'
+                                      : 'none',
                                   '@keyframes spin': {
                                     '0%': {transform: 'rotate(0deg)'},
                                     '100%': {transform: 'rotate(360deg)'},
@@ -537,11 +674,18 @@ export default function ChannelsPage() {
           onSuccess={() => {
             setWizardOpen(false);
             // Refresh channels list
-            channelsApi.list().then(res => {
-              const data = res?.data;
-              const list = Array.isArray(data) ? data : Array.isArray(data?.channels) ? data.channels : [];
-              setChannels(list);
-            }).catch(() => {});
+            channelsApi
+              .list()
+              .then((res) => {
+                const data = res?.data;
+                const list = Array.isArray(data)
+                  ? data
+                  : Array.isArray(data?.channels)
+                    ? data.channels
+                    : [];
+                setChannels(list);
+              })
+              .catch(() => {});
           }}
         />
 
@@ -551,7 +695,8 @@ export default function ChannelsPage() {
           onClose={() => setDialogOpen(false)}
           PaperProps={{
             sx: {
-              background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 15, 26, 0.98) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 15, 26, 0.98) 100%)',
               backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 3,
@@ -559,13 +704,15 @@ export default function ChannelsPage() {
             },
           }}
         >
-          <DialogTitle sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: '#fff',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-          }}>
+          <DialogTitle
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#fff',
+              borderBottom: '1px solid rgba(255,255,255,0.05)',
+            }}
+          >
             <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
               <StorageIcon sx={{color: '#6C63FF'}} />
               Add Channel
@@ -578,17 +725,29 @@ export default function ChannelsPage() {
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent sx={{pt: 3, pb: 1, display: 'flex', flexDirection: 'column', gap: 2.5}}>
+          <DialogContent
+            sx={{
+              pt: 3,
+              pb: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2.5,
+            }}
+          >
             <TextField
               select
               fullWidth
               label="Platform"
               value={newChannel.type}
-              onChange={(e) => setNewChannel((p) => ({...p, type: e.target.value}))}
+              onChange={(e) =>
+                setNewChannel((p) => ({...p, type: e.target.value}))
+              }
               sx={inputSx}
             >
               {CHANNEL_TYPES.map((ct) => (
-                <MenuItem key={ct.value} value={ct.value}>{ct.label}</MenuItem>
+                <MenuItem key={ct.value} value={ct.value}>
+                  {ct.label}
+                </MenuItem>
               ))}
             </TextField>
             <TextField
@@ -597,8 +756,12 @@ export default function ChannelsPage() {
               label="Channel Name"
               placeholder="e.g. My Telegram Bot"
               value={newChannel.name}
-              onChange={(e) => setNewChannel((p) => ({...p, name: e.target.value}))}
-              onKeyDown={(e) => { if (e.key === 'Enter' && newChannel.name.trim()) handleCreate(); }}
+              onChange={(e) =>
+                setNewChannel((p) => ({...p, name: e.target.value}))
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newChannel.name.trim()) handleCreate();
+              }}
               sx={inputSx}
             />
             <TextField
@@ -606,12 +769,18 @@ export default function ChannelsPage() {
               label="Bot Token / API Key (optional)"
               placeholder="Paste your bot token here"
               value={newChannel.token}
-              onChange={(e) => setNewChannel((p) => ({...p, token: e.target.value}))}
-              onKeyDown={(e) => { if (e.key === 'Enter' && newChannel.name.trim()) handleCreate(); }}
+              onChange={(e) =>
+                setNewChannel((p) => ({...p, token: e.target.value}))
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newChannel.name.trim()) handleCreate();
+              }}
               sx={inputSx}
             />
           </DialogContent>
-          <DialogActions sx={{p: 3, borderTop: '1px solid rgba(255,255,255,0.05)'}}>
+          <DialogActions
+            sx={{p: 3, borderTop: '1px solid rgba(255,255,255,0.05)'}}
+          >
             <Button
               onClick={() => setDialogOpen(false)}
               sx={{color: 'rgba(255,255,255,0.7)', textTransform: 'none'}}

@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import {regionsApi} from '../../../services/socialApi';
+
 import {
   Dialog,
   DialogTitle,
@@ -14,7 +15,7 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import {regionsApi} from '../../../services/socialApi';
+import React, {useState} from 'react';
 
 const CATEGORIES = [
   'governance',

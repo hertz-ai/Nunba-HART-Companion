@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, {useState, useRef, useEffect, useMemo} from 'react';
 import {logger} from '../../utils/logger';
+
+import React, {useState, useRef, useEffect, useMemo} from 'react';
 
 const ThinkingProcessContainer = ({
   thinkingMessages,

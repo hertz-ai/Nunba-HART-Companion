@@ -3,8 +3,9 @@
  * Replaces duplicated SECRET_KEY + decryptValue() across 5 files.
  */
 
-import CryptoJS from 'crypto-js';
 import {ENCRYPTION_KEY} from '../config/apiBase';
+
+import CryptoJS from 'crypto-js';
 
 const SECRET_KEY = ENCRYPTION_KEY;
 

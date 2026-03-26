@@ -1,5 +1,12 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import {recipesApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
 import EmptyState from '../shared/EmptyState';
 import InfiniteScroll from '../shared/InfiniteScroll';
 import UserChip from '../shared/UserChip';
@@ -18,13 +25,6 @@ import {
 import {alpha} from '@mui/material/styles';
 import React, {useState, useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
 
 /* Premium keyframes */
 const shimmerSweep = keyframes`

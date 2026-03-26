@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../testHelpers';
 import ChallengeCard from '../../../../components/Social/shared/ChallengeCard';
+import {renderWithProviders} from '../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 describe('ChallengeCard Component', () => {
   // Note: Component uses 'goal' not 'target', 'name' or 'title', and 'reward' for display

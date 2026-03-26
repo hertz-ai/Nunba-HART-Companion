@@ -1,4 +1,13 @@
-import React, {useState, useEffect} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {computeApi, resonanceApi} from '../../../services/socialApi';
+import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import {animFadeInUp, animSlideInUp} from '../../../utils/animations';
+
+import BoltIcon from '@mui/icons-material/Bolt';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import GroupsIcon from '@mui/icons-material/Groups';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import MemoryIcon from '@mui/icons-material/Memory';
 import {
   Typography,
   Box,
@@ -12,15 +21,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import MemoryIcon from '@mui/icons-material/Memory';
-import BoltIcon from '@mui/icons-material/Bolt';
-import GroupsIcon from '@mui/icons-material/Groups';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import {computeApi, resonanceApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import {socialTokens, RADIUS} from '../../../theme/socialTokens';
-import {animFadeInUp, animSlideInUp} from '../../../utils/animations';
+import React, {useState, useEffect} from 'react';
 
 export default function ComputeDashboardPage() {
   const theme = useTheme();

@@ -1,4 +1,14 @@
-import React from 'react';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  DURATIONS,
+} from '../../../theme/socialTokens';
+import {pressDown} from '../../../utils/animations';
+
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   Card,
   CardContent,
@@ -11,16 +21,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  DURATIONS,
-} from '../../../theme/socialTokens';
-import {pressDown} from '../../../utils/animations';
+import React from 'react';
 
 export default function EncounterCard({encounter, onAccept, onSkip}) {
   const theme = useTheme();

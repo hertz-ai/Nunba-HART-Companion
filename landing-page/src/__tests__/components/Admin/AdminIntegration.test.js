@@ -1,11 +1,12 @@
-import React from 'react';
-import {screen, waitFor} from '@testing-library/react';
 import {
   renderWithProviders,
   mockStats,
   mockUsers,
   mockReports,
 } from '../../testHelpers';
+
+import {screen, waitFor} from '@testing-library/react';
+import React from 'react';
 
 // Mock all admin APIs
 jest.mock('../../../services/socialApi', () => ({

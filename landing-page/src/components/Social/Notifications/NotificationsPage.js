@@ -1,6 +1,15 @@
-import {notificationsApi} from '../../../services/socialApi';
 import {useSocial} from '../../../contexts/SocialContext';
+import {notificationsApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
 
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import {
   Typography,
   List,
@@ -15,17 +24,8 @@ import {
   keyframes,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-import NotificationsIcon from '@mui/icons-material/Notifications';
 import React, {useState, useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
 
 /* Premium keyframes */
 const unreadPulse = keyframes`
@@ -111,7 +111,7 @@ export default function NotificationsPage() {
   if (loading)
     return (
       <Box textAlign="center" py={6}>
-        <CircularProgress sx={{ color: '#6C63FF' }} />
+        <CircularProgress sx={{color: '#6C63FF'}} />
       </Box>
     );
 

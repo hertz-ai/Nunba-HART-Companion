@@ -1,18 +1,21 @@
 import React, {useEffect, useState} from 'react';
 import Radio from '@mui/material/Radio';
-import Typography from '@mui/material/Typography';
-import Link from '@mui/material/Link';
-import Box from '@mui/material/Box';
+
 // get our fontawesome imports
 import Register from './register';
 import Spacer from './Spacer';
+
 import HeaderNano from '../pages/Layouts/header';
+
+import Box from '@mui/material/Box';
 import './RegisterClient.scss';
-import {useNavigate} from 'react-router-dom';
 // configData import removed - RegisterClient does not use any config endpoints directly
 import Button from '@mui/material/Button';
 import {green, purple} from '@mui/material/colors';
+import Link from '@mui/material/Link';
 import {withStyles, useTheme} from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import {useNavigate} from 'react-router-dom';
 
 function Copyright() {
   return (

@@ -1,19 +1,19 @@
-import React, { Suspense, useEffect, useState, useCallback } from 'react'
+import React, {Suspense, useEffect, useState, useCallback} from 'react';
 
-import './assets/css/tailwind.css'
+import './assets/css/tailwind.css';
 
-import { NunbaThemeProvider } from './contexts/ThemeContext';
+import {NunbaThemeProvider} from './contexts/ThemeContext';
 
 import ReactGA from 'react-ga';
-import { useLocation, useNavigate } from 'react-router-dom';
+import {useLocation, useNavigate} from 'react-router-dom';
 
 import MainRoutes from './MainRoute';
-import { SocialProvider } from './contexts/SocialContext';
-import { RealtimeProvider } from './contexts/RealtimeContext';
-import { ToastProvider } from './components/shared/ToastProvider';
+import {SocialProvider} from './contexts/SocialContext';
+import {RealtimeProvider} from './contexts/RealtimeContext';
+import {ToastProvider} from './components/shared/ToastProvider';
 import PageSkeleton from './components/shared/PageSkeleton';
 import AgentContactRequest from './components/Agent/AgentContactRequest';
-import { GA_TRACKING_ID, API_BASE_URL } from './config/apiBase';
+import {GA_TRACKING_ID, API_BASE_URL} from './config/apiBase';
 import realtimeService from './services/realtimeService';
 
 function App() {
@@ -48,34 +48,43 @@ function App() {
         localStorage.setItem('agent_proactive_message', JSON.stringify(data));
       }
     });
-    return () => { unsub(); unsubDirect(); };
+    return () => {
+      unsub();
+      unsubDirect();
+    };
   }, []);
 
-  const handleAcceptContact = useCallback((req) => {
-    const jwt = localStorage.getItem('jwt');
-    const headers = { 'Content-Type': 'application/json' };
-    if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
-    fetch(`${API_BASE_URL}/agents/contact/respond`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ request_id: req.request_id, action: 'accept' }),
-    }).then(r => r.json()).then(data => {
-      if (data.success && data.agent_id) {
-        localStorage.setItem('active_agent_id', data.agent_id);
-        navigate('/');
-      }
-    }).catch(() => {});
-    setContactRequest(null);
-  }, [navigate]);
+  const handleAcceptContact = useCallback(
+    (req) => {
+      const jwt = localStorage.getItem('jwt');
+      const headers = {'Content-Type': 'application/json'};
+      if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
+      fetch(`${API_BASE_URL}/agents/contact/respond`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({request_id: req.request_id, action: 'accept'}),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.agent_id) {
+            localStorage.setItem('active_agent_id', data.agent_id);
+            navigate('/');
+          }
+        })
+        .catch(() => {});
+      setContactRequest(null);
+    },
+    [navigate]
+  );
 
   const handleDenyContact = useCallback((req) => {
     const jwt = localStorage.getItem('jwt');
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {'Content-Type': 'application/json'};
     if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
     fetch(`${API_BASE_URL}/agents/contact/respond`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ request_id: req.request_id, action: 'deny' }),
+      body: JSON.stringify({request_id: req.request_id, action: 'deny'}),
     }).catch(() => {});
     setContactRequest(null);
   }, []);

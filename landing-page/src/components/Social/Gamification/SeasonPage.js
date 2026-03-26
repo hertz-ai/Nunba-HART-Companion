@@ -1,4 +1,11 @@
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {seasonsApi} from '../../../services/socialApi';
+import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import EmptyState from '../shared/EmptyState';
+import SeasonBanner from '../shared/SeasonBanner';
+
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import {
   Typography,
   Box,
@@ -14,13 +21,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import {seasonsApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import SeasonBanner from '../shared/SeasonBanner';
-import EmptyState from '../shared/EmptyState';
-import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 
 const TIER_COLORS = {
   bronze: '#cd7f32',

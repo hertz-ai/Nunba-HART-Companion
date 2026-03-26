@@ -1,11 +1,12 @@
 import KnnResults from './knnresults';
 
 import {createApiClient} from '../services/axiosFactory';
+import {logger} from '../utils/logger';
+
 import React, {useState, useEffect} from 'react';
 import ContentLoader from 'react-content-loader';
 import * as Icon from 'react-feather';
 import {useMeasure} from 'react-use';
-import {logger} from '../utils/logger';
 
 const geocodeApi = createApiClient('https://api.bigdatacloud.net', {
   handle401: false,

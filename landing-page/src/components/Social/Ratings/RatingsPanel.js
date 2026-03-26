@@ -1,4 +1,8 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {ratingsApi} from '../../../services/socialApi';
+import StarRating from '../shared/StarRating';
+import TrustScore from '../shared/TrustScore';
+
 import {
   Box,
   Typography,
@@ -9,10 +13,7 @@ import {
   Divider,
   Avatar,
 } from '@mui/material';
-import TrustScore from '../shared/TrustScore';
-import StarRating from '../shared/StarRating';
-import {ratingsApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
+import React, {useState, useEffect, useCallback} from 'react';
 
 export default function RatingsPanel({userId, isOwnProfile = false}) {
   const {currentUser} = useSocial();

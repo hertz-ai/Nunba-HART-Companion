@@ -1,18 +1,20 @@
+import {logger} from '../utils/logger';
+
+import {SettingsInputAntenna} from '@mui/icons-material';
+import {RemoveRounded, AddRounded} from '@mui/icons-material';
+import {Autocomplete} from '@mui/lab';
+import Alert from '@mui/lab/Alert';
 import {Button} from '@mui/material';
+import {Tooltip} from '@mui/material';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
 import TextField from '@mui/material/TextField';
-import {Tooltip} from '@mui/material';
 import Typography from '@mui/material/Typography';
-import {SettingsInputAntenna} from '@mui/icons-material';
-import {Autocomplete} from '@mui/lab';
+import {set} from 'date-fns';
 import React, {useState, Fragment, useEffect} from 'react';
 import ReactDOM from 'react-dom';
 import Select, {components} from 'react-select';
-import {set} from 'date-fns';
-import {RemoveRounded, AddRounded} from '@mui/icons-material';
-import Alert from '@mui/lab/Alert';
-import {logger} from '../utils/logger';
+
 // import "bootstrap/dist/css/bootstrap.css";
 import './TeacherLanding/TeacherHome.css';
 import {mailerApi} from '../services/socialApi';

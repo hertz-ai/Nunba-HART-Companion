@@ -1,4 +1,3 @@
-import {renderHook, act} from '@testing-library/react';
 import {
   useReducedMotion,
   useInView,
@@ -7,6 +6,8 @@ import {
   useAnimatedMount,
   useScrollDirection,
 } from '../../hooks/useAnimations';
+
+import {renderHook, act} from '@testing-library/react';
 
 // ─── useReducedMotion ────────────────────────────────────────────────────────
 

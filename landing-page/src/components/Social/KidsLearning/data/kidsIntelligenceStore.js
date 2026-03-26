@@ -441,7 +441,7 @@ export function KidsIntelligenceProvider({children}) {
       // Build a curve from response times and accuracy over attempts
       const responseTimes = data.recall.responseTimes || [];
       const curve = [];
-      let runningCorrect = 0;
+      const runningCorrect = 0;
       const total = data.timesPresented;
       const baseAccuracy = total > 0 ? data.timesCorrect / total : 0;
 

@@ -1,10 +1,10 @@
-import React from 'react';
-import RedeemIcon from '@mui/icons-material/Redeem';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
-import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
-import RepeatOnIcon from '@mui/icons-material/RepeatOn';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import RedeemIcon from '@mui/icons-material/Redeem';
+import RepeatOnIcon from '@mui/icons-material/RepeatOn';
+import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
+import React from 'react';
 
 export default function AiFeatures() {
   const featureData = [

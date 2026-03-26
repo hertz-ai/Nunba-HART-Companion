@@ -37,16 +37,17 @@ export async function probeTTSCapability() {
     // sessionStorage unavailable (private browsing, etc.) — proceed without cache
   }
 
-  const result = { engine: 'server', sampleRate: 48000, reason: '' };
+  const result = {engine: 'server', sampleRate: 48000, reason: ''};
 
   // 1. WASM threads available? (required for ONNX inference)
-  const hasWASMThreads = typeof SharedArrayBuffer !== 'undefined'
-    && typeof WebAssembly !== 'undefined';
+  const hasWASMThreads =
+    typeof SharedArrayBuffer !== 'undefined' &&
+    typeof WebAssembly !== 'undefined';
 
   // 2. Enough device memory? (navigator.deviceMemory is Chrome-only, default 4GB)
   const memoryGB = navigator.deviceMemory || 4;
-  const hasEnoughForLuxTTS = memoryGB >= 2;   // 130MB models + inference overhead
-  const hasEnoughForPocket = memoryGB >= 2;   // 200MB models + inference overhead
+  const hasEnoughForLuxTTS = memoryGB >= 2; // 130MB models + inference overhead
+  const hasEnoughForPocket = memoryGB >= 2; // 200MB models + inference overhead
 
   // 3. Can we import ONNX Runtime? Quick probe (just checks importability)
   let canLoadORT = false;
@@ -68,13 +69,15 @@ export async function probeTTSCapability() {
     result.sampleRate = 24000;
     result.fallback = hasEnoughForLuxTTS ? 'luxtts' : null;
     result.fallbackSampleRate = 48000;
-    result.reason = 'Pocket TTS ONNX: WASM+threads available, 24kHz, voice marius';
+    result.reason =
+      'Pocket TTS ONNX: WASM+threads available, 24kHz, voice marius';
   } else if (hasWASMThreads && canLoadORT && hasEnoughForLuxTTS) {
     result.engine = 'luxtts';
     result.sampleRate = 48000;
     result.fallback = null;
     result.fallbackSampleRate = null;
-    result.reason = 'LuxTTS ONNX: WASM+threads available, 48kHz, non-autoregressive';
+    result.reason =
+      'LuxTTS ONNX: WASM+threads available, 48kHz, non-autoregressive';
   } else {
     result.engine = 'server';
     result.sampleRate = 48000;
@@ -99,7 +102,9 @@ export async function probeTTSCapability() {
  * Useful for testing or when capabilities change.
  */
 export function clearTTSCapabilityCache() {
-  try { sessionStorage.removeItem(CACHE_KEY); } catch (_) {}
+  try {
+    sessionStorage.removeItem(CACHE_KEY);
+  } catch (_) {}
 }
 
 export default probeTTSCapability;

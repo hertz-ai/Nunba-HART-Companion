@@ -1,5 +1,5 @@
-import React, {Component} from 'react';
 import {withStyles} from '@mui/material/styles';
+import React, {Component} from 'react';
 
 const useStyles = (theme) => ({
   aboutUsIcons: {

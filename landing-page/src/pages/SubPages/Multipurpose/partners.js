@@ -1,9 +1,10 @@
+import {logger} from '../../../utils/logger';
+
+import Grid from '@mui/material/Grid';
 import React, {Component} from 'react';
+import MetaTags from 'react-meta-tags';
 import {Link} from 'react-router-dom';
 import {ScrollTo} from 'react-scroll-to';
-import Grid from '@mui/material/Grid';
-import MetaTags from 'react-meta-tags';
-import {logger} from '../../../utils/logger';
 
 class Partners extends Component {
   constructor(props) {

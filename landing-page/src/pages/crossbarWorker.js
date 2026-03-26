@@ -13,7 +13,7 @@ let agentInstallationSuccess = true;
 let hasReceivedActionRequest = false;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-let processedMessages = new Set();
+const processedMessages = new Set();
 let messageCleanupTimer = null;
 let activeSubscriptions = new Map();
 
@@ -198,7 +198,7 @@ const stopPeriodicStatusCheck = () => {
 async function handleAction(args, kwargs, details) {
   const {action} = kwargs;
   console.log(details, args, kwargs, 'hi ramesh');
-  let promptIDAction = args[0]?.prompt_id;
+  const promptIDAction = args[0]?.prompt_id;
   console.log(args, 'hiiii');
 
   if (promptIDAction) {

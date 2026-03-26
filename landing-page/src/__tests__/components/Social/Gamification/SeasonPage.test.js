@@ -1,5 +1,6 @@
 import React from 'react';
 import {screen, waitFor} from '@testing-library/react';
+
 import {renderWithProviders} from '../../../testHelpers';
 import SeasonPage from '../../../../components/Social/Gamification/SeasonPage';
 

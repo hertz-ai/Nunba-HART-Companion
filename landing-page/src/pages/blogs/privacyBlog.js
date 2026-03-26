@@ -1,26 +1,30 @@
-import React from 'react';
-import Grid from '@mui/material/Grid';
-import Container from '@mui/material/Container';
-import GitHubIcon from '@mui/icons-material/GitHub';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import HeaderNano from '../Layouts/header';
 // import Header from './Header';
-import MainFeaturedPost from './MainFeaturedPost';
+import post2 from './blog-post.2.md';
+import post3 from './blog-post.3.md';
 import FeaturedPost from './FeaturedPost';
+import MainFeaturedPost from './MainFeaturedPost';
 import Main from './Main';
+import post1 from './privc.md';
 import Sidebar from './Sidebar';
 // import Footer from '../Layouts/footer';
 import FooterLight from '../Layouts/footer-light';
-import post1 from './privc.md';
-import post2 from './blog-post.2.md';
-import post3 from './blog-post.3.md';
+
+import HeaderNano from '../Layouts/header';
+
 import {
   faLinkedin,
   faTwitter,
   faYoutube,
 } from '@fortawesome/free-brands-svg-icons';
+
 import {logger} from '../../utils/logger';
+
+import FacebookIcon from '@mui/icons-material/Facebook';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import Container from '@mui/material/Container';
+import Grid from '@mui/material/Grid';
+import React from 'react';
 
 const sxStyles = {
   mainGrid: {
@@ -111,7 +115,7 @@ export default function PrivacyBlog() {
 
   React.useEffect(() => {
     logger.log('Blog is fully loaded');
-    //getAllAssessmentNames();
+    // getAllAssessmentNames();
     fetch(post1)
       .then((res) => res.text())
       .then((postContent) => setPosts([postContent]))

@@ -11,11 +11,12 @@
  *   await MediaPreloader.preloadForGame(gameConfig);
  */
 
-import {logger} from '../../../../utils/logger';
-import {getCachedMusic} from '../kidsLearningApi';
+import GameAssetService from './GameAssetService';
 import MediaCacheManager from './MediaCacheManager';
 import TTSManager from './TTSManager';
-import GameAssetService from './GameAssetService';
+
+import {logger} from '../../../../utils/logger';
+import {getCachedMusic} from '../kidsLearningApi';
 
 // ── Pregeneration request (uses same endpoint as RN) ─────────────────────────
 

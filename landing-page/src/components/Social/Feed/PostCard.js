@@ -1,5 +1,12 @@
-import React, {useState, useRef, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {postsApi, resonanceApi} from '../../../services/socialApi';
+import BoostButton from '../shared/BoostButton';
+import LevelBadge from '../shared/LevelBadge';
+import UserChip from '../shared/UserChip';
+import BoltIcon from '@mui/icons-material/Bolt';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import {
   Card,
   CardContent,
@@ -11,22 +18,16 @@ import {
   useTheme,
   Snackbar,
 } from '@mui/material';
+import React, {useState, useRef, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {alpha} from '@mui/material/styles';
-import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ShareIcon from '@mui/icons-material/Share';
-import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
-import BoltIcon from '@mui/icons-material/Bolt';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import StarIcon from '@mui/icons-material/Star';
-import UserChip from '../shared/UserChip';
-import LevelBadge from '../shared/LevelBadge';
-import BoostButton from '../shared/BoostButton';
+
 import ShareDialog from '../shared/ShareDialog';
-import {postsApi, resonanceApi} from '../../../services/socialApi';
 import {useRoleAccess} from '../../RoleGuard';
 import {useInView} from '../../../hooks/useAnimations';
 import {

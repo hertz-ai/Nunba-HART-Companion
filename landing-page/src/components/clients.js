@@ -1,11 +1,12 @@
-import React from 'react';
-import {Link} from 'react-router-dom';
 import client1 from '../../src/assets/images/client/Client1.jpg';
+import client3 from '../../src/assets/images/client/Client3.jpg';
 import client4 from '../../src/assets/images/client/Client4.jpg';
 import client6 from '../../src/assets/images/client/Client6.jpg';
-import client3 from '../../src/assets/images/client/Client3.jpg';
-import Sahil from '../assets/images/client/Sahil.png';
 import monisha from '../assets/images/client/Monisha.png';
+import Sahil from '../assets/images/client/Sahil.png';
+
+import React from 'react';
+import {Link} from 'react-router-dom';
 
 export default function Clients() {
   const clientData = [

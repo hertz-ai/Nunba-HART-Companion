@@ -1,5 +1,6 @@
 import React from 'react';
 import {screen, fireEvent, waitFor} from '@testing-library/react';
+
 import {renderWithProviders, mockReports} from '../../testHelpers';
 import ModerationPage from '../../../components/Admin/ModerationPage';
 

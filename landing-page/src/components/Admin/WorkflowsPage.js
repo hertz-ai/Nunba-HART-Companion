@@ -1,5 +1,11 @@
 import {workflowsApi} from '../../services/socialApi';
 
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {
   Typography,
   Card,
@@ -18,12 +24,6 @@ import {
   Fade,
   Grow,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import CloseIcon from '@mui/icons-material/Close';
 import React, {useState, useEffect} from 'react';
 
 const NODE_TYPES = [
@@ -35,7 +35,8 @@ const NODE_TYPES = [
 
 // Card style
 const cardStyle = {
-  background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
+  background:
+    'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
   backdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.05)',
   borderRadius: 3,
@@ -53,15 +54,48 @@ function WorkflowSkeleton() {
     <Card sx={{...cardStyle, '&:hover': {}}}>
       <CardContent sx={{p: 3}}>
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5, mb: 2}}>
-          <Skeleton variant="rounded" width={32} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-          <Skeleton variant="text" width={150} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+          <Skeleton
+            variant="rounded"
+            width={32}
+            height={32}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
+          <Skeleton
+            variant="text"
+            width={150}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
         </Box>
-        <Skeleton variant="text" width={100} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-        <Skeleton variant="rounded" width={60} height={24} sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 1}} />
+        <Skeleton
+          variant="text"
+          width={100}
+          sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+        />
+        <Skeleton
+          variant="rounded"
+          width={60}
+          height={24}
+          sx={{bgcolor: 'rgba(255,255,255,0.05)', mt: 1}}
+        />
         <Box sx={{display: 'flex', gap: 1, mt: 2}}>
-          <Skeleton variant="circular" width={32} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-          <Skeleton variant="circular" width={32} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-          <Skeleton variant="circular" width={32} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+          <Skeleton
+            variant="circular"
+            width={32}
+            height={32}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
+          <Skeleton
+            variant="circular"
+            width={32}
+            height={32}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
+          <Skeleton
+            variant="circular"
+            width={32}
+            height={32}
+            sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+          />
         </Box>
       </CardContent>
     </Card>
@@ -86,7 +120,9 @@ export default function WorkflowsPage() {
         console.error('[WorkflowsPage] Failed to load workflows:', err);
         const msg = err?.error || err?.message || '';
         if (msg.includes('Authorization') || msg.includes('token')) {
-          setError('Authentication required. Please log in with an admin account.');
+          setError(
+            'Authentication required. Please log in with an admin account.'
+          );
         }
         setWorkflows([]);
       }
@@ -102,22 +138,31 @@ export default function WorkflowsPage() {
     setActionLoading('create');
     setError(null);
     try {
-      const res = await workflowsApi.create({name: newName, nodes: [], edges: []});
-      setWorkflows((prev) => [...prev, res.data || {
-        id: Date.now().toString(),
+      const res = await workflowsApi.create({
         name: newName,
         nodes: [],
         edges: [],
-        active: false,
-      }]);
+      });
+      setWorkflows((prev) => [
+        ...prev,
+        res.data || {
+          id: Date.now().toString(),
+          name: newName,
+          nodes: [],
+          edges: [],
+          active: false,
+        },
+      ]);
       setDialogOpen(false);
       setNewName('');
     } catch (err) {
       console.error('[WorkflowsPage] Failed to create workflow:', err);
       const msg = err?.error || err?.message || 'Failed to create workflow';
-      setError(msg.includes('Authorization') || msg.includes('token')
-        ? 'Authentication required. Please log in with an admin account.'
-        : msg);
+      setError(
+        msg.includes('Authorization') || msg.includes('token')
+          ? 'Authentication required. Please log in with an admin account.'
+          : msg
+      );
     }
     setActionLoading(null);
   };
@@ -159,34 +204,55 @@ export default function WorkflowsPage() {
       <Box>
         {/* Page Header */}
         <Box sx={{mb: 4}}>
-          <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2}}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+            }}
+          >
             <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-              <Box sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(155, 148, 255, 0.15) 100%)',
-              }}>
-                <AccountTreeIcon sx={{
-                  fontSize: 24,
-                  background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }} />
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background:
+                    'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(155, 148, 255, 0.15) 100%)',
+                }}
+              >
+                <AccountTreeIcon
+                  sx={{
+                    fontSize: 24,
+                    background:
+                      'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                />
               </Box>
               <Box>
-                <Typography variant="h4" sx={{
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    background:
+                      'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
                   Workflows
                 </Typography>
-                <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                <Typography
+                  variant="body2"
+                  sx={{color: 'rgba(255,255,255,0.5)'}}
+                >
                   Automate agent behaviors with visual workflows
                 </Typography>
               </Box>
@@ -216,14 +282,27 @@ export default function WorkflowsPage() {
         {/* Error Banner */}
         {error && (
           <Fade in={true} timeout={200}>
-            <Box sx={{
-              mb: 3, p: 2, borderRadius: 2,
-              background: 'linear-gradient(135deg, rgba(255,152,0,0.1) 0%, rgba(255,200,0,0.1) 100%)',
-              border: '1px solid rgba(255,152,0,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <Typography variant="body2" sx={{color: '#ff9800'}}>{error}</Typography>
-              <IconButton size="small" onClick={() => setError(null)} sx={{color: 'rgba(255,152,0,0.7)'}}>
+            <Box
+              sx={{
+                mb: 3,
+                p: 2,
+                borderRadius: 2,
+                background:
+                  'linear-gradient(135deg, rgba(255,152,0,0.1) 0%, rgba(255,200,0,0.1) 100%)',
+                border: '1px solid rgba(255,152,0,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Typography variant="body2" sx={{color: '#ff9800'}}>
+                {error}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setError(null)}
+                sx={{color: 'rgba(255,152,0,0.7)'}}
+              >
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -233,14 +312,27 @@ export default function WorkflowsPage() {
         {/* Success Banner */}
         {successMsg && (
           <Fade in={true} timeout={200}>
-            <Box sx={{
-              mb: 3, p: 2, borderRadius: 2,
-              background: 'linear-gradient(135deg, rgba(108,99,255,0.1) 0%, rgba(155,148,255,0.1) 100%)',
-              border: '1px solid rgba(108,99,255,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <Typography variant="body2" sx={{color: '#6C63FF'}}>{successMsg}</Typography>
-              <IconButton size="small" onClick={() => setSuccessMsg(null)} sx={{color: 'rgba(108,99,255,0.7)'}}>
+            <Box
+              sx={{
+                mb: 3,
+                p: 2,
+                borderRadius: 2,
+                background:
+                  'linear-gradient(135deg, rgba(108,99,255,0.1) 0%, rgba(155,148,255,0.1) 100%)',
+                border: '1px solid rgba(108,99,255,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Typography variant="body2" sx={{color: '#6C63FF'}}>
+                {successMsg}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setSuccessMsg(null)}
+                sx={{color: 'rgba(108,99,255,0.7)'}}
+              >
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -250,7 +342,10 @@ export default function WorkflowsPage() {
         {/* Node Types Legend */}
         <Grow in={true} timeout={400}>
           <Box sx={{mb: 3}}>
-            <Typography variant="subtitle2" sx={{color: 'rgba(255,255,255,0.5)', mb: 1.5}}>
+            <Typography
+              variant="subtitle2"
+              sx={{color: 'rgba(255,255,255,0.5)', mb: 1.5}}
+            >
               Node Types
             </Typography>
             <Box sx={{display: 'flex', gap: 1.5, flexWrap: 'wrap'}}>
@@ -288,19 +383,27 @@ export default function WorkflowsPage() {
           </Grid>
         ) : workflows.length === 0 ? (
           <Grow in={true} timeout={500}>
-            <Box sx={{
-              textAlign: 'center',
-              py: 8,
-              background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6) 0%, rgba(15, 15, 26, 0.6) 100%)',
-              borderRadius: 3,
-              border: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              <AccountTreeIcon sx={{
-                fontSize: 64,
-                color: 'rgba(255,255,255,0.2)',
-                mb: 2,
-              }} />
-              <Typography variant="h6" sx={{color: '#fff', fontWeight: 600, mb: 1}}>
+            <Box
+              sx={{
+                textAlign: 'center',
+                py: 8,
+                background:
+                  'linear-gradient(135deg, rgba(26, 26, 46, 0.6) 0%, rgba(15, 15, 26, 0.6) 100%)',
+                borderRadius: 3,
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              <AccountTreeIcon
+                sx={{
+                  fontSize: 64,
+                  color: 'rgba(255,255,255,0.2)',
+                  mb: 2,
+                }}
+              />
+              <Typography
+                variant="h6"
+                sx={{color: '#fff', fontWeight: 600, mb: 1}}
+              >
                 No Workflows Yet
               </Typography>
               <Typography sx={{color: 'rgba(255,255,255,0.5)', mb: 3}}>
@@ -311,7 +414,8 @@ export default function WorkflowsPage() {
                 startIcon={<AddIcon />}
                 onClick={() => setDialogOpen(true)}
                 sx={{
-                  background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                  background:
+                    'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                   borderRadius: 2,
                   textTransform: 'none',
                   fontWeight: 600,
@@ -329,25 +433,44 @@ export default function WorkflowsPage() {
                 <Grow in={true} timeout={400 + index * 100}>
                   <Card sx={cardStyle}>
                     <CardContent sx={{p: 3}}>
-                      <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5, mb: 2}}>
-                        <Box sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 2,
+                      <Box
+                        sx={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)',
-                        }}>
-                          <AccountTreeIcon sx={{fontSize: 20, color: '#6C63FF'}} />
+                          gap: 1.5,
+                          mb: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background:
+                              'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)',
+                          }}
+                        >
+                          <AccountTreeIcon
+                            sx={{fontSize: 20, color: '#6C63FF'}}
+                          />
                         </Box>
-                        <Typography variant="subtitle1" sx={{fontWeight: 600, color: '#fff'}}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{fontWeight: 600, color: '#fff'}}
+                        >
                           {wf.name}
                         </Typography>
                       </Box>
 
-                      <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)', mb: 2}}>
-                        {wf.nodes?.length || 0} nodes, {wf.edges?.length || 0} connections
+                      <Typography
+                        variant="body2"
+                        sx={{color: 'rgba(255,255,255,0.5)', mb: 2}}
+                      >
+                        {wf.nodes?.length || 0} nodes, {wf.edges?.length || 0}{' '}
+                        connections
                       </Typography>
 
                       <Chip
@@ -357,19 +480,25 @@ export default function WorkflowsPage() {
                           background: wf.active
                             ? 'linear-gradient(135deg, rgba(0, 232, 157, 0.2) 0%, rgba(0, 180, 120, 0.2) 100%)'
                             : 'rgba(255,255,255,0.1)',
-                          color: wf.active ? '#00e89d' : 'rgba(255,255,255,0.5)',
-                          border: wf.active ? '1px solid rgba(0, 232, 157, 0.3)' : '1px solid rgba(255,255,255,0.1)',
+                          color: wf.active
+                            ? '#00e89d'
+                            : 'rgba(255,255,255,0.5)',
+                          border: wf.active
+                            ? '1px solid rgba(0, 232, 157, 0.3)'
+                            : '1px solid rgba(255,255,255,0.1)',
                           fontWeight: 500,
                         }}
                       />
 
-                      <Box sx={{
-                        display: 'flex',
-                        gap: 1,
-                        mt: 2,
-                        pt: 2,
-                        borderTop: '1px solid rgba(255,255,255,0.05)',
-                      }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          gap: 1,
+                          mt: 2,
+                          pt: 2,
+                          borderTop: '1px solid rgba(255,255,255,0.05)',
+                        }}
+                      >
                         <IconButton
                           size="small"
                           onClick={() => handleTest(wf.id)}
@@ -434,7 +563,8 @@ export default function WorkflowsPage() {
           onClose={() => setDialogOpen(false)}
           PaperProps={{
             sx: {
-              background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 15, 26, 0.98) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 15, 26, 0.98) 100%)',
               backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 3,
@@ -442,13 +572,15 @@ export default function WorkflowsPage() {
             },
           }}
         >
-          <DialogTitle sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: '#fff',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-          }}>
+          <DialogTitle
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#fff',
+              borderBottom: '1px solid rgba(255,255,255,0.05)',
+            }}
+          >
             <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
               <AccountTreeIcon sx={{color: '#6C63FF'}} />
               Create Workflow
@@ -469,7 +601,9 @@ export default function WorkflowsPage() {
               placeholder="e.g. Auto-respond to mentions"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && newName.trim()) handleCreate(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newName.trim()) handleCreate();
+              }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   color: '#fff',
@@ -482,7 +616,9 @@ export default function WorkflowsPage() {
               }}
             />
           </DialogContent>
-          <DialogActions sx={{p: 3, borderTop: '1px solid rgba(255,255,255,0.05)'}}>
+          <DialogActions
+            sx={{p: 3, borderTop: '1px solid rgba(255,255,255,0.05)'}}
+          >
             <Button
               onClick={() => setDialogOpen(false)}
               sx={{
@@ -514,7 +650,8 @@ export default function WorkflowsPage() {
           onClose={() => setConfirmDelete(null)}
           PaperProps={{
             sx: {
-              background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 15, 26, 0.98) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 15, 26, 0.98) 100%)',
               backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 3,
@@ -525,11 +662,15 @@ export default function WorkflowsPage() {
           <DialogTitle sx={{color: '#fff'}}>Delete Workflow</DialogTitle>
           <DialogContent>
             <Typography sx={{color: 'rgba(255,255,255,0.7)'}}>
-              Are you sure you want to delete this workflow? This action cannot be undone.
+              Are you sure you want to delete this workflow? This action cannot
+              be undone.
             </Typography>
           </DialogContent>
           <DialogActions sx={{p: 2}}>
-            <Button onClick={() => setConfirmDelete(null)} sx={{color: 'rgba(255,255,255,0.7)', textTransform: 'none'}}>
+            <Button
+              onClick={() => setConfirmDelete(null)}
+              sx={{color: 'rgba(255,255,255,0.7)', textTransform: 'none'}}
+            >
               Cancel
             </Button>
             <Button

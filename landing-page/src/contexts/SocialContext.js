@@ -1,3 +1,14 @@
+import {useReferral} from '../hooks/useReferral';
+import {apiCache} from '../services/apiCache';
+import realtimeService from '../services/realtimeService';
+import {
+  authApi,
+  notificationsApi,
+  resonanceApi,
+  onboardingApi,
+  mailerApi,
+} from '../services/socialApi';
+
 import React, {
   createContext,
   useContext,
@@ -6,16 +17,6 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import {
-  authApi,
-  notificationsApi,
-  resonanceApi,
-  onboardingApi,
-  mailerApi,
-} from '../services/socialApi';
-import {apiCache} from '../services/apiCache';
-import realtimeService from '../services/realtimeService';
-import {useReferral} from '../hooks/useReferral';
 
 const SocialContext = createContext();
 
@@ -95,11 +96,15 @@ export function SocialProvider({children}) {
           const guestId = localStorage.getItem('guest_user_id');
           const guestName = localStorage.getItem('guest_name');
           if (localStorage.getItem('guest_mode') === 'true' && guestId) {
-            authApi.guestRecover({ device_id: guestId, display_name: guestName })
+            authApi
+              .guestRecover({device_id: guestId, display_name: guestName})
               .then((res) => {
                 if (res?.data?.token) {
                   localStorage.setItem('access_token', res.data.token);
-                  localStorage.setItem('social_user_id', res.data.user?.id || guestId);
+                  localStorage.setItem(
+                    'social_user_id',
+                    res.data.user?.id || guestId
+                  );
                   setCurrentUser({
                     id: res.data.user?.id || guestId,
                     username: guestName || 'User',
@@ -110,11 +115,18 @@ export function SocialProvider({children}) {
               })
               .catch(() => {
                 // Recovery failed (key rotated after reinstall) — re-register as guest
-                authApi.guestRegister({ guest_name: guestName || 'User', device_id: guestId })
+                authApi
+                  .guestRegister({
+                    guest_name: guestName || 'User',
+                    device_id: guestId,
+                  })
                   .then((res) => {
                     if (res?.data?.token) {
                       localStorage.setItem('access_token', res.data.token);
-                      localStorage.setItem('social_user_id', res.data.user?.id || guestId);
+                      localStorage.setItem(
+                        'social_user_id',
+                        res.data.user?.id || guestId
+                      );
                       setCurrentUser({
                         id: res.data.user?.id || guestId,
                         username: guestName || 'User',
@@ -122,11 +134,19 @@ export function SocialProvider({children}) {
                       });
                       fetchProfile();
                     } else {
-                      setCurrentUser({ id: guestId, username: guestName || 'User', role: 'guest' });
+                      setCurrentUser({
+                        id: guestId,
+                        username: guestName || 'User',
+                        role: 'guest',
+                      });
                     }
                   })
                   .catch(() => {
-                    setCurrentUser({ id: guestId, username: guestName || 'User', role: 'guest' });
+                    setCurrentUser({
+                      id: guestId,
+                      username: guestName || 'User',
+                      role: 'guest',
+                    });
                   });
               })
               .finally(() => setLoading(false));
@@ -207,11 +227,13 @@ export function SocialProvider({children}) {
           role: 'guest',
         });
         // Try to silently re-authenticate in the background
-        authApi.guestRecover({ device_id: guestId, display_name: guestName })
+        authApi
+          .guestRecover({device_id: guestId, display_name: guestName})
           .then((res) => {
             if (res?.data?.token) {
               localStorage.setItem('access_token', res.data.token);
-              if (res.data.user?.id) localStorage.setItem('social_user_id', res.data.user.id);
+              if (res.data.user?.id)
+                localStorage.setItem('social_user_id', res.data.user.id);
             }
           })
           .catch(() => {}); // silent — guest UI still works without a token
@@ -247,9 +269,11 @@ export function SocialProvider({children}) {
             role: 'guest',
           });
           // Try silent re-auth
-          authApi.guestRecover({ device_id: guestId, display_name: guestName })
+          authApi
+            .guestRecover({device_id: guestId, display_name: guestName})
             .then((res) => {
-              if (res?.data?.token) localStorage.setItem('access_token', res.data.token);
+              if (res?.data?.token)
+                localStorage.setItem('access_token', res.data.token);
             })
             .catch(() => {});
           return;

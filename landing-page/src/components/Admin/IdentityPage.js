@@ -1,5 +1,10 @@
 import {identityApi} from '../../services/socialApi';
 
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import EditIcon from '@mui/icons-material/Edit';
+import PersonIcon from '@mui/icons-material/Person';
+import SaveIcon from '@mui/icons-material/Save';
 import {
   Typography,
   Card,
@@ -15,16 +20,12 @@ import {
   Grow,
   IconButton,
 } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
-import SaveIcon from '@mui/icons-material/Save';
-import EditIcon from '@mui/icons-material/Edit';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import React, {useState, useEffect} from 'react';
 
 // Card style
 const cardStyle = {
-  background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
+  background:
+    'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
   backdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.05)',
   borderRadius: 3,
@@ -53,14 +54,33 @@ function IdentitySkeleton() {
         <Card sx={cardStyle}>
           <CardContent sx={{p: 4}}>
             <Box sx={{display: 'flex', alignItems: 'center', gap: 3, mb: 4}}>
-              <Skeleton variant="circular" width={100} height={100} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+              <Skeleton
+                variant="circular"
+                width={100}
+                height={100}
+                sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+              />
               <Box>
-                <Skeleton variant="text" width={150} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-                <Skeleton variant="text" width={100} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+                <Skeleton
+                  variant="text"
+                  width={150}
+                  height={32}
+                  sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+                />
+                <Skeleton
+                  variant="text"
+                  width={100}
+                  sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+                />
               </Box>
             </Box>
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} variant="rounded" height={56} sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 2}} />
+              <Skeleton
+                key={i}
+                variant="rounded"
+                height={56}
+                sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 2}}
+              />
             ))}
           </CardContent>
         </Card>
@@ -68,9 +88,19 @@ function IdentitySkeleton() {
       <Grid item xs={12} md={6}>
         <Card sx={cardStyle}>
           <CardContent sx={{p: 4}}>
-            <Skeleton variant="text" width={120} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 3}} />
+            <Skeleton
+              variant="text"
+              width={120}
+              height={32}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 3}}
+            />
             {[1, 2].map((i) => (
-              <Skeleton key={i} variant="rounded" height={56} sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 2}} />
+              <Skeleton
+                key={i}
+                variant="rounded"
+                height={56}
+                sx={{bgcolor: 'rgba(255,255,255,0.05)', mb: 2}}
+              />
             ))}
           </CardContent>
         </Card>
@@ -138,29 +168,39 @@ export default function IdentityPage() {
         {/* Page Header */}
         <Box sx={{mb: 4}}>
           <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-            <Box sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 3,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(255, 107, 107, 0.15) 100%)',
-            }}>
-              <PersonIcon sx={{
-                fontSize: 24,
-                background: 'linear-gradient(135deg, #6C63FF 0%, #FF6B6B 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }} />
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background:
+                  'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(255, 107, 107, 0.15) 100%)',
+              }}
+            >
+              <PersonIcon
+                sx={{
+                  fontSize: 24,
+                  background:
+                    'linear-gradient(135deg, #6C63FF 0%, #FF6B6B 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  background:
+                    'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
                 Agent Identity
               </Typography>
               <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
@@ -179,36 +219,42 @@ export default function IdentityPage() {
               <Grow in={true} timeout={400}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Typography variant="h6" sx={{
-                      color: '#fff',
-                      fontWeight: 600,
-                      mb: 3,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                    }}>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: '#fff',
+                        fontWeight: 600,
+                        mb: 3,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                      }}
+                    >
                       <EditIcon sx={{fontSize: 20, color: '#6C63FF'}} />
                       Profile
                     </Typography>
 
                     {/* Avatar Preview */}
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 3,
-                      mb: 4,
-                      p: 3,
-                      borderRadius: 3,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.05)',
-                    }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        mb: 4,
+                        p: 3,
+                        borderRadius: 3,
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                      }}
+                    >
                       <Avatar
                         src={identity.avatar_url}
                         sx={{
                           width: 100,
                           height: 100,
                           fontSize: 40,
-                          background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                          background:
+                            'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                           border: '3px solid rgba(108, 99, 255, 0.3)',
                           boxShadow: '0 8px 24px rgba(108, 99, 255, 0.2)',
                         }}
@@ -216,17 +262,22 @@ export default function IdentityPage() {
                         {(identity.display_name || 'A')[0]}
                       </Avatar>
                       <Box>
-                        <Typography variant="h5" sx={{
-                          fontWeight: 700,
-                          color: '#fff',
-                          mb: 0.5,
-                        }}>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 700,
+                            color: '#fff',
+                            mb: 0.5,
+                          }}
+                        >
                           {identity.display_name || 'Agent'}
                         </Typography>
-                        <Typography sx={{
-                          color: '#6C63FF',
-                          fontWeight: 500,
-                        }}>
+                        <Typography
+                          sx={{
+                            color: '#6C63FF',
+                            fontWeight: 500,
+                          }}
+                        >
                           @{identity.username || 'agent'}
                         </Typography>
                       </Box>
@@ -252,7 +303,11 @@ export default function IdentityPage() {
                       sx={{...inputStyle, mb: 2}}
                       InputProps={{
                         startAdornment: (
-                          <Typography sx={{color: 'rgba(255,255,255,0.3)', mr: 0.5}}>@</Typography>
+                          <Typography
+                            sx={{color: 'rgba(255,255,255,0.3)', mr: 0.5}}
+                          >
+                            @
+                          </Typography>
                         ),
                       }}
                     />
@@ -276,7 +331,8 @@ export default function IdentityPage() {
                       onClick={handleSave}
                       disabled={saving}
                       sx={{
-                        background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                        background:
+                          'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                         borderRadius: 2,
                         textTransform: 'none',
                         fontWeight: 600,
@@ -300,14 +356,17 @@ export default function IdentityPage() {
               <Grow in={true} timeout={500}>
                 <Card sx={cardStyle}>
                   <CardContent sx={{p: 4}}>
-                    <Typography variant="h6" sx={{
-                      color: '#fff',
-                      fontWeight: 600,
-                      mb: 3,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                    }}>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: '#fff',
+                        fontWeight: 600,
+                        mb: 3,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                      }}
+                    >
                       <PersonIcon sx={{fontSize: 20, color: '#6C63FF'}} />
                       Personality
                     </Typography>
@@ -330,7 +389,10 @@ export default function IdentityPage() {
                       label="System Prompt"
                       value={identity.system_prompt || ''}
                       onChange={(e) =>
-                        setIdentity({...identity, system_prompt: e.target.value})
+                        setIdentity({
+                          ...identity,
+                          system_prompt: e.target.value,
+                        })
                       }
                       sx={{...inputStyle, mb: 3}}
                       placeholder="Define the agent's core behavior and instructions..."
@@ -338,22 +400,30 @@ export default function IdentityPage() {
 
                     {/* Traits */}
                     <Box sx={{mb: 3}}>
-                      <Typography variant="subtitle2" sx={{
-                        color: 'rgba(255,255,255,0.7)',
-                        mb: 1.5,
-                        fontWeight: 600,
-                      }}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          color: 'rgba(255,255,255,0.7)',
+                          mb: 1.5,
+                          fontWeight: 600,
+                        }}
+                      >
                         Traits
                       </Typography>
-                      <Box sx={{display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2}}>
+                      <Box
+                        sx={{display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2}}
+                      >
                         {(identity.traits || []).map((trait, i) => (
                           <Fade in={true} timeout={200} key={i}>
                             <Chip
                               label={trait}
                               onDelete={() => removeTrait(i)}
-                              deleteIcon={<CloseIcon sx={{fontSize: '16px !important'}} />}
+                              deleteIcon={
+                                <CloseIcon sx={{fontSize: '16px !important'}} />
+                              }
                               sx={{
-                                background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)',
+                                background:
+                                  'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)',
                                 color: '#6C63FF',
                                 border: '1px solid rgba(108, 99, 255, 0.3)',
                                 fontWeight: 500,
@@ -387,7 +457,8 @@ export default function IdentityPage() {
                         <IconButton
                           onClick={addTrait}
                           sx={{
-                            background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                            background:
+                              'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                             color: '#fff',
                             width: 40,
                             height: 40,
@@ -408,11 +479,14 @@ export default function IdentityPage() {
               <Grow in={true} timeout={600}>
                 <Card sx={{...cardStyle, mt: 3}}>
                   <CardContent sx={{p: 4}}>
-                    <Typography variant="h6" sx={{
-                      color: '#fff',
-                      fontWeight: 600,
-                      mb: 3,
-                    }}>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: '#fff',
+                        fontWeight: 600,
+                        mb: 3,
+                      }}
+                    >
                       Avatar Gallery
                     </Typography>
                     <Grid container spacing={1.5}>
@@ -430,14 +504,20 @@ export default function IdentityPage() {
                                 width: 64,
                                 height: 64,
                                 cursor: 'pointer',
-                                border: identity.avatar_url === av.url
-                                  ? '3px solid #6C63FF'
-                                  : '3px solid transparent',
-                                boxShadow: identity.avatar_url === av.url
-                                  ? '0 0 20px rgba(108, 99, 255, 0.4)'
-                                  : 'none',
-                                transform: hoveredAvatar === i ? 'scale(1.1)' : 'scale(1)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                border:
+                                  identity.avatar_url === av.url
+                                    ? '3px solid #6C63FF'
+                                    : '3px solid transparent',
+                                boxShadow:
+                                  identity.avatar_url === av.url
+                                    ? '0 0 20px rgba(108, 99, 255, 0.4)'
+                                    : 'none',
+                                transform:
+                                  hoveredAvatar === i
+                                    ? 'scale(1.1)'
+                                    : 'scale(1)',
+                                transition:
+                                  'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                 '&:hover': {
                                   border: '3px solid rgba(108, 99, 255, 0.5)',
                                 },
@@ -448,16 +528,20 @@ export default function IdentityPage() {
                       ))}
                       {avatars.length === 0 && (
                         <Grid item xs={12}>
-                          <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 1,
-                            py: 4,
-                            color: 'rgba(255,255,255,0.4)',
-                          }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 1,
+                              py: 4,
+                              color: 'rgba(255,255,255,0.4)',
+                            }}
+                          >
                             <PersonIcon />
-                            <Typography variant="body2">No avatars available</Typography>
+                            <Typography variant="body2">
+                              No avatars available
+                            </Typography>
                           </Box>
                         </Grid>
                       )}

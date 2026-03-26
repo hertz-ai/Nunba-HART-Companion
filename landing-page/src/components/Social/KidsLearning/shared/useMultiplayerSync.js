@@ -16,8 +16,8 @@
  * Uses the existing 12-endpoint gamesApi + crossbar/SSE broadcast infrastructure.
  */
 
-import realtimeService from '../../../../services/realtimeService';
 import gameRealtimeService from '../../../../services/gameRealtimeService';
+import realtimeService from '../../../../services/realtimeService';
 import {gamesApi} from '../../../../services/socialApi';
 
 import {useState, useEffect, useRef, useCallback} from 'react';

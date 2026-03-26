@@ -4,8 +4,8 @@
  * Tests auth state management, login/logout, user profile loading,
  * derived state (accessTier, isGuest, isAuthenticated), and token refresh.
  */
-import React from 'react';
 import {render, screen, act, waitFor} from '@testing-library/react';
+import React from 'react';
 import {BrowserRouter} from 'react-router-dom';
 
 // Build the mock axios instance — all API calls route through this

@@ -1,5 +1,6 @@
-import {useEffect} from 'react';
 import {referralsApi} from '../services/socialApi';
+
+import {useEffect} from 'react';
 
 /**
  * useReferral — Captures referral code from URL query params on mount.

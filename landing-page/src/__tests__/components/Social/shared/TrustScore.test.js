@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../testHelpers';
 import TrustScore from '../../../../components/Social/shared/TrustScore';
+import {renderWithProviders} from '../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 // TrustScore component renders a radar chart with 5 axes:
 // skill, usefulness, reliability, creativity, composite (each 0-5 scale)

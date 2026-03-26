@@ -1,12 +1,14 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
-import React, {useState, useEffect} from 'react';
-import {FileText} from 'lucide-react';
-import Lottie from 'lottie-react';
-import hourglassAnimation from '../../assets/hourglass-lottie.json';
-import TypeWriterForSubtitle from './TypeWriterSubtitle';
-import ThinkingProcessContainer from './ThinkingProcessContainer';
-import WorkflowFlowchart from './WorkflowFlowchart';
 import SetupProgressCard from './SetupProgressCard';
+import ThinkingProcessContainer from './ThinkingProcessContainer';
+import TypeWriterForSubtitle from './TypeWriterSubtitle';
+import WorkflowFlowchart from './WorkflowFlowchart';
+
+import hourglassAnimation from '../../assets/hourglass-lottie.json';
+
+import Lottie from 'lottie-react';
+import {FileText} from 'lucide-react';
+import React, {useState, useEffect} from 'react';
 
 const THINKING_VERBS = [
   'Analyzing',

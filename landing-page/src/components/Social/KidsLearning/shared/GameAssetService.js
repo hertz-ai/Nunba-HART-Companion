@@ -18,8 +18,9 @@
  *   // url is a Blob URL string, or null if unavailable
  */
 
-import {API_BASE_URL} from '../../../../config/apiBase';
 import MediaCacheManager from './MediaCacheManager';
+
+import {API_BASE_URL} from '../../../../config/apiBase';
 
 // ── Base URL ─────────────────────────────────────────────────────────────────
 // Imported from the centralized config (src/config/apiBase.js).

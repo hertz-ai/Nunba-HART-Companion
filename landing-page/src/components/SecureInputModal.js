@@ -1,5 +1,6 @@
-import React, {useState, useRef, useEffect} from 'react';
 import {chatApi} from '../services/socialApi';
+
+import React, {useState, useRef, useEffect} from 'react';
 
 const SecureInputModal = ({secretRequest, onClose}) => {
   const [value, setValue] = useState('');

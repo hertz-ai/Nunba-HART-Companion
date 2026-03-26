@@ -1,8 +1,8 @@
-import React, {useState} from 'react';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import {Box, IconButton, Typography, keyframes, useTheme} from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import React, {useState} from 'react';
 
 // Pop animation for vote action
 const pop = keyframes`

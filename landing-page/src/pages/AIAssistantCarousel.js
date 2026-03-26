@@ -1,6 +1,3 @@
-import React, {useState, useEffect, useRef} from 'react';
-import {Swiper, SwiperSlide} from 'swiper/react';
-import {EffectCoverflow} from 'swiper/modules';
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,6 +7,9 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
+import React, {useState, useEffect, useRef} from 'react';
+import {EffectCoverflow} from 'swiper/modules';
+import {Swiper, SwiperSlide} from 'swiper/react';
 
 import 'swiper/css';
 import 'swiper/css/effect-coverflow';

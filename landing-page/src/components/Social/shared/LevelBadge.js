@@ -1,6 +1,6 @@
-import React, {useState} from 'react';
 import {Tooltip, Box, Skeleton, keyframes, useTheme} from '@mui/material';
 import {alpha} from '@mui/material/styles';
+import React, {useState} from 'react';
 
 const TITLES = {
   1: 'Newcomer',

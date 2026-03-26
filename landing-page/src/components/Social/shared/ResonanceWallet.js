@@ -1,5 +1,5 @@
-import React, {useState, useEffect} from 'react';
 import {Box, Typography, Tooltip, Skeleton, Fade} from '@mui/material';
+import React, {useState, useEffect} from 'react';
 
 function getLevelColor(level) {
   if (level >= 26) return 'linear-gradient(135deg, #FFD700, #FFA500)';

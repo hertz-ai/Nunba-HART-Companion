@@ -1,6 +1,6 @@
-import React from 'react';
 import {Box, Typography, Fade, useTheme, SvgIcon} from '@mui/material';
 import {alpha} from '@mui/material/styles';
+import React from 'react';
 
 /* Inline fallback icon (inbox) — avoids @mui/icons-material chunk dependency */
 const FallbackIcon = React.forwardRef(function FallbackIcon(props, ref) {

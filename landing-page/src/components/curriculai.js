@@ -1,21 +1,25 @@
 import KnnResults from './knnresults';
 
 import { createApiClient } from '../services/axiosFactory';
+import { logger } from '../utils/logger';
+
 import React, {useState, useEffect} from 'react';
 import ContentLoader from 'react-content-loader';
 import * as Icon from 'react-feather';
 import {useMeasure} from 'react-use';
 import Rellax from 'rellax';
+
 // import './parallax.scss';
 import '../App.scss';
-//import {Parallax} from 'react-scroll-parallax';
+// import {Parallax} from 'react-scroll-parallax';
 //  import EssentialsLoader from './essentials'
 import './progressStyles.css';
-//import './progress.js'
+// import './progress.js'
 import HeaderMulti from '../pages/Layouts/header-multi';
+
 import Parallax from './parallaxCodepen';
+
 import Footer from '../pages/Layouts/footer';
-import { logger } from '../utils/logger';
 
 const geocodeApi = createApiClient('https://api.bigdatacloud.net', { handle401: false });
 
@@ -116,7 +120,7 @@ const Curriculai = (props) => {
       // window.removeEventListener('scroll', this.scrollLoop, false)
     }
     setPosition = (yPos) => {
-      //this.dom.style.transform = "translate3d(0, " + yPos + "px, 0)";
+      // this.dom.style.transform = "translate3d(0, " + yPos + "px, 0)";
       // this.dom.style.top = yPos + "px";
     };
     scrollLoop = () => {
@@ -128,7 +132,7 @@ const Curriculai = (props) => {
     }
   }
 
-  var rellax = new Rellax('.rellax');
+  const rellax = new Rellax('.rellax');
   const ParallaxImage = () => (
     <Parallax className="custom-class" y={[-0, 20]} tagOuter="figure">
       <img src="/essentials_1.svg" className="crowd-bg rellax" />

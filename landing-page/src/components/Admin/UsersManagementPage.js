@@ -1,6 +1,9 @@
+import {useSocial} from '../../contexts/SocialContext';
 import {adminApi, moderationApi} from '../../services/socialApi';
-import { useSocial } from '../../contexts/SocialContext';
 
+import PeopleIcon from '@mui/icons-material/People';
+import SearchIcon from '@mui/icons-material/Search';
+import VerifiedIcon from '@mui/icons-material/Verified';
 import {
   Typography,
   TextField,
@@ -27,9 +30,6 @@ import {
   Tooltip,
   IconButton,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import PeopleIcon from '@mui/icons-material/People';
-import VerifiedIcon from '@mui/icons-material/Verified';
 import React, {useState, useEffect, useMemo} from 'react';
 
 // Role color mapping
@@ -76,7 +76,8 @@ function timeAgo(dateStr) {
 
 // Reusable styles matching DashboardPage
 const cardStyle = {
-  background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
+  background:
+    'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
   backdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.05)',
   borderRadius: 3,
@@ -108,15 +109,46 @@ function TableSkeleton() {
     <Box sx={cardStyle}>
       <Box sx={{p: 2}}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <Box key={i} sx={{display: 'flex', gap: 2, mb: 2, alignItems: 'center'}}>
-            <Skeleton variant="circular" width={40} height={40} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+          <Box
+            key={i}
+            sx={{display: 'flex', gap: 2, mb: 2, alignItems: 'center'}}
+          >
+            <Skeleton
+              variant="circular"
+              width={40}
+              height={40}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+            />
             <Box sx={{flex: 1}}>
-              <Skeleton variant="text" width="60%" sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-              <Skeleton variant="text" width="40%" sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+              <Skeleton
+                variant="text"
+                width="60%"
+                sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+              />
+              <Skeleton
+                variant="text"
+                width="40%"
+                sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+              />
             </Box>
-            <Skeleton variant="rounded" width={80} height={24} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-            <Skeleton variant="rounded" width={60} height={24} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
-            <Skeleton variant="rounded" width={80} height={32} sx={{bgcolor: 'rgba(255,255,255,0.05)'}} />
+            <Skeleton
+              variant="rounded"
+              width={80}
+              height={24}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+            />
+            <Skeleton
+              variant="rounded"
+              width={60}
+              height={24}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+            />
+            <Skeleton
+              variant="rounded"
+              width={80}
+              height={32}
+              sx={{bgcolor: 'rgba(255,255,255,0.05)'}}
+            />
           </Box>
         ))}
       </Box>
@@ -144,7 +176,14 @@ function StatCard({label, count, color, selected, onClick}) {
         },
       }}
     >
-      <Typography sx={{color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: 500, mb: 0.5}}>
+      <Typography
+        sx={{
+          color: 'rgba(255,255,255,0.5)',
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          mb: 0.5,
+        }}
+      >
         {label}
       </Typography>
       <Typography sx={{color, fontSize: '1.5rem', fontWeight: 700}}>
@@ -185,7 +224,11 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
     if (open) setConfirmText('');
   }, [open]);
 
-  const transitionMessage = getTransitionMessage(currentRole, newRole, user?.username);
+  const transitionMessage = getTransitionMessage(
+    currentRole,
+    newRole,
+    user?.username
+  );
 
   return (
     <Dialog
@@ -200,25 +243,37 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
         },
       }}
     >
-      <DialogTitle sx={{
-        color: '#fff',
-        fontWeight: 600,
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-      }}>
+      <DialogTitle
+        sx={{
+          color: '#fff',
+          fontWeight: 600,
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
         Change User Role
       </DialogTitle>
       <DialogContent sx={{pt: 3}}>
         <Box sx={{display: 'flex', alignItems: 'center', gap: 2, mb: 3}}>
-          <Box sx={{
-            width: 48, height: 48, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.1rem', fontWeight: 600, color: '#fff',
-          }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              color: '#fff',
+            }}
+          >
             {(user?.username || 'U')[0].toUpperCase()}
           </Box>
           <Box>
-            <Typography sx={{color: '#fff', fontWeight: 600}}>{user?.username}</Typography>
+            <Typography sx={{color: '#fff', fontWeight: 600}}>
+              {user?.username}
+            </Typography>
             <Box sx={{display: 'flex', alignItems: 'center', gap: 1, mt: 0.5}}>
               <RoleChip role={currentRole} />
               <Typography sx={{color: 'rgba(255,255,255,0.3)'}}>→</Typography>
@@ -227,21 +282,45 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
           </Box>
         </Box>
 
-        <Box sx={{
-          p: 2, borderRadius: 2, mb: 2,
-          background: isCentralChange ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255,255,255,0.03)',
-          border: isCentralChange ? '1px solid rgba(255, 152, 0, 0.2)' : '1px solid rgba(255,255,255,0.05)',
-        }}>
-          <Typography sx={{color: isCentralChange ? '#ff9800' : 'rgba(255,255,255,0.7)', fontSize: '0.9rem'}}>
+        <Box
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            mb: 2,
+            background: isCentralChange
+              ? 'rgba(255, 152, 0, 0.1)'
+              : 'rgba(255,255,255,0.03)',
+            border: isCentralChange
+              ? '1px solid rgba(255, 152, 0, 0.2)'
+              : '1px solid rgba(255,255,255,0.05)',
+          }}
+        >
+          <Typography
+            sx={{
+              color: isCentralChange ? '#ff9800' : 'rgba(255,255,255,0.7)',
+              fontSize: '0.9rem',
+            }}
+          >
             {transitionMessage}
           </Typography>
         </Box>
 
-        <Box sx={{p: 2, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)'}}>
-          <Typography sx={{color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', mb: 0.5}}>
+        <Box
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.05)',
+          }}
+        >
+          <Typography
+            sx={{color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', mb: 0.5}}
+          >
             {ROLE_LABELS[newRole]} role includes:
           </Typography>
-          <Typography sx={{color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem'}}>
+          <Typography
+            sx={{color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem'}}
+          >
             {ROLE_DESCRIPTIONS[newRole]}
           </Typography>
         </Box>
@@ -249,7 +328,8 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
         {needsTypingConfirm && (
           <Box sx={{mt: 2}}>
             <Typography sx={{color: '#ff9800', fontSize: '0.85rem', mb: 1}}>
-              Type <strong style={{color: '#fff'}}>{user?.username}</strong> to confirm central promotion:
+              Type <strong style={{color: '#fff'}}>{user?.username}</strong> to
+              confirm central promotion:
             </Typography>
             <TextField
               fullWidth
@@ -270,7 +350,9 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{px: 3, pb: 2, borderTop: '1px solid rgba(255,255,255,0.05)'}}>
+      <DialogActions
+        sx={{px: 3, pb: 2, borderTop: '1px solid rgba(255,255,255,0.05)'}}
+      >
         <Button
           onClick={onClose}
           sx={{color: 'rgba(255,255,255,0.5)', textTransform: 'none'}}
@@ -279,7 +361,9 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
         </Button>
         <Button
           onClick={onConfirm}
-          disabled={loading || (needsTypingConfirm && confirmText !== user?.username)}
+          disabled={
+            loading || (needsTypingConfirm && confirmText !== user?.username)
+          }
           sx={{
             textTransform: 'none',
             fontWeight: 600,
@@ -289,7 +373,9 @@ function ConfirmRoleDialog({open, onClose, onConfirm, user, newRole, loading}) {
               ? 'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)'
               : 'linear-gradient(135deg, rgba(255, 68, 68, 0.2) 0%, rgba(255, 100, 100, 0.2) 100%)',
             color: isPromotion ? '#6C63FF' : '#ff6b6b',
-            border: isPromotion ? '1px solid rgba(108, 99, 255, 0.3)' : '1px solid rgba(255, 68, 68, 0.3)',
+            border: isPromotion
+              ? '1px solid rgba(108, 99, 255, 0.3)'
+              : '1px solid rgba(255, 68, 68, 0.3)',
             '&:hover': {
               background: isPromotion
                 ? 'linear-gradient(135deg, rgba(108, 99, 255, 0.3) 0%, rgba(155, 148, 255, 0.3) 100%)'
@@ -351,9 +437,17 @@ export default function UsersManagementPage() {
   const [actionLoading, setActionLoading] = useState(null);
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [confirmDialog, setConfirmDialog] = useState({open: false, user: null, newRole: null});
-  const [snackbar, setSnackbar] = useState({open: false, message: '', severity: 'success'});
-  const { currentUser } = useSocial();
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    user: null,
+    newRole: null,
+  });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+  const {currentUser} = useSocial();
 
   const loadUsers = async (q) => {
     setLoading(true);
@@ -378,7 +472,7 @@ export default function UsersManagementPage() {
   // Role stats computed from loaded users
   const roleStats = useMemo(() => {
     const stats = {central: 0, regional: 0, flat: 0, guest: 0, banned: 0};
-    users.forEach(u => {
+    users.forEach((u) => {
       if (u.is_banned) stats.banned++;
       const role = u.role || 'flat';
       if (stats[role] !== undefined) stats[role]++;
@@ -390,7 +484,7 @@ export default function UsersManagementPage() {
 
   // Filtered users
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
+    return users.filter((u) => {
       const role = u.role || 'flat';
       if (roleFilter !== 'all' && role !== roleFilter) return false;
       if (statusFilter === 'active' && u.is_banned) return false;
@@ -442,7 +536,9 @@ export default function UsersManagementPage() {
       setUsers((prev) =>
         prev.map((u) => (u.id === user.id ? {...u, role: newRole} : u))
       );
-      showSnackbar(`${user.username}'s role changed to ${ROLE_LABELS[newRole]}`);
+      showSnackbar(
+        `${user.username}'s role changed to ${ROLE_LABELS[newRole]}`
+      );
     } catch (err) {
       showSnackbar('Failed to change role', 'error');
     }
@@ -458,18 +554,26 @@ export default function UsersManagementPage() {
     );
     try {
       await adminApi.updateUser(user.id, {is_verified: newVerified});
-      showSnackbar(newVerified ? `${user.username} verified` : `${user.username} unverified`);
+      showSnackbar(
+        newVerified
+          ? `${user.username} verified`
+          : `${user.username} unverified`
+      );
     } catch (err) {
       // Revert
       setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? {...u, is_verified: !newVerified} : u))
+        prev.map((u) =>
+          u.id === user.id ? {...u, is_verified: !newVerified} : u
+        )
       );
       showSnackbar('Failed to update verification', 'error');
     }
   };
 
-  const isSelf = (userId) => currentUser && String(currentUser.id) === String(userId);
-  const isLastCentral = (user) => (user.role || 'flat') === 'central' && centralCount <= 1;
+  const isSelf = (userId) =>
+    currentUser && String(currentUser.id) === String(userId);
+  const isLastCentral = (user) =>
+    (user.role || 'flat') === 'central' && centralCount <= 1;
 
   const roleFilterChips = ['all', 'central', 'regional', 'flat', 'guest'];
   const statusFilterChips = ['all', 'active', 'banned', 'verified'];
@@ -480,29 +584,39 @@ export default function UsersManagementPage() {
         {/* Page Header */}
         <Box sx={{mb: 4}}>
           <Box sx={{display: 'flex', alignItems: 'center', gap: 2, mb: 1}}>
-            <Box sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 3,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(155, 148, 255, 0.15) 100%)',
-            }}>
-              <PeopleIcon sx={{
-                fontSize: 24,
-                background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }} />
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background:
+                  'linear-gradient(135deg, rgba(108, 99, 255, 0.15) 0%, rgba(155, 148, 255, 0.15) 100%)',
+              }}
+            >
+              <PeopleIcon
+                sx={{
+                  fontSize: 24,
+                  background:
+                    'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  background:
+                    'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
                 User Management
               </Typography>
               <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
@@ -516,30 +630,48 @@ export default function UsersManagementPage() {
         <Grow in={!loading} timeout={400}>
           <Box sx={{display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap'}}>
             <StatCard
-              label="Central" count={roleStats.central} color={ROLE_COLORS.central}
+              label="Central"
+              count={roleStats.central}
+              color={ROLE_COLORS.central}
               selected={roleFilter === 'central'}
-              onClick={() => setRoleFilter(f => f === 'central' ? 'all' : 'central')}
+              onClick={() =>
+                setRoleFilter((f) => (f === 'central' ? 'all' : 'central'))
+              }
             />
             <StatCard
-              label="Regional" count={roleStats.regional} color={ROLE_COLORS.regional}
+              label="Regional"
+              count={roleStats.regional}
+              color={ROLE_COLORS.regional}
               selected={roleFilter === 'regional'}
-              onClick={() => setRoleFilter(f => f === 'regional' ? 'all' : 'regional')}
+              onClick={() =>
+                setRoleFilter((f) => (f === 'regional' ? 'all' : 'regional'))
+              }
             />
             <StatCard
-              label="Flat" count={roleStats.flat} color={ROLE_COLORS.flat}
+              label="Flat"
+              count={roleStats.flat}
+              color={ROLE_COLORS.flat}
               selected={roleFilter === 'flat'}
-              onClick={() => setRoleFilter(f => f === 'flat' ? 'all' : 'flat')}
+              onClick={() =>
+                setRoleFilter((f) => (f === 'flat' ? 'all' : 'flat'))
+              }
             />
             <StatCard
-              label="Guest" count={roleStats.guest} color={ROLE_COLORS.guest}
+              label="Guest"
+              count={roleStats.guest}
+              color={ROLE_COLORS.guest}
               selected={roleFilter === 'guest'}
-              onClick={() => setRoleFilter(f => f === 'guest' ? 'all' : 'guest')}
+              onClick={() =>
+                setRoleFilter((f) => (f === 'guest' ? 'all' : 'guest'))
+              }
             />
             <StatCard
-              label="Banned" count={roleStats.banned} color="#ff4444"
+              label="Banned"
+              count={roleStats.banned}
+              color="#ff4444"
               selected={statusFilter === 'banned'}
               onClick={() => {
-                setStatusFilter(f => f === 'banned' ? 'all' : 'banned');
+                setStatusFilter((f) => (f === 'banned' ? 'all' : 'banned'));
                 if (statusFilter !== 'banned') setRoleFilter('all');
               }}
             />
@@ -587,9 +719,21 @@ export default function UsersManagementPage() {
         </Grow>
 
         {/* Filter Chips */}
-        <Box sx={{display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center'}}>
-          <Typography sx={{color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', mr: 1}}>Role:</Typography>
-          {roleFilterChips.map(f => (
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1,
+            mb: 3,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          <Typography
+            sx={{color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', mr: 1}}
+          >
+            Role:
+          </Typography>
+          {roleFilterChips.map((f) => (
             <Chip
               key={`role-${f}`}
               size="small"
@@ -599,25 +743,51 @@ export default function UsersManagementPage() {
                 cursor: 'pointer',
                 fontWeight: 500,
                 transition: 'all 0.2s ease',
-                background: roleFilter === f
-                  ? (f === 'all' ? 'rgba(255,255,255,0.15)' : `${ROLE_COLORS[f]}25`)
-                  : 'rgba(255,255,255,0.05)',
-                color: roleFilter === f
-                  ? (f === 'all' ? '#fff' : ROLE_COLORS[f])
-                  : 'rgba(255,255,255,0.5)',
-                border: roleFilter === f
-                  ? `1px solid ${f === 'all' ? 'rgba(255,255,255,0.3)' : `${ROLE_COLORS[f]}50`}`
-                  : '1px solid transparent',
+                background:
+                  roleFilter === f
+                    ? f === 'all'
+                      ? 'rgba(255,255,255,0.15)'
+                      : `${ROLE_COLORS[f]}25`
+                    : 'rgba(255,255,255,0.05)',
+                color:
+                  roleFilter === f
+                    ? f === 'all'
+                      ? '#fff'
+                      : ROLE_COLORS[f]
+                    : 'rgba(255,255,255,0.5)',
+                border:
+                  roleFilter === f
+                    ? `1px solid ${f === 'all' ? 'rgba(255,255,255,0.3)' : `${ROLE_COLORS[f]}50`}`
+                    : '1px solid transparent',
                 '&:hover': {
-                  background: f === 'all' ? 'rgba(255,255,255,0.1)' : `${ROLE_COLORS[f]}15`,
+                  background:
+                    f === 'all'
+                      ? 'rgba(255,255,255,0.1)'
+                      : `${ROLE_COLORS[f]}15`,
                 },
               }}
             />
           ))}
-          <Box sx={{width: 1, height: 20, background: 'rgba(255,255,255,0.1)', mx: 1}} />
-          <Typography sx={{color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', mr: 1}}>Status:</Typography>
-          {statusFilterChips.map(f => {
-            const statusColors = {all: '#fff', active: '#6C63FF', banned: '#ff4444', verified: '#9B94FF'};
+          <Box
+            sx={{
+              width: 1,
+              height: 20,
+              background: 'rgba(255,255,255,0.1)',
+              mx: 1,
+            }}
+          />
+          <Typography
+            sx={{color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', mr: 1}}
+          >
+            Status:
+          </Typography>
+          {statusFilterChips.map((f) => {
+            const statusColors = {
+              all: '#fff',
+              active: '#6C63FF',
+              banned: '#ff4444',
+              verified: '#9B94FF',
+            };
             const c = statusColors[f];
             return (
               <Chip
@@ -629,9 +799,13 @@ export default function UsersManagementPage() {
                   cursor: 'pointer',
                   fontWeight: 500,
                   transition: 'all 0.2s ease',
-                  background: statusFilter === f ? `${c}20` : 'rgba(255,255,255,0.05)',
+                  background:
+                    statusFilter === f ? `${c}20` : 'rgba(255,255,255,0.05)',
                   color: statusFilter === f ? c : 'rgba(255,255,255,0.5)',
-                  border: statusFilter === f ? `1px solid ${c}40` : '1px solid transparent',
+                  border:
+                    statusFilter === f
+                      ? `1px solid ${c}40`
+                      : '1px solid transparent',
                   '&:hover': {background: `${c}10`},
                 }}
               />
@@ -647,15 +821,17 @@ export default function UsersManagementPage() {
             <Box sx={cardStyle}>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{
-                    background: 'rgba(108, 99, 255, 0.05)',
-                    '& th': {
-                      color: 'rgba(255,255,255,0.7)',
-                      fontWeight: 600,
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      py: 2,
-                    },
-                  }}>
+                  <TableRow
+                    sx={{
+                      background: 'rgba(108, 99, 255, 0.05)',
+                      '& th': {
+                        color: 'rgba(255,255,255,0.7)',
+                        fontWeight: 600,
+                        borderBottom: '1px solid rgba(255,255,255,0.1)',
+                        py: 2,
+                      },
+                    }}
+                  >
                     <TableCell>Username</TableCell>
                     <TableCell>Role</TableCell>
                     <TableCell>Type</TableCell>
@@ -675,34 +851,53 @@ export default function UsersManagementPage() {
 
                     return (
                       <Fade in={true} timeout={300 + index * 50} key={u.id}>
-                        <TableRow sx={{
-                          ...tableRowStyle,
-                          '& td': {
-                            color: '#fff',
-                            borderBottom: '1px solid rgba(255,255,255,0.05)',
-                            py: 1.5,
-                          },
-                        }}>
+                        <TableRow
+                          sx={{
+                            ...tableRowStyle,
+                            '& td': {
+                              color: '#fff',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)',
+                              py: 1.5,
+                            },
+                          }}
+                        >
                           <TableCell>
-                            <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
-                              <Box sx={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: '50%',
-                                background: `linear-gradient(135deg, ${ROLE_COLORS[userRole]} 0%, ${ROLE_COLORS[userRole]}80 100%)`,
+                            <Box
+                              sx={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '0.9rem',
-                                fontWeight: 600,
-                              }}>
+                                gap: 1.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: '50%',
+                                  background: `linear-gradient(135deg, ${ROLE_COLORS[userRole]} 0%, ${ROLE_COLORS[userRole]}80 100%)`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.9rem',
+                                  fontWeight: 600,
+                                }}
+                              >
                                 {(u.username || 'U')[0].toUpperCase()}
                               </Box>
                               <Box>
-                                <Typography sx={{fontWeight: 500, lineHeight: 1.2}}>
+                                <Typography
+                                  sx={{fontWeight: 500, lineHeight: 1.2}}
+                                >
                                   {u.username}
                                   {self && (
-                                    <Typography component="span" sx={{color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', ml: 1}}>
+                                    <Typography
+                                      component="span"
+                                      sx={{
+                                        color: 'rgba(255,255,255,0.3)',
+                                        fontSize: '0.75rem',
+                                        ml: 1,
+                                      }}
+                                    >
                                       (you)
                                     </Typography>
                                   )}
@@ -712,9 +907,13 @@ export default function UsersManagementPage() {
                           </TableCell>
                           <TableCell>
                             <Tooltip
-                              title={selectDisabled
-                                ? (self ? "Cannot change your own role" : "Cannot demote the last central admin")
-                                : ""}
+                              title={
+                                selectDisabled
+                                  ? self
+                                    ? 'Cannot change your own role'
+                                    : 'Cannot demote the last central admin'
+                                  : ''
+                              }
                               arrow
                             >
                               <Box>
@@ -722,7 +921,9 @@ export default function UsersManagementPage() {
                                   value={userRole}
                                   size="small"
                                   disabled={selectDisabled}
-                                  onChange={(e) => handleRoleSelectChange(u, e.target.value)}
+                                  onChange={(e) =>
+                                    handleRoleSelectChange(u, e.target.value)
+                                  }
                                   sx={{
                                     minWidth: 110,
                                     '& .MuiSelect-select': {
@@ -734,12 +935,14 @@ export default function UsersManagementPage() {
                                     '& .MuiOutlinedInput-notchedOutline': {
                                       borderColor: `${ROLE_COLORS[userRole]}30`,
                                     },
-                                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                                      borderColor: `${ROLE_COLORS[userRole]}60`,
-                                    },
-                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                      borderColor: ROLE_COLORS[userRole],
-                                    },
+                                    '&:hover .MuiOutlinedInput-notchedOutline':
+                                      {
+                                        borderColor: `${ROLE_COLORS[userRole]}60`,
+                                      },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline':
+                                      {
+                                        borderColor: ROLE_COLORS[userRole],
+                                      },
                                     '&.Mui-disabled': {
                                       opacity: 0.5,
                                     },
@@ -751,27 +954,46 @@ export default function UsersManagementPage() {
                                     PaperProps: {
                                       sx: {
                                         background: '#1a1a2e',
-                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        border:
+                                          '1px solid rgba(255,255,255,0.1)',
                                         '& .MuiMenuItem-root': {
                                           color: '#fff',
-                                          '&:hover': {background: 'rgba(255,255,255,0.05)'},
-                                          '&.Mui-selected': {background: 'rgba(108, 99, 255, 0.1)'},
+                                          '&:hover': {
+                                            background:
+                                              'rgba(255,255,255,0.05)',
+                                          },
+                                          '&.Mui-selected': {
+                                            background:
+                                              'rgba(108, 99, 255, 0.1)',
+                                          },
                                         },
                                       },
                                     },
                                   }}
                                 >
-                                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                                    <MenuItem key={value} value={value}>
-                                      <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                                        <Box sx={{
-                                          width: 8, height: 8, borderRadius: '50%',
-                                          background: ROLE_COLORS[value],
-                                        }} />
-                                        {label}
-                                      </Box>
-                                    </MenuItem>
-                                  ))}
+                                  {Object.entries(ROLE_LABELS).map(
+                                    ([value, label]) => (
+                                      <MenuItem key={value} value={value}>
+                                        <Box
+                                          sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                          }}
+                                        >
+                                          <Box
+                                            sx={{
+                                              width: 8,
+                                              height: 8,
+                                              borderRadius: '50%',
+                                              background: ROLE_COLORS[value],
+                                            }}
+                                          />
+                                          {label}
+                                        </Box>
+                                      </MenuItem>
+                                    )
+                                  )}
                                 </Select>
                               </Box>
                             </Tooltip>
@@ -781,17 +1003,31 @@ export default function UsersManagementPage() {
                               size="small"
                               label={u.user_type || 'human'}
                               sx={{
-                                background: u.user_type === 'agent'
-                                  ? 'linear-gradient(135deg, rgba(155, 148, 255, 0.2) 0%, rgba(108, 99, 255, 0.2) 100%)'
-                                  : 'rgba(255,255,255,0.1)',
-                                color: u.user_type === 'agent' ? '#6C63FF' : 'rgba(255,255,255,0.7)',
-                                border: u.user_type === 'agent' ? '1px solid rgba(108, 99, 255, 0.3)' : 'none',
+                                background:
+                                  u.user_type === 'agent'
+                                    ? 'linear-gradient(135deg, rgba(155, 148, 255, 0.2) 0%, rgba(108, 99, 255, 0.2) 100%)'
+                                    : 'rgba(255,255,255,0.1)',
+                                color:
+                                  u.user_type === 'agent'
+                                    ? '#6C63FF'
+                                    : 'rgba(255,255,255,0.7)',
+                                border:
+                                  u.user_type === 'agent'
+                                    ? '1px solid rgba(108, 99, 255, 0.3)'
+                                    : 'none',
                                 fontWeight: 500,
                               }}
                             />
                           </TableCell>
                           <TableCell sx={{textAlign: 'center'}}>
-                            <Tooltip title={u.is_verified ? 'Verified — click to remove' : 'Not verified — click to verify'} arrow>
+                            <Tooltip
+                              title={
+                                u.is_verified
+                                  ? 'Verified — click to remove'
+                                  : 'Not verified — click to verify'
+                              }
+                              arrow
+                            >
                               <IconButton
                                 size="small"
                                 onClick={() => handleVerifyToggle(u)}
@@ -802,19 +1038,30 @@ export default function UsersManagementPage() {
                                   },
                                 }}
                               >
-                                <VerifiedIcon sx={{
-                                  fontSize: 20,
-                                  color: u.is_verified ? '#9B94FF' : 'rgba(255,255,255,0.15)',
-                                  transition: 'color 0.3s ease',
-                                }} />
+                                <VerifiedIcon
+                                  sx={{
+                                    fontSize: 20,
+                                    color: u.is_verified
+                                      ? '#9B94FF'
+                                      : 'rgba(255,255,255,0.15)',
+                                    transition: 'color 0.3s ease',
+                                  }}
+                                />
                               </IconButton>
                             </Tooltip>
                           </TableCell>
                           <TableCell>
-                            <Typography sx={{
-                              color: (u.karma || 0) > 100 ? '#6C63FF' : (u.karma || 0) < 0 ? '#ff4444' : 'rgba(255,255,255,0.7)',
-                              fontWeight: 600,
-                            }}>
+                            <Typography
+                              sx={{
+                                color:
+                                  (u.karma || 0) > 100
+                                    ? '#6C63FF'
+                                    : (u.karma || 0) < 0
+                                      ? '#ff4444'
+                                      : 'rgba(255,255,255,0.7)',
+                                fontWeight: 600,
+                              }}
+                            >
                               {u.karma || 0}
                             </Typography>
                           </TableCell>
@@ -824,7 +1071,8 @@ export default function UsersManagementPage() {
                                 size="small"
                                 label="Banned"
                                 sx={{
-                                  background: 'linear-gradient(135deg, rgba(255, 68, 68, 0.2) 0%, rgba(255, 100, 100, 0.2) 100%)',
+                                  background:
+                                    'linear-gradient(135deg, rgba(255, 68, 68, 0.2) 0%, rgba(255, 100, 100, 0.2) 100%)',
                                   color: '#ff4444',
                                   border: '1px solid rgba(255, 68, 68, 0.3)',
                                   fontWeight: 500,
@@ -835,7 +1083,8 @@ export default function UsersManagementPage() {
                                 size="small"
                                 label="Active"
                                 sx={{
-                                  background: 'linear-gradient(135deg, rgba(0, 232, 157, 0.2) 0%, rgba(0, 180, 120, 0.2) 100%)',
+                                  background:
+                                    'linear-gradient(135deg, rgba(0, 232, 157, 0.2) 0%, rgba(0, 180, 120, 0.2) 100%)',
                                   color: '#00e89d',
                                   border: '1px solid rgba(0, 232, 157, 0.3)',
                                   fontWeight: 500,
@@ -844,8 +1093,20 @@ export default function UsersManagementPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Tooltip title={u.created_at ? new Date(u.created_at).toLocaleString() : ''} arrow>
-                              <Typography sx={{color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem'}}>
+                            <Tooltip
+                              title={
+                                u.created_at
+                                  ? new Date(u.created_at).toLocaleString()
+                                  : ''
+                              }
+                              arrow
+                            >
+                              <Typography
+                                sx={{
+                                  color: 'rgba(255,255,255,0.5)',
+                                  fontSize: '0.875rem',
+                                }}
+                              >
                                 {timeAgo(u.created_at)}
                               </Typography>
                             </Tooltip>
@@ -858,12 +1119,15 @@ export default function UsersManagementPage() {
                                 disabled={actionLoading === u.id}
                                 sx={{
                                   ...actionButtonStyle,
-                                  background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)',
+                                  background:
+                                    'linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(155, 148, 255, 0.2) 100%)',
                                   color: '#6C63FF',
                                   border: '1px solid rgba(108, 99, 255, 0.3)',
                                 }}
                               >
-                                {actionLoading === u.id ? 'Processing...' : 'Unban'}
+                                {actionLoading === u.id
+                                  ? 'Processing...'
+                                  : 'Unban'}
                               </Button>
                             ) : (
                               <Button
@@ -872,12 +1136,15 @@ export default function UsersManagementPage() {
                                 disabled={actionLoading === u.id || self}
                                 sx={{
                                   ...actionButtonStyle,
-                                  background: 'linear-gradient(135deg, rgba(255, 68, 68, 0.2) 0%, rgba(255, 100, 100, 0.2) 100%)',
+                                  background:
+                                    'linear-gradient(135deg, rgba(255, 68, 68, 0.2) 0%, rgba(255, 100, 100, 0.2) 100%)',
                                   color: '#ff6b6b',
                                   border: '1px solid rgba(255, 68, 68, 0.3)',
                                 }}
                               >
-                                {actionLoading === u.id ? 'Processing...' : 'Ban'}
+                                {actionLoading === u.id
+                                  ? 'Processing...'
+                                  : 'Ban'}
                               </Button>
                             )}
                           </TableCell>
@@ -889,9 +1156,17 @@ export default function UsersManagementPage() {
                     <TableRow>
                       <TableCell colSpan={8} align="center" sx={{py: 6}}>
                         <Box sx={{textAlign: 'center'}}>
-                          <PeopleIcon sx={{fontSize: 48, color: 'rgba(255,255,255,0.2)', mb: 2}} />
+                          <PeopleIcon
+                            sx={{
+                              fontSize: 48,
+                              color: 'rgba(255,255,255,0.2)',
+                              mb: 2,
+                            }}
+                          />
                           <Typography sx={{color: 'rgba(255,255,255,0.5)'}}>
-                            {users.length === 0 ? 'No users found' : 'No users match the selected filters'}
+                            {users.length === 0
+                              ? 'No users found'
+                              : 'No users match the selected filters'}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -906,7 +1181,9 @@ export default function UsersManagementPage() {
         {/* Role Change Confirmation Dialog */}
         <ConfirmRoleDialog
           open={confirmDialog.open}
-          onClose={() => setConfirmDialog({open: false, user: null, newRole: null})}
+          onClose={() =>
+            setConfirmDialog({open: false, user: null, newRole: null})
+          }
           onConfirm={confirmRoleChange}
           user={confirmDialog.user}
           newRole={confirmDialog.newRole}
@@ -917,11 +1194,11 @@ export default function UsersManagementPage() {
         <Snackbar
           open={snackbar.open}
           autoHideDuration={4000}
-          onClose={() => setSnackbar(s => ({...s, open: false}))}
+          onClose={() => setSnackbar((s) => ({...s, open: false}))}
           anchorOrigin={{vertical: 'bottom', horizontal: 'center'}}
         >
           <Alert
-            onClose={() => setSnackbar(s => ({...s, open: false}))}
+            onClose={() => setSnackbar((s) => ({...s, open: false}))}
             severity={snackbar.severity}
             variant="filled"
             sx={{

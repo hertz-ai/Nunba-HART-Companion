@@ -1,20 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box, Typography, Card, CardContent, Grid, IconButton, Tooltip, Fab,
-  CircularProgress, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Fade, Grow,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
-import { channelUserApi } from '../../services/socialApi';
 import ChannelPresenceIndicator from './ChannelPresenceIndicator';
 import ChannelSetupWizard from './ChannelSetupWizard';
 
+import {channelUserApi} from '../../services/socialApi';
+
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Grid,
+  IconButton,
+  Tooltip,
+  Fab,
+  CircularProgress,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Fade,
+  Grow,
+} from '@mui/material';
+import React, {useState, useEffect, useCallback} from 'react';
+
 const cardStyle = {
-  background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
+  background:
+    'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
   backdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.05)',
   borderRadius: '12px',
@@ -50,14 +67,18 @@ export default function ChannelBindingsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchBindings(); }, [fetchBindings]);
+  useEffect(() => {
+    fetchBindings();
+  }, [fetchBindings]);
 
   const handleSetPreferred = async (id) => {
     setActionLoading(id);
     try {
       await channelUserApi.setPreferred(id);
       await fetchBindings();
-    } catch (e) { /* handled */ }
+    } catch (e) {
+      /* handled */
+    }
     setActionLoading(null);
   };
 
@@ -66,8 +87,10 @@ export default function ChannelBindingsPage() {
     setActionLoading(deleteTarget.id);
     try {
       await channelUserApi.removeBinding(deleteTarget.id);
-      setBindings(prev => prev.filter(b => b.id !== deleteTarget.id));
-    } catch (e) { /* handled */ }
+      setBindings((prev) => prev.filter((b) => b.id !== deleteTarget.id));
+    } catch (e) {
+      /* handled */
+    }
     setActionLoading(null);
     setDeleteTarget(null);
   };
@@ -78,20 +101,30 @@ export default function ChannelBindingsPage() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: '#6C63FF' }} />
+      <Box sx={{display: 'flex', justifyContent: 'center', py: 8}}>
+        <CircularProgress sx={{color: '#6C63FF'}} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', py: 3, px: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+    <Box sx={{maxWidth: 900, mx: 'auto', py: 3, px: 2}}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 3,
+        }}
+      >
         <Box>
-          <Typography variant="h5" sx={{ color: '#fff', fontWeight: 700 }}>
+          <Typography variant="h5" sx={{color: '#fff', fontWeight: 700}}>
             My Channels
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>
+          <Typography
+            variant="body2"
+            sx={{color: 'rgba(255,255,255,0.4)', mt: 0.5}}
+          >
             Manage your connected communication channels
           </Typography>
         </Box>
@@ -108,17 +141,28 @@ export default function ChannelBindingsPage() {
 
       {bindings.length === 0 ? (
         <Fade in>
-          <Box sx={{
-            textAlign: 'center', py: 8,
-            bgcolor: 'rgba(26,26,46,0.5)',
-            borderRadius: '16px',
-            border: '1px dashed rgba(255,255,255,0.1)',
-          }}>
-            <LinkOffIcon sx={{ fontSize: 56, color: 'rgba(255,255,255,0.15)', mb: 2 }} />
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1 }}>
+          <Box
+            sx={{
+              textAlign: 'center',
+              py: 8,
+              bgcolor: 'rgba(26,26,46,0.5)',
+              borderRadius: '16px',
+              border: '1px dashed rgba(255,255,255,0.1)',
+            }}
+          >
+            <LinkOffIcon
+              sx={{fontSize: 56, color: 'rgba(255,255,255,0.15)', mb: 2}}
+            />
+            <Typography
+              variant="h6"
+              sx={{color: 'rgba(255,255,255,0.4)', mb: 1}}
+            >
               No channels connected
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.25)', mb: 3 }}>
+            <Typography
+              variant="body2"
+              sx={{color: 'rgba(255,255,255,0.25)', mb: 3}}
+            >
               Add a channel to start receiving messages across platforms
             </Typography>
             <Button
@@ -127,7 +171,7 @@ export default function ChannelBindingsPage() {
               onClick={() => setWizardOpen(true)}
               sx={{
                 bgcolor: '#6C63FF',
-                '&:hover': { bgcolor: '#5a52e0' },
+                '&:hover': {bgcolor: '#5a52e0'},
                 textTransform: 'none',
                 px: 4,
               }}
@@ -141,35 +185,69 @@ export default function ChannelBindingsPage() {
           {bindings.map((binding, idx) => (
             <Grid item xs={12} sm={6} key={binding.id || idx}>
               <Grow in timeout={300 + idx * 100}>
-                <Card sx={binding.is_preferred ? preferredCardStyle : cardStyle} elevation={0}>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box sx={{
-                          width: 40, height: 40, borderRadius: '10px',
-                          bgcolor: `${binding.color || '#6C63FF'}20`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <Box sx={{
-                            width: 14, height: 14, borderRadius: '50%',
-                            bgcolor: binding.color || '#6C63FF',
-                          }} />
+                <Card
+                  sx={binding.is_preferred ? preferredCardStyle : cardStyle}
+                  elevation={0}
+                >
+                  <CardContent sx={{p: 2.5}}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Box
+                        sx={{display: 'flex', alignItems: 'center', gap: 1.5}}
+                      >
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '10px',
+                            bgcolor: `${binding.color || '#6C63FF'}20`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 14,
+                              height: 14,
+                              borderRadius: '50%',
+                              bgcolor: binding.color || '#6C63FF',
+                            }}
+                          />
                         </Box>
                         <Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
+                          <Box
+                            sx={{display: 'flex', alignItems: 'center', gap: 1}}
+                          >
+                            <Typography
+                              variant="subtitle1"
+                              sx={{color: '#fff', fontWeight: 600}}
+                            >
                               {binding.display_name || binding.channel_type}
                             </Typography>
-                            <ChannelPresenceIndicator channelType={binding.channel_type} size={8} />
+                            <ChannelPresenceIndicator
+                              channelType={binding.channel_type}
+                              size={8}
+                            />
                           </Box>
-                          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)' }}>
+                          <Typography
+                            variant="caption"
+                            sx={{color: 'rgba(255,255,255,0.35)'}}
+                          >
                             {binding.channel_type}
                             {binding.is_preferred && (
                               <Chip
                                 label="preferred"
                                 size="small"
                                 sx={{
-                                  ml: 1, height: 16, fontSize: '0.6rem',
+                                  ml: 1,
+                                  height: 16,
+                                  fontSize: '0.6rem',
                                   bgcolor: 'rgba(108,99,255,0.15)',
                                   color: '#6C63FF',
                                   border: 'none',
@@ -180,15 +258,31 @@ export default function ChannelBindingsPage() {
                         </Box>
                       </Box>
 
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Tooltip title={binding.is_preferred ? 'Preferred channel' : 'Set as preferred'}>
+                      <Box
+                        sx={{display: 'flex', alignItems: 'center', gap: 0.5}}
+                      >
+                        <Tooltip
+                          title={
+                            binding.is_preferred
+                              ? 'Preferred channel'
+                              : 'Set as preferred'
+                          }
+                        >
                           <IconButton
                             size="small"
                             onClick={() => handleSetPreferred(binding.id)}
                             disabled={actionLoading === binding.id}
-                            sx={{ color: binding.is_preferred ? '#6C63FF' : 'rgba(255,255,255,0.25)' }}
+                            sx={{
+                              color: binding.is_preferred
+                                ? '#6C63FF'
+                                : 'rgba(255,255,255,0.25)',
+                            }}
                           >
-                            {binding.is_preferred ? <StarIcon /> : <StarBorderIcon />}
+                            {binding.is_preferred ? (
+                              <StarIcon />
+                            ) : (
+                              <StarBorderIcon />
+                            )}
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Remove channel">
@@ -196,7 +290,10 @@ export default function ChannelBindingsPage() {
                             size="small"
                             onClick={() => setDeleteTarget(binding)}
                             disabled={actionLoading === binding.id}
-                            sx={{ color: 'rgba(255,255,255,0.25)', '&:hover': { color: '#ff4444' } }}
+                            sx={{
+                              color: 'rgba(255,255,255,0.25)',
+                              '&:hover': {color: '#ff4444'},
+                            }}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -205,14 +302,22 @@ export default function ChannelBindingsPage() {
                     </Box>
 
                     {(binding.capabilities || []).length > 0 && (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1.5 }}>
-                        {binding.capabilities.map(cap => (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 0.5,
+                          mt: 1.5,
+                        }}
+                      >
+                        {binding.capabilities.map((cap) => (
                           <Chip
                             key={cap}
                             label={cap}
                             size="small"
                             sx={{
-                              height: 20, fontSize: '0.65rem',
+                              height: 20,
+                              fontSize: '0.65rem',
                               bgcolor: 'rgba(108,99,255,0.08)',
                               color: 'rgba(255,255,255,0.4)',
                               border: 'none',
@@ -234,9 +339,11 @@ export default function ChannelBindingsPage() {
         <Fab
           onClick={() => setWizardOpen(true)}
           sx={{
-            position: 'fixed', bottom: 24, right: 24,
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
             bgcolor: '#6C63FF',
-            '&:hover': { bgcolor: '#5a52e0' },
+            '&:hover': {bgcolor: '#5a52e0'},
           }}
         >
           <AddIcon />
@@ -254,26 +361,40 @@ export default function ChannelBindingsPage() {
       <Dialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        PaperProps={{ sx: {
-          bgcolor: '#0F0E17', backgroundImage: 'none',
-          border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px',
-        }}}
+        PaperProps={{
+          sx: {
+            bgcolor: '#0F0E17',
+            backgroundImage: 'none',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '12px',
+          },
+        }}
       >
-        <DialogTitle sx={{ color: '#fff' }}>Remove Channel</DialogTitle>
+        <DialogTitle sx={{color: '#fff'}}>Remove Channel</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-            Remove <strong style={{ color: '#fff' }}>{deleteTarget?.display_name || deleteTarget?.channel_type}</strong> from
-            your connected channels? You can re-add it later.
+          <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.6)'}}>
+            Remove{' '}
+            <strong style={{color: '#fff'}}>
+              {deleteTarget?.display_name || deleteTarget?.channel_type}
+            </strong>{' '}
+            from your connected channels? You can re-add it later.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setDeleteTarget(null)} sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'none' }}>
+        <DialogActions sx={{px: 3, py: 2}}>
+          <Button
+            onClick={() => setDeleteTarget(null)}
+            sx={{color: 'rgba(255,255,255,0.5)', textTransform: 'none'}}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleRemove}
             variant="contained"
-            sx={{ bgcolor: '#ff4444', '&:hover': { bgcolor: '#cc3333' }, textTransform: 'none' }}
+            sx={{
+              bgcolor: '#ff4444',
+              '&:hover': {bgcolor: '#cc3333'},
+              textTransform: 'none',
+            }}
           >
             Remove
           </Button>
