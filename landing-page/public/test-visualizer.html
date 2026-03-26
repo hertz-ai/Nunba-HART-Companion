@@ -224,16 +224,33 @@ function render() {
 
   ctx.globalCompositeOperation = 'source-over';
 
-  // --- Core ---
-  var cr = 4 + energy * 8;
-  var cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr * 3);
-  cg.addColorStop(0, 'rgba(200,195,255,' + (0.3 + energy * 0.6).toFixed(2) + ')');
-  cg.addColorStop(0.4, 'rgba(108,99,255,' + (0.1 + energy * 0.2).toFixed(2) + ')');
+  // --- Core — breathing glow + pulsing dot ---
+  var breathe1 = Math.sin(time * 1.2) * 0.3 + Math.sin(time * 1.9) * 0.15;
+  var breathe2 = Math.sin(time * 0.8) * 0.2 + Math.cos(time * 1.4) * 0.1;
+
+  // Outer glow — breathes even when idle
+  var glowR = (8 + energy * 12 + breathe1 * 4) * 3;
+  var cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+  cg.addColorStop(0, 'rgba(200,195,255,' + (0.15 + energy * 0.5 + breathe1 * 0.08).toFixed(3) + ')');
+  cg.addColorStop(0.3, 'rgba(108,99,255,' + (0.08 + energy * 0.2 + breathe2 * 0.04).toFixed(3) + ')');
+  cg.addColorStop(0.6, 'rgba(80,60,200,' + (0.03 + energy * 0.08 + breathe1 * 0.02).toFixed(3) + ')');
   cg.addColorStop(1, 'rgba(108,99,255,0)');
   ctx.fillStyle = cg;
-  ctx.beginPath(); ctx.arc(cx, cy, cr * 3, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,' + (0.2 + energy * 0.8).toFixed(2) + ')';
-  ctx.beginPath(); ctx.arc(cx, cy, 1.5 + energy * 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
+
+  // Inner bright core — pulses
+  var coreR = 3 + energy * 6 + breathe1 * 1.5;
+  var cg2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+  cg2.addColorStop(0, 'rgba(220,215,255,' + (0.3 + energy * 0.5 + breathe2 * 0.1).toFixed(3) + ')');
+  cg2.addColorStop(0.5, 'rgba(108,99,255,' + (0.1 + energy * 0.3 + breathe1 * 0.05).toFixed(3) + ')');
+  cg2.addColorStop(1, 'rgba(108,99,255,0)');
+  ctx.fillStyle = cg2;
+  ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill();
+
+  // Hot dot — size breathes
+  var dotR = 1.5 + energy * 2.5 + Math.sin(time * 2.5) * 0.6;
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.15 + energy * 0.7 + breathe2 * 0.1).toFixed(3) + ')';
+  ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI * 2); ctx.fill();
 }
 
 render();
