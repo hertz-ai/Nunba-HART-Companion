@@ -118,11 +118,11 @@ function render() {
   for (var i = 0; i <= PTS; i++) {
     var a = (i / PTS) * Math.PI * 2;
     var d = dir;
-    // Subtle idle breathing — always present, very gentle
+    // Idle breathing — visible but calm
     var idle =
-      2.0 * Math.sin(2 * a + time * 0.4) +
-      1.2 * Math.sin(3 * a - time * 0.3) +
-      0.8 * Math.sin(5 * a + time * 0.5);
+      6 * Math.sin(2 * a + time * 0.6) +
+      4 * Math.sin(3 * a - time * 0.45) +
+      3 * Math.sin(5 * a + time * 0.7);
     // Audio-reactive wave
     var wave = idle +
       bassCur   * 55 * Math.sin(2 * a + time * 1.5 * d) +

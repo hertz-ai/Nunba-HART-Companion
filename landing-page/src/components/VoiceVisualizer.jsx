@@ -99,11 +99,11 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       var maxPeakR = baseR;
       for (var i = 0; i <= PTS; i++) {
         var a = (i / PTS) * Math.PI * 2;
-        // Subtle idle breathing — always present
+        // Idle breathing — visible but calm
         var idle =
-          2.0 * Math.sin(2 * a + t * 0.4) +
-          1.2 * Math.sin(3 * a - t * 0.3) +
-          0.8 * Math.sin(5 * a + t * 0.5);
+          6 * Math.sin(2 * a + t * 0.6) +
+          4 * Math.sin(3 * a - t * 0.45) +
+          3 * Math.sin(5 * a + t * 0.7);
         var wave = idle +
           s.bassCur * 55 * Math.sin(2 * a + t * 1.5 * d) +
           s.bassCur * 32 * Math.sin(3 * a - t * 0.8 * d) +
