@@ -189,6 +189,40 @@ class TTSLoader(ModelLoader):
         pass  # TTSEngine manages its own backend lifecycle
 
     def is_downloaded(self, entry: ModelEntry) -> bool:
+        backend_name = entry.id.replace('tts-', '')
+
+        # ── LuxTTS: pip package (sherpa_onnx) alone is not enough —
+        # the engine also needs ~163 MB of ONNX model files that are
+        # downloaded lazily on first synthesis call.  Without them the
+        # first TTS request blocks (or hangs) while downloading from
+        # GitHub.  Report not-downloaded so the catalog scorer doesn't
+        # give luxtts the +50 "already downloaded" bonus and a lighter
+        # engine (Piper) wins instead — until the user explicitly
+        # downloads luxtts via the AI Setup Wizard.
+        if backend_name == 'luxtts':
+            import os
+            from pathlib import Path
+            # Mirror the two lookup paths used by luxtts_tool._get_model_dir()
+            _luxtts_search = [
+                Path(os.path.expanduser('~/.hevolve/models/luxtts')),
+                Path(os.path.expanduser('~/.nunba/models/luxtts')),
+            ]
+            try:
+                from integrations.service_tools.model_storage import model_storage
+                _luxtts_search.insert(0, Path(model_storage.get_tool_dir('luxtts')))
+            except Exception:
+                pass
+            _models_ready = any(
+                (d / 'encoder.int8.onnx').exists() for d in _luxtts_search
+            )
+            if not _models_ready:
+                logger.info(
+                    "LuxTTS ONNX models not present — "
+                    "marking as not-downloaded so a lighter engine is used. "
+                    "Download via AI Setup Wizard to enable LuxTTS."
+                )
+                return False
+
         pkg = entry.files.get('package') or entry.repo_id
         if pkg:
             import importlib.util
