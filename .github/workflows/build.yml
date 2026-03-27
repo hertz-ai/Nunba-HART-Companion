@@ -50,6 +50,14 @@ jobs:
           token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
         continue-on-error: true
 
+      - name: Checkout Hevolve_Database
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/Hevolve_Database
+          path: _deps/Hevolve_Database
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
       - name: Link sibling repos
         shell: bash
         run: |
@@ -59,11 +67,11 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cmd //c "mklink /J \"$(cygpath -w ../HARTOS)\" \"$(cygpath -w $GITHUB_WORKSPACE/_deps/HARTOS)\"" 2>/dev/null || true
             cmd //c "mklink /J \"$(cygpath -w ../hevolveai)\" \"$(cygpath -w $GITHUB_WORKSPACE/_deps/hevolveai)\"" 2>/dev/null || true
-            cmd //c "mklink /J \"$(cygpath -w ../Hevolve_Database)\" \"$(cygpath -w $GITHUB_WORKSPACE/_deps/HARTOS)\"" 2>/dev/null || true
+            cmd //c "mklink /J \"$(cygpath -w ../Hevolve_Database)\" \"$(cygpath -w $GITHUB_WORKSPACE/_deps/Hevolve_Database)\"" 2>/dev/null || true
           else
             ln -sf "$GITHUB_WORKSPACE/_deps/HARTOS" ../HARTOS || true
             ln -sf "$GITHUB_WORKSPACE/_deps/hevolveai" ../hevolveai || true
-            ln -sf "$GITHUB_WORKSPACE/_deps/HARTOS" ../Hevolve_Database || true
+            ln -sf "$GITHUB_WORKSPACE/_deps/Hevolve_Database" ../Hevolve_Database || true
           fi
           ls -la ../HARTOS/pyproject.toml ../hevolveai/ 2>/dev/null || echo "Some sibling repos not available"
 
@@ -218,10 +226,18 @@ jobs:
           token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
         continue-on-error: true
 
+      - name: Checkout Hevolve_Database
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/Hevolve_Database
+          path: _deps/Hevolve_Database
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
       - name: Symlink sibling repos
         run: |
           ln -s "$GITHUB_WORKSPACE/_deps/HARTOS" ../HARTOS || true
           ln -s "$GITHUB_WORKSPACE/_deps/hevolveai" ../hevolveai || true
+          ln -sf "$GITHUB_WORKSPACE/_deps/Hevolve_Database" ../Hevolve_Database || true
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -350,11 +366,19 @@ jobs:
           token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
         continue-on-error: true
 
+      - name: Checkout Hevolve_Database
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/Hevolve_Database
+          path: _deps/Hevolve_Database
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
       - name: Symlink sibling repos
         run: |
           ln -s "$GITHUB_WORKSPACE/_deps/HARTOS" ../HARTOS || true
           ln -s "$GITHUB_WORKSPACE/_deps/hevolveai" ../hevolveai || true
 
+          ln -sf "$GITHUB_WORKSPACE/_deps/Hevolve_Database" ../Hevolve_Database || true
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
