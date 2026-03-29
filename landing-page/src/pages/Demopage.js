@@ -3535,7 +3535,8 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                       </div>
                     </div>
                   )}
-                  <div className="h-5/6 flex items-center justify-center">
+                  <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{zIndex: 1}}>
+                   <div className="pointer-events-auto">
                     {agentsLoading ? (
                       /* ── Loading skeleton while agents are being fetched ── */
                       <div className="text-center space-y-4 mb-1 w-full max-w-lg px-4">
@@ -3675,6 +3676,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                       )}
                     </div>
                     )}
+                   </div>
                   </div>
                 </>
               ) : (
