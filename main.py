@@ -2341,24 +2341,28 @@ if __name__ == '__main__':
                     pass
 
                 # Trigger language-based engine selection (loads GPU model)
-                if preferred_lang != 'en':
-                    logging.info(f"TTS warm-up: user prefers '{preferred_lang}', loading GPU engine...")
-                    engine.set_language(preferred_lang)
-                else:
-                    # English: try to load Chatterbox Turbo (GPU) instead of Piper (CPU)
-                    try:
-                        engine.set_language('en')
-                    except Exception:
-                        pass
+                logging.info(f"TTS warm-up: user prefers '{preferred_lang}', selecting GPU engine...")
+                engine.set_language(preferred_lang)
 
-                # Force model load by synthesizing a silent test (discarded)
+                # Wait for background engine switch to complete (up to 60s)
+                # set_language() starts a background thread — we need to wait
+                # for it to finish so the GPU model is actually in VRAM
+                for _wait in range(120):
+                    if not getattr(engine, '_pending_backend', None):
+                        break
+                    time.sleep(0.5)
+                    if _wait == 0:
+                        logging.info(f"TTS warm-up: waiting for {engine._pending_backend} to load...")
+
+                # Force model load by synthesizing a test sentence
                 import tempfile as _tf
                 _test_path = os.path.join(_tf.gettempdir(), '_nunba_tts_warmup.wav')
                 try:
-                    engine.synthesize(".", output_path=_test_path, language=preferred_lang)
-                    os.unlink(_test_path)
-                except Exception:
-                    pass
+                    engine.synthesize("test", output_path=_test_path, language=preferred_lang)
+                    if os.path.exists(_test_path):
+                        os.unlink(_test_path)
+                except Exception as _se:
+                    logging.debug(f"TTS warm-up synthesis skipped: {_se}")
 
                 backend = engine.get_info().get('active_backend', 'unknown')
                 logging.info(f"TTS engine warmed up: {backend} (language={preferred_lang})")
