@@ -2092,8 +2092,11 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    const _hartLang = localStorage.getItem('hart_language') || 'en';
-    recognition.lang = _sttLangMap[_hartLang] || _hartLang;
+    // STT language = what the USER speaks (always English for now)
+    // hart_language = what the AI RESPONDS in (may be Tamil, Hindi, etc.)
+    // User speaks English → AI responds in preferred language
+    const _sttLang = localStorage.getItem('stt_language') || 'en';
+    recognition.lang = _sttLangMap[_sttLang] || _sttLang;
 
     // Track what was committed (final) vs what's still interim
     let committedText = '';
