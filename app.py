@@ -3796,9 +3796,16 @@ def start_flask():
             """Bring the webview window to the foreground (called by duplicate instances)."""
             try:
                 if _window is not None:
+                    _window.show()  # unhide if started in background mode
                     _window.restore()
+                    # Load /local if page was never loaded (background start)
+                    try:
+                        _cur = _window.get_current_url() or ''
+                        if not _cur or 'about:blank' in _cur:
+                            _window.load_url(f"http://localhost:{args.port}/local")
+                    except Exception:
+                        pass
                     _window.on_top = True
-                    # Reset on_top after a short delay so it doesn't stay pinned
                     import threading as _thr
                     _thr.Timer(0.5, lambda: setattr(_window, 'on_top', False)).start()
                 return jsonify({"focused": True})
