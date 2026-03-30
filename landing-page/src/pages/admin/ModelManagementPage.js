@@ -31,15 +31,38 @@ function VRAMBar({ compute }) {
         }} />
       </div>
       {Object.keys(allocs).length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-          {Object.entries(allocs).map(([name, gb]) => (
-            <span key={name} style={{
-              fontSize: 11, background: '#1a2332', padding: '2px 6px',
-              borderRadius: 4, color: '#8899aa',
-            }}>
-              {name}: {gb.toFixed(1)}GB
-            </span>
-          ))}
+        <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+          {Object.entries(allocs).map(([name, info]) => {
+            const isRich = typeof info === 'object' && info !== null;
+            const gb = isRich ? info.gb : info;
+            const device = isRich ? info.device : null;
+            const quant = isRich ? info.quant : null;
+            const ctx = isRich ? info.context : null;
+            const vision = isRich ? info.vision : false;
+            const mmproj = isRich ? info.mmproj : null;
+            const deviceColor = device === 'gpu' ? '#4CAF50' : device === 'cpu' ? '#FF9800' : '#8899aa';
+            return (
+              <div key={name} style={{
+                fontSize: 11, background: '#1a2332', padding: '4px 8px',
+                borderRadius: 6, border: '1px solid #2a3a4a',
+                display: 'flex', flexDirection: 'column', gap: 2,
+              }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ color: '#ccc', fontWeight: 600 }}>{name}</span>
+                  <span style={{ color: deviceColor, fontWeight: 600 }}>{gb?.toFixed?.(1) || gb}GB</span>
+                  {device && <span style={{ color: deviceColor, fontSize: 10 }}>{device.toUpperCase()}</span>}
+                </div>
+                {(quant || ctx || vision || mmproj) && (
+                  <div style={{ display: 'flex', gap: 6, fontSize: 10, color: '#667' }}>
+                    {quant && <span style={{ background: '#6C63FF22', color: '#9990ff', padding: '0 4px', borderRadius: 3 }}>{quant}</span>}
+                    {ctx && <span>ctx: {typeof ctx === 'number' && ctx >= 1000 ? `${Math.round(ctx/1024)}K` : ctx}</span>}
+                    {vision && <span style={{ color: '#4CAF50' }}>VLM</span>}
+                    {mmproj && <span>mmproj: {mmproj}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

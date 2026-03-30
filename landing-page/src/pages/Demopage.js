@@ -1871,12 +1871,16 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           localStorage.setItem('guest_name_verified', 'true');
           setGuestNameConflict(null);
         } else {
+          // Forge legendary variants — anime-style suffixes, not boring numbers
+          const _suffixes = ['zen', 'ra', 'ki', 'va', 'rin', 'ax', 'ix', 'on', 'ex', 'ith', 'ark', 'os'];
+          const _pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
           setGuestNameConflict({
-            message: `The name "${guestName}" is already taken.`,
+            taken: true,
             suggestions: data.suggestions || [
-              `${guestName}_${Math.floor(Math.random() * 999)}`,
-              `${guestName}${new Date().getFullYear()}`,
-            ],
+              `${guestName}${_pick(_suffixes)}`,
+              `${guestName}${_pick(_suffixes)}`,
+              `${guestName}${_pick(_suffixes)}`,
+            ].filter((v, i, a) => a.indexOf(v) === i), // dedupe
           });
         }
       } catch (err) {
@@ -2081,80 +2085,160 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   };
 
   const handleStart = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Tier 1: WebSocket streaming STT (GPU faster-whisper, real-time)
+    // Tier 2: Batch HTTP STT (GPU faster-whisper, 2s chunks)
+    // Tier 3: Browser Web Speech API (fallback)
+    const _useStreamingWhisper = async () => {
+      try {
+        // Discover streaming STT WebSocket port
+        const portResp = await fetch('/voice/stt/stream-port');
+        if (!portResp.ok) return false;
+        const { url: wsUrl } = await portResp.json();
+        if (!wsUrl) return false;
 
-    if (!SpeechRecognition) {
-      alert('Speech Recognition is not supported in your browser.');
-      return;
-    }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    // STT: use hart_language as a HINT for browser Speech API,
-    // but user can speak any language — Whisper auto-detects on server.
-    // Browser API needs a BCP-47 hint for best results but handles
-    // mixed language (code-switching) reasonably well.
-    const _hartLang = localStorage.getItem('hart_language') || 'en';
-    recognition.lang = _sttLangMap[_hartLang] || _hartLang;
+        // Connect WebSocket
+        const ws = new WebSocket(wsUrl);
+        let wsReady = false;
+        let autoSendTimer = null;
+        let fullText = '';
 
-    // Track what was committed (final) vs what's still interim
-    let committedText = '';
+        ws.onopen = () => { wsReady = true; };
+        ws.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            if (data.text?.trim()) {
+              if (data.is_final) {
+                fullText += (fullText ? ' ' : '') + data.text.trim();
+                setInputMessage(fullText);
+                // Auto-send after 1.5s of silence
+                clearTimeout(autoSendTimer);
+                autoSendTimer = setTimeout(() => {
+                  if (fullText.trim() && handleSendRef.current) {
+                    handleSendRef.current();
+                    fullText = '';
+                  }
+                }, 1500);
+              } else {
+                // Interim — show current full + interim
+                setInputMessage(fullText + (fullText ? ' ' : '') + data.text.trim());
+              }
+            }
+          } catch { /* ignore malformed messages */ }
+        };
+        ws.onerror = () => { wsReady = false; };
 
-    recognition.onresult = (event) => {
-      let interim = '';
-      let finalText = '';
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalText += result[0].transcript;
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-      // Replace input with committed finals + current interim (no duplication)
-      committedText = finalText;
-      setInputMessage(committedText + interim);
-    };
+        // Record audio and send chunks over WebSocket
+        // Use AudioWorklet or ScriptProcessor to get raw PCM
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const source = audioCtx.createMediaStreamSource(stream);
+        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
-    // Auto-send on speech pause: when a final result arrives and
-    // no new speech for 1.5s, send automatically (voice agent UX)
-    let autoSendTimer = null;
-    const origOnResult = recognition.onresult;
-    recognition.onresult = (event) => {
-      origOnResult(event);
-      // Check if the latest result is final (speech pause detected)
-      const lastResult = event.results[event.results.length - 1];
-      if (lastResult.isFinal) {
-        clearTimeout(autoSendTimer);
-        autoSendTimer = setTimeout(() => {
-          if (committedText.trim()) {
-            // Auto-send without pressing Enter
-            if (handleSendRef.current) handleSendRef.current();
-            committedText = '';
+        processor.onaudioprocess = (e) => {
+          if (!wsReady) return;
+          const float32 = e.inputBuffer.getChannelData(0);
+          // Convert float32 [-1,1] to int16 PCM
+          const pcm16 = new Int16Array(float32.length);
+          for (let i = 0; i < float32.length; i++) {
+            pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
           }
-        }, 1500); // 1.5s silence → auto-send
+          ws.send(pcm16.buffer);
+        };
+
+        source.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        recognitionRef.current = {
+          stop: () => {
+            // Send final control message
+            if (wsReady) {
+              try { ws.send(JSON.stringify({ control: 'final' })); } catch {}
+            }
+            processor.disconnect();
+            source.disconnect();
+            audioCtx.close();
+            stream.getTracks().forEach(t => t.stop());
+            // Wait briefly for final transcription, then close
+            setTimeout(() => {
+              ws.close();
+              clearTimeout(autoSendTimer);
+              if (fullText.trim() && handleSendRef.current) {
+                handleSendRef.current();
+                fullText = '';
+              }
+              setIsRecording(false);
+            }, 500);
+          },
+          _type: 'whisper-stream',
+        };
+        setIsRecording(true);
+        return true;
+      } catch (err) {
+        console.warn('Streaming STT failed:', err.message);
+        return false;
       }
     };
 
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-    };
+    const _useWebSpeech = () => {
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    recognition.onend = () => {
-      clearTimeout(autoSendTimer);
-      // Auto-send any remaining text when recording stops
-      if (committedText.trim() && handleSendRef.current) {
-        handleSendRef.current();
-        committedText = '';
+      if (!SpeechRecognition) {
+        alert('Speech Recognition is not supported in your browser.');
+        return;
       }
-      setIsRecording(false);
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      const _hartLang = localStorage.getItem('hart_language') || 'en';
+      recognition.lang = _sttLangMap[_hartLang] || _hartLang;
+
+      let committedText = '';
+      let autoSendTimer = null;
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let finalText = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) finalText += result[0].transcript;
+          else interim += result[0].transcript;
+        }
+        committedText = finalText;
+        setInputMessage(committedText + interim);
+
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal) {
+          clearTimeout(autoSendTimer);
+          autoSendTimer = setTimeout(() => {
+            if (committedText.trim() && handleSendRef.current) {
+              handleSendRef.current();
+              committedText = '';
+            }
+          }, 1500);
+        }
+      };
+
+      recognition.onerror = (event) => console.error('Speech recognition error', event.error);
+
+      recognition.onend = () => {
+        clearTimeout(autoSendTimer);
+        if (committedText.trim() && handleSendRef.current) {
+          handleSendRef.current();
+          committedText = '';
+        }
+        setIsRecording(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsRecording(true);
     };
 
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsRecording(true);
+    // Tier cascade: WebSocket streaming → Web Speech fallback
+    _useStreamingWhisper().then(ok => { if (!ok) _useWebSpeech(); });
   };
 
   const handleStop = () => {
@@ -3363,22 +3447,17 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
         />
 
         <div className="flex flex-col min-h-screen bg-black w-full">
-          {/* VoiceVisualizer — outside layout columns so never clipped */}
-          {audioUrl && !videoUrl && (
-            <div className="fixed bottom-24 right-4 z-50">
-              <VoiceVisualizer audioRef={audioRef} isActive={isPlayingResponse} size={120} />
-            </div>
-          )}
+          {/* VoiceVisualizer removed from corner — now lives in the media column */}
           <div className="w-full flex flex-col md:flex-row-reverse flex-1">
             {/* Chat/Messages section - Now on the left for wider screens */}
 
             <div
               className={`${
                 !uploadedImage && !uploadedPdf && window.innerWidth > 768
-                  ? (isTextMode || (!videoUrl && !audioUrl) ? 'w-0 overflow-hidden' : (videoUrl ? 'w-[30%]' : 'w-0 overflow-hidden'))
+                  ? (isTextMode ? 'w-0 overflow-hidden' : (videoUrl || mediaMode === 'audio' ? 'w-[30%]' : 'w-0 overflow-hidden'))
                   : 'w-full'
               } ${
-                window.innerWidth <= 768 ? (isTextMode || (!videoUrl && !audioUrl) ? '' : 'h-[35vh] mb-4') : ''
+                window.innerWidth <= 768 ? (isTextMode ? '' : (videoUrl || mediaMode === 'audio' ? 'h-[35vh] mb-4' : '')) : ''
               } flex justify-center items-center transition-all duration-300`}
             >
               {!isTextMode && (
@@ -3403,17 +3482,30 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                           onEnded={handleMediaEnded}
                           onError={handleVideoError}
                         />
-                      ) : audioUrl ? (
-                        <audio
-                          ref={audioRef}
-                          src={audioUrl}
-                          autoPlay
-                          controlsList="nodownload noplaybackrate"
-                          controls={false}
-                          onLoadedMetadata={handleLoadedMetadataaudio}
-                          onEnded={handleMediaEnded}
-                          style={{display: 'none'}}
-                        />
+                      ) : mediaMode === 'audio' ? (
+                        <>
+                          {/* Hidden audio element for playback */}
+                          {audioUrl && (
+                            <audio
+                              ref={audioRef}
+                              src={audioUrl}
+                              autoPlay
+                              controlsList="nodownload noplaybackrate"
+                              controls={false}
+                              onLoadedMetadata={handleLoadedMetadataaudio}
+                              onEnded={handleMediaEnded}
+                              style={{display: 'none'}}
+                            />
+                          )}
+                          {/* VoiceVisualizer — centered in media column */}
+                          <div className="flex justify-center items-center w-full h-full">
+                            <VoiceVisualizer
+                              audioRef={audioRef}
+                              isActive={isPlayingResponse || tts.isSpeaking}
+                              size={window.innerWidth <= 768 ? 200 : 280}
+                            />
+                          </div>
+                        </>
                       ) : null}
                     </>
                   ) : (
@@ -3517,23 +3609,72 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
               {messages.length === 0 ? (
                 <>
                   {guestNameConflict && (
-                    <div className="mx-4 mt-2 p-3 rounded-lg text-sm"
-                         style={{ background: 'rgba(108,99,255,0.12)', border: '1px solid rgba(108,99,255,0.3)', color: '#c4c0ff' }}>
-                      <p className="font-semibold" style={{ color: '#a8a3ff' }}>
-                        {guestNameConflict.message}
+                    <div className="mx-4 mt-2 overflow-hidden"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(15,14,23,0.95) 0%, rgba(25,22,40,0.95) 100%)',
+                           border: '1px solid rgba(108,99,255,0.25)',
+                           borderRadius: '16px',
+                           padding: '16px 20px',
+                           boxShadow: '0 0 30px rgba(108,99,255,0.08), inset 0 1px 0 rgba(255,255,255,0.05)',
+                           backdropFilter: 'blur(20px)',
+                         }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div style={{
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: '#FF6B6B',
+                          boxShadow: '0 0 8px rgba(255,107,107,0.5)',
+                          animation: 'pulse 2s ease-in-out infinite',
+                        }} />
+                        <span style={{
+                          color: 'rgba(255,255,255,0.5)',
+                          fontSize: '0.7rem',
+                          fontFamily: '"SF Mono", "Fira Code", monospace',
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                        }}>
+                          Name taken globally
+                        </span>
+                      </div>
+                      <p style={{
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: '0.78rem',
+                        marginBottom: 12,
+                        fontFamily: '"SF Mono", "Fira Code", monospace',
+                      }}>
+                        Forge your identity —
                       </p>
-                      <p className="mt-1" style={{ color: '#9994d6' }}>Choose an alternative:</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2">
                         {guestNameConflict.suggestions.map((name) => (
                           <button
                             key={name}
                             onClick={() => handleGuestNameChange(name)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-colors"
-                            style={{ background: 'rgba(108,99,255,0.2)', color: '#d0ccff' }}
-                            onMouseOver={(e) => e.target.style.background = 'rgba(108,99,255,0.35)'}
-                            onMouseOut={(e) => e.target.style.background = 'rgba(108,99,255,0.2)'}
+                            className="transition-all duration-200"
+                            style={{
+                              background: 'rgba(108,99,255,0.12)',
+                              border: '1px solid rgba(108,99,255,0.3)',
+                              borderRadius: '10px',
+                              padding: '8px 16px',
+                              color: '#c4c0ff',
+                              fontSize: '0.82rem',
+                              fontFamily: '"SF Mono", "Fira Code", monospace',
+                              fontWeight: 500,
+                              letterSpacing: '0.04em',
+                              cursor: 'pointer',
+                            }}
+                            onMouseOver={(e) => {
+                              e.target.style.background = 'rgba(108,99,255,0.25)';
+                              e.target.style.borderColor = 'rgba(108,99,255,0.6)';
+                              e.target.style.boxShadow = '0 0 16px rgba(108,99,255,0.2)';
+                              e.target.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.background = 'rgba(108,99,255,0.12)';
+                              e.target.style.borderColor = 'rgba(108,99,255,0.3)';
+                              e.target.style.boxShadow = 'none';
+                              e.target.style.transform = 'translateY(0)';
+                            }}
                           >
-                            {name}
+                            @{name}
                           </button>
                         ))}
                       </div>

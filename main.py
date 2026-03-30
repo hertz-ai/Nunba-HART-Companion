@@ -2279,6 +2279,115 @@ def _start_diarization_service():
         logging.warning(f"DiarizationService failed to start: {e}")
 
 
+_bg_services_started = False
+
+def start_background_services():
+    """Start all background services: LangChain, vision, diarization, TTS warm-up.
+
+    Called from both `python main.py` (direct) and `app.py` (frozen exe import).
+    Guarded — only runs once per process.
+    """
+    global _bg_services_started
+    if _bg_services_started:
+        logging.debug("Background services already started — skipping")
+        return
+    _bg_services_started = True
+
+    # Start LangChain service in background thread (non-blocking)
+    langchain_thread = threading.Thread(target=start_langchain_service, daemon=True)
+    langchain_thread.start()
+
+    # Start LangChain watchdog (monitors subprocess health, auto-restarts on failure).
+    # Only needed when LangChain runs as a subprocess (standalone, non-bundled mode).
+    _should_watchdog = not (os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False))
+    if _should_watchdog:
+        try:
+            from routes.hartos_backend_adapter import _hartos_backend_available
+            if _hartos_backend_available:
+                _should_watchdog = False  # in-process, no subprocess to watch
+        except Exception:
+            pass  # import failed, subprocess might be needed
+
+    if _should_watchdog:
+        watchdog_thread = threading.Thread(
+            target=_langchain_watchdog, daemon=True, name='LangChainWatchdog'
+        )
+        watchdog_thread.start()
+        logging.info("LangChain watchdog thread started")
+    else:
+        logging.info("LangChain watchdog skipped (in-process or bundled mode)")
+
+    # Start VisionService (MiniCPM + frame receiver) in daemon thread
+    vision_thread = threading.Thread(target=_start_vision_service, daemon=True)
+    vision_thread.start()
+
+    # Start streaming STT WebSocket server (faster-whisper, real-time mic input)
+    try:
+        from integrations.service_tools.whisper_tool import start_stt_stream_server
+        stt_port = start_stt_stream_server()
+        if stt_port:
+            logging.info(f"Streaming STT WebSocket server started on port {stt_port}")
+    except Exception as e:
+        logging.debug(f"Streaming STT server skipped: {e}")
+
+    # Start DiarizationService (speaker diarization sidecar) in daemon thread
+    diarization_thread = threading.Thread(target=_start_diarization_service, daemon=True)
+    diarization_thread.start()
+
+    # Warm-up TTS engine in background with user's preferred language
+    # so the correct GPU engine (Indic Parler, CosyVoice3, Chatterbox Turbo)
+    # is loaded BEFORE the first TTS request — no cold-start delay.
+    def _warmup_tts():
+        try:
+            if os.environ.get('NUNBA_DISABLE_TTS'):
+                return
+            from tts.tts_engine import get_tts_engine
+            engine = get_tts_engine()
+
+            # Read user's preferred language from HART onboarding
+            preferred_lang = 'en'
+            try:
+                import json as _json
+                _hart_lang_file = os.path.join(
+                    os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
+                if os.path.exists(_hart_lang_file):
+                    with open(_hart_lang_file) as _f:
+                        preferred_lang = _json.load(_f).get('language', 'en')
+            except Exception:
+                pass
+
+            # Trigger language-based engine selection (loads GPU model)
+            logging.info(f"TTS warm-up: user prefers '{preferred_lang}', selecting GPU engine...")
+            engine.set_language(preferred_lang)
+
+            # Wait for background engine switch to complete (up to 60s)
+            # set_language() starts a background thread — we need to wait
+            # for it to finish so the GPU model is actually in VRAM
+            for _wait in range(120):
+                if not getattr(engine, '_pending_backend', None):
+                    break
+                time.sleep(0.5)
+                if _wait == 0:
+                    logging.info(f"TTS warm-up: waiting for {engine._pending_backend} to load...")
+
+            # Force model load by synthesizing a test sentence
+            import tempfile as _tf
+            _test_path = os.path.join(_tf.gettempdir(), '_nunba_tts_warmup.wav')
+            try:
+                engine.synthesize("test", output_path=_test_path, language=preferred_lang)
+                if os.path.exists(_test_path):
+                    os.unlink(_test_path)
+            except Exception as _se:
+                logging.debug(f"TTS warm-up synthesis skipped: {_se}")
+
+            backend = engine.get_info().get('active_backend', 'unknown')
+            logging.info(f"TTS engine warmed up: {backend} (language={preferred_lang})")
+        except Exception as e:
+            logging.warning(f"TTS warm-up failed (non-blocking): {e}")
+    tts_thread = threading.Thread(target=_warmup_tts, daemon=True, name='TTSWarmup')
+    tts_thread.start()
+
+
 if __name__ == '__main__':
     try:
         # Log Python version and environment info
@@ -2286,90 +2395,7 @@ if __name__ == '__main__':
         logging.info(f"Running from: {os.path.abspath(__file__)}")
         logging.info(f"Hevolve build directory: {LANDING_PAGE_BUILD_DIR}")
 
-        # Start LangChain service in background thread (non-blocking)
-        langchain_thread = threading.Thread(target=start_langchain_service, daemon=True)
-        langchain_thread.start()
-
-        # Start LangChain watchdog (monitors subprocess health, auto-restarts on failure).
-        # Only needed when LangChain runs as a subprocess (standalone, non-bundled mode).
-        _should_watchdog = not (os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False))
-        if _should_watchdog:
-            try:
-                from routes.hartos_backend_adapter import _hartos_backend_available
-                if _hartos_backend_available:
-                    _should_watchdog = False  # in-process, no subprocess to watch
-            except Exception:
-                pass  # import failed, subprocess might be needed
-
-        if _should_watchdog:
-            watchdog_thread = threading.Thread(
-                target=_langchain_watchdog, daemon=True, name='LangChainWatchdog'
-            )
-            watchdog_thread.start()
-            logging.info("LangChain watchdog thread started")
-        else:
-            logging.info("LangChain watchdog skipped (in-process or bundled mode)")
-
-        # Start VisionService (MiniCPM + frame receiver) in daemon thread
-        vision_thread = threading.Thread(target=_start_vision_service, daemon=True)
-        vision_thread.start()
-
-        # Start DiarizationService (speaker diarization sidecar) in daemon thread
-        diarization_thread = threading.Thread(target=_start_diarization_service, daemon=True)
-        diarization_thread.start()
-
-        # Warm-up TTS engine in background with user's preferred language
-        # so the correct GPU engine (Indic Parler, CosyVoice3, Chatterbox Turbo)
-        # is loaded BEFORE the first TTS request — no cold-start delay.
-        def _warmup_tts():
-            try:
-                if os.environ.get('NUNBA_DISABLE_TTS'):
-                    return
-                from tts.tts_engine import get_tts_engine
-                engine = get_tts_engine()
-
-                # Read user's preferred language from HART onboarding
-                preferred_lang = 'en'
-                try:
-                    import json as _json
-                    _hart_lang_file = os.path.join(
-                        os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
-                    if os.path.exists(_hart_lang_file):
-                        with open(_hart_lang_file) as _f:
-                            preferred_lang = _json.load(_f).get('language', 'en')
-                except Exception:
-                    pass
-
-                # Trigger language-based engine selection (loads GPU model)
-                logging.info(f"TTS warm-up: user prefers '{preferred_lang}', selecting GPU engine...")
-                engine.set_language(preferred_lang)
-
-                # Wait for background engine switch to complete (up to 60s)
-                # set_language() starts a background thread — we need to wait
-                # for it to finish so the GPU model is actually in VRAM
-                for _wait in range(120):
-                    if not getattr(engine, '_pending_backend', None):
-                        break
-                    time.sleep(0.5)
-                    if _wait == 0:
-                        logging.info(f"TTS warm-up: waiting for {engine._pending_backend} to load...")
-
-                # Force model load by synthesizing a test sentence
-                import tempfile as _tf
-                _test_path = os.path.join(_tf.gettempdir(), '_nunba_tts_warmup.wav')
-                try:
-                    engine.synthesize("test", output_path=_test_path, language=preferred_lang)
-                    if os.path.exists(_test_path):
-                        os.unlink(_test_path)
-                except Exception as _se:
-                    logging.debug(f"TTS warm-up synthesis skipped: {_se}")
-
-                backend = engine.get_info().get('active_backend', 'unknown')
-                logging.info(f"TTS engine warmed up: {backend} (language={preferred_lang})")
-            except Exception as e:
-                logging.warning(f"TTS warm-up failed (non-blocking): {e}")
-        tts_thread = threading.Thread(target=_warmup_tts, daemon=True, name='TTSWarmup')
-        tts_thread.start()
+        start_background_services()
 
         # Start the server via waitress (production WSGI)
         # Default to 127.0.0.1 (loopback only) for security; set NUNBA_BIND_HOST=0.0.0.0 to expose on all interfaces

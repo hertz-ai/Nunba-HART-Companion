@@ -1512,6 +1512,18 @@ def voice_transcribe():
             pass
 
 
+def voice_stt_stream_port():
+    """GET /voice/stt/stream-port — return WebSocket port for streaming STT."""
+    try:
+        from integrations.service_tools.whisper_tool import get_stt_stream_port
+        port = get_stt_stream_port()
+        if port:
+            return jsonify({'port': port, 'url': f'ws://127.0.0.1:{port}'})
+        return jsonify({'error': 'Streaming STT not running'}), 503
+    except ImportError:
+        return jsonify({'error': 'STT module not available'}), 501
+
+
 def voice_diarize():
     """
     POST /voice/diarize
@@ -3169,6 +3181,7 @@ def register_routes(app):
     # Voice pipeline routes (STT + Diarization — batch fallback for WS streaming primary)
     app.route("/voice/transcribe", methods=["POST"])(voice_transcribe)
     app.route("/voice/diarize", methods=["POST"])(voice_diarize)
+    app.route("/voice/stt/stream-port", methods=["GET"])(voice_stt_stream_port)
 
     # LLM config routes (AI provider management) — protected by auth (D4 fix)
     app.route("/api/llm/config", methods=["GET"])(_require_local_or_token(llm_config_get))

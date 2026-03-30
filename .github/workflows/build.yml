@@ -108,22 +108,29 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt 2>&1 | tail -5
 
-          # Install sibling deps in order: Hevolve_Database → hevolveai → HARTOS
-          for dep_dir in ../Hevolve_Database ../hevolveai ../HARTOS; do
+          # Install sibling deps in order: hevolveai → HARTOS (skip Hevolve_Database here, handled below)
+          for dep_dir in ../hevolveai ../HARTOS; do
             if [ -f "$dep_dir/pyproject.toml" ] || [ -f "$dep_dir/setup.py" ]; then
               echo "Installing $(basename $dep_dir) from source..."
               pip install --no-deps -e "$dep_dir" 2>&1 | tail -2
             fi
           done
 
-          # Hevolve_Database has no setup.py — add to path directly
+          # Hevolve_Database: try pip install -e first, fall back to .pth
+          if [ -f "../Hevolve_Database/setup.py" ]; then
+            echo "Installing Hevolve_Database from source (setup.py)..."
+            pip install --no-deps -e "../Hevolve_Database" 2>&1 | tail -3
+          fi
+          # Always create .pth as belt-and-suspenders (editable installs can silently break)
           if [ -d "../Hevolve_Database/sql" ]; then
             SITE_PKG=$(python -c "import site; print(site.getsitepackages()[0])")
-            echo "$(cd ../Hevolve_Database && pwd)" > "$SITE_PKG/hevolve_database.pth"
-            echo "Added Hevolve_Database to Python path via .pth"
+            HEVOLVE_DB_PATH=$(cd ../Hevolve_Database && pwd)
+            echo "$HEVOLVE_DB_PATH" > "$SITE_PKG/hevolve_database.pth"
+            echo "Added Hevolve_Database to Python path via .pth: $HEVOLVE_DB_PATH"
           fi
-          python -c "import sql; print('sql OK')" 2>/dev/null || echo "WARN: sql not importable"
-        continue-on-error: true
+
+          # Hard-fail if sql module is not importable — build will crash anyway
+          python -c "import sql; print('sql OK:', sql.__file__)"
 
       - name: Build Nunba app (cx_Freeze + slim)
         run: python scripts/build.py app --skip-wizard
@@ -274,18 +281,23 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt 2>&1 | tail -5
-          for dep_dir in ../Hevolve_Database ../hevolveai ../HARTOS; do
+          for dep_dir in ../hevolveai ../HARTOS; do
             if [ -f "$dep_dir/pyproject.toml" ] || [ -f "$dep_dir/setup.py" ]; then
               echo "Installing $(basename $dep_dir) from source..."
               pip install --no-deps -e "$dep_dir" 2>&1 | tail -2
             fi
           done
+          if [ -f "../Hevolve_Database/setup.py" ]; then
+            echo "Installing Hevolve_Database from source (setup.py)..."
+            pip install --no-deps -e "../Hevolve_Database" 2>&1 | tail -3
+          fi
           if [ -d "../Hevolve_Database/sql" ]; then
             SITE_PKG=$(python -c "import site; print(site.getsitepackages()[0])")
-            echo "$(cd ../Hevolve_Database && pwd)" > "$SITE_PKG/hevolve_database.pth"
-            echo "Added Hevolve_Database to Python path via .pth"
+            HEVOLVE_DB_PATH=$(cd ../Hevolve_Database && pwd)
+            echo "$HEVOLVE_DB_PATH" > "$SITE_PKG/hevolve_database.pth"
+            echo "Added Hevolve_Database to Python path via .pth: $HEVOLVE_DB_PATH"
           fi
-        continue-on-error: true
+          python -c "import sql; print('sql OK:', sql.__file__)"
 
       - name: Build Nunba
         run: python scripts/build.py full --skip-wizard
@@ -425,7 +437,7 @@ jobs:
           echo "=== Checking sibling repos ==="
           ls -la ../Hevolve_Database/ ../hevolveai/ ../HARTOS/ 2>&1 | head -20
           echo "=== Installing sibling deps ==="
-          for dep_dir in ../Hevolve_Database ../hevolveai ../HARTOS; do
+          for dep_dir in ../hevolveai ../HARTOS; do
             if [ -f "$dep_dir/pyproject.toml" ] || [ -f "$dep_dir/setup.py" ]; then
               echo "Installing $(basename $dep_dir) from $dep_dir..."
               pip install --no-deps -e "$dep_dir" 2>&1 | tail -3
@@ -435,20 +447,23 @@ jobs:
             fi
           done
 
-          # Hevolve_Database has no setup.py in the repo — add it to Python path directly
+          # Hevolve_Database: try pip install -e first, fall back to .pth
+          if [ -f "../Hevolve_Database/setup.py" ]; then
+            echo "Installing Hevolve_Database from source (setup.py)..."
+            pip install --no-deps -e "../Hevolve_Database" 2>&1 | tail -3
+          fi
+          # Always create .pth as belt-and-suspenders (editable installs can silently break)
           if [ -d "../Hevolve_Database/sql" ]; then
-            echo "Adding Hevolve_Database to PYTHONPATH (no setup.py in repo)"
-            export PYTHONPATH="../Hevolve_Database:$PYTHONPATH"
-            # Also create a .pth file so cx_Freeze can trace it
             SITE_PKG=$(python -c "import site; print(site.getsitepackages()[0])")
-            echo "$(realpath ../Hevolve_Database)" > "$SITE_PKG/hevolve_database.pth"
+            HEVOLVE_DB_PATH=$(realpath ../Hevolve_Database)
+            echo "$HEVOLVE_DB_PATH" > "$SITE_PKG/hevolve_database.pth"
+            echo "Added Hevolve_Database to Python path via .pth: $HEVOLVE_DB_PATH"
           fi
 
           echo "=== Verify imports ==="
-          python -c "import sql; print('sql OK:', sql.__file__)" 2>&1 || echo "WARN: sql not importable"
+          python -c "import sql; print('sql OK:', sql.__file__)"
           python -c "import hevolveai; print('hevolveai OK')" 2>&1 || echo "WARN: hevolveai not importable"
           python -c "import hart_intelligence; print('hart_intelligence OK')" 2>&1 || echo "WARN: hart_intelligence not importable"
-        continue-on-error: true
 
       - name: Build Nunba app (cx_Freeze)
         run: python scripts/build.py app --skip-wizard

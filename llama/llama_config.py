@@ -621,13 +621,13 @@ class LlamaConfig:
         started = self.start_server(model_preset=preset)
 
         # ── 8. Register VRAM allocation (so TTS/vision see the LLM's reservation) ──
+        # Canonical key 'llm' — idempotent, same key used by ModelOrchestrator
         if started and diag['run_mode'] == 'gpu':
             vm = self._get_vram_manager()
             if vm:
                 model_gb = preset.size_mb / 1024.0
-                tool_key = f'llm_{preset.display_name.replace(" ", "_").lower()}'
-                vm._allocations[tool_key] = model_gb
-                logger.info(f"Registered VRAM allocation: {tool_key} = {model_gb:.1f}GB")
+                vm._allocations['llm'] = model_gb
+                logger.info(f"Registered VRAM allocation: llm = {model_gb:.1f}GB")
 
         mode_label = 'GPU' if diag['run_mode'] == 'gpu' else 'CPU'
         if started:
@@ -973,9 +973,9 @@ class LlamaConfig:
                         logger.info(f"Running model: {actual_gguf}")
 
                         # Match GGUF filename to MODEL_PRESETS display name
+                        # MODEL_PRESETS is already imported at module level (line 18)
                         display_name = actual_gguf  # fallback
                         try:
-                            from llama.llama_installer import MODEL_PRESETS
                             for p in MODEL_PRESETS:
                                 if p.file_name == actual_gguf:
                                     display_name = p.display_name
@@ -1253,14 +1253,13 @@ class LlamaConfig:
                     # Propagate LLM URL to env so HARTOS resolves the correct endpoint
                     self.api_base = f'http://127.0.0.1:{desired_port}/v1'
                     self._propagate_llm_url(self.api_base)
-                    # Register VRAM allocation with VRAMManager (shared with TTS, vision)
+                    # Register VRAM allocation — canonical key 'llm', idempotent
                     if can_use_gpu:
                         vm = self._get_vram_manager()
                         if vm:
                             model_gb = model_preset.size_mb / 1024.0
-                            tool_key = f'llm_{model_preset.display_name.replace(" ", "_").lower()}'
-                            vm._allocations[tool_key] = model_gb
-                            logger.info(f"VRAM allocation registered: {tool_key} = {model_gb:.1f}GB")
+                            vm._allocations['llm'] = model_gb
+                            logger.info(f"VRAM allocation registered: llm = {model_gb:.1f}GB")
                     # Quick benchmark — warm up the KV cache and measure t/s
                     try:
                         import urllib.request
@@ -1320,11 +1319,9 @@ class LlamaConfig:
                 # Release VRAM allocation so TTS/vision can reclaim the space
                 vm = self._get_vram_manager()
                 if vm:
-                    released = [k for k in list(vm._allocations) if k.startswith('llm_')]
-                    for k in released:
-                        freed = vm._allocations.pop(k, 0)
-                        if freed:
-                            logger.info(f"Released VRAM allocation: {k} = {freed:.1f}GB")
+                    freed = vm._allocations.pop('llm', 0)
+                    if freed:
+                        logger.info(f"Released VRAM allocation: llm = {freed:.1f}GB")
 
     def switch_model(self, model_index: int) -> bool:
         """

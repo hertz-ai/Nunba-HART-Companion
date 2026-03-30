@@ -2727,6 +2727,14 @@ def _import_main_app():
 
     # Get the Flask app instance from main.py
     flask_app = main_module.app
+
+    # Start background services (TTS warm-up, vision, diarization, langchain)
+    # main.py's if __name__=='__main__' block doesn't run when imported as module
+    if hasattr(main_module, 'start_background_services'):
+        threading.Thread(
+            target=main_module.start_background_services,
+            daemon=True, name='BackgroundServices'
+        ).start()
     _startup_phase = 'main_imported'
 
     # Configure CORS properly for hevolve domains
@@ -5530,14 +5538,23 @@ def main():
         def _on_loaded_recovery():
             if _page_recovery_count[0] >= 3:
                 return
+            # Defer check — React mounts async after the HTML shell loads.
+            # Checking #root immediately always finds it empty → false reload.
+            def _deferred_check():
+                time.sleep(3)
+                _do_recovery_check()
+            threading.Thread(target=_deferred_check, daemon=True).start()
+
+        def _do_recovery_check():
+            if _page_recovery_count[0] >= 3:
+                return
             try:
                 _cur_url = _window.get_current_url() or ''
                 # URL-level check (about:blank, error pages, non-http)
                 is_error_url = ('about:blank' in _cur_url or 'error' in _cur_url.lower()
                                 or not _cur_url.startswith('http'))
                 # Content-level check — detect blank page even with valid URL.
-                # Check #root children count (not body length, which includes the
-                # pre-react-loader HTML and falsely passes the old <50 threshold).
+                # Check #root children count after React has had time to mount.
                 is_blank_content = False
                 if not is_error_url:
                     try:

@@ -216,9 +216,12 @@ class STTLoader(ModelLoader):
                 import subprocess
                 import sys
                 logger.info("STT download: installing faster-whisper")
+                _kw = dict(capture_output=True, text=True, timeout=300)
+                if sys.platform == 'win32':
+                    _kw['creationflags'] = subprocess.CREATE_NO_WINDOW
                 result = subprocess.run(
                     [sys.executable, '-m', 'pip', 'install', 'faster-whisper', '--quiet'],
-                    capture_output=True, text=True, timeout=300)
+                    **_kw)
                 if result.returncode != 0:
                     logger.warning(f"faster-whisper install failed: {result.stderr[:200]}")
                     return False

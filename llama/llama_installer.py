@@ -705,16 +705,19 @@ class LlamaInstaller:
         try:
             logger.info("Building llama.cpp from source...")
 
+            # Windows: suppress console windows
+            _cf = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+
             # Check for git
             try:
-                subprocess.run(["git", "--version"], check=True, capture_output=True)
+                subprocess.run(["git", "--version"], check=True, capture_output=True, creationflags=_cf)
             except Exception:
                 logger.error("Git not found. Please install git to build from source.")
                 return False
 
             # Check for cmake
             try:
-                subprocess.run(["cmake", "--version"], check=True, capture_output=True)
+                subprocess.run(["cmake", "--version"], check=True, capture_output=True, creationflags=_cf)
             except Exception:
                 logger.error("CMake not found. Please install CMake to build from source.")
                 return False
@@ -729,7 +732,7 @@ class LlamaInstaller:
                 ["git", "clone", "--depth", "1",
                  "https://github.com/ggml-org/llama.cpp",
                  str(self.install_dir)],
-                check=True
+                check=True, creationflags=_cf
             )
 
             # Create build directory

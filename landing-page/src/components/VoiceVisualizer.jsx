@@ -22,19 +22,36 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
   var stateRef = useRef({ bass: 0, mid: 0, treble: 0, bassCur: 0, midCur: 0, trebleCur: 0, time: 0, dir: 1, wasQuiet: false });
   var outerR = useRef(new Float32Array(PTS + 1));
 
+  var lastAudioEl = useRef(null);
+
   var connectAnalyser = useCallback(function() {
-    if (!audioRef || !audioRef.current || sourceRef.current) return;
+    if (!audioRef || !audioRef.current) return;
+    // Already connected to THIS audio element — skip
+    if (sourceRef.current && lastAudioEl.current === audioRef.current) return;
     try {
-      var ctx = new (window.AudioContext || window.webkitAudioContext)();
-      audioCtxRef.current = ctx;
-      var analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.8;
+      // Reuse existing AudioContext, create new source for new audio element
+      var ctx = audioCtxRef.current;
+      if (!ctx || ctx.state === 'closed') {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtxRef.current = ctx;
+      }
+      // Disconnect old source if switching audio elements
+      if (sourceRef.current) {
+        try { sourceRef.current.disconnect(); } catch(e) {}
+        sourceRef.current = null;
+      }
+      var analyser = analyserRef.current;
+      if (!analyser) {
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.8;
+        analyser.connect(ctx.destination);
+        analyserRef.current = analyser;
+      }
       var source = ctx.createMediaElementSource(audioRef.current);
       source.connect(analyser);
-      analyser.connect(ctx.destination);
-      analyserRef.current = analyser;
       sourceRef.current = source;
+      lastAudioEl.current = audioRef.current;
     } catch(e) { /* synthetic fallback */ }
   }, [audioRef]);
 
@@ -54,6 +71,10 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
     function render() {
       animRef.current = requestAnimationFrame(render);
       s.time += 0.02;
+      // Reconnect if audio element changed (new pre-synth line)
+      if (isActive && audioRef && audioRef.current && lastAudioEl.current !== audioRef.current) {
+        connectAnalyser();
+      }
       var an = analyserRef.current;
 
       if (isActive && an) {
@@ -67,6 +88,11 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
         s.bass = bS / (len * 0.15) / 255;
         s.mid = mS / (len * 0.35) / 255;
         s.treble = tS / (len * 0.5) / 255;
+      } else if (isActive) {
+        // No analyser (Web Speech API) — simulate speech-like energy
+        s.bass = 0.25 + 0.15 * Math.sin(s.time * 2.3);
+        s.mid = 0.3 + 0.2 * Math.sin(s.time * 3.1 + 0.5);
+        s.treble = 0.15 + 0.1 * Math.sin(s.time * 4.7 + 1.2);
       } else {
         s.bass *= 0.95; s.mid *= 0.95; s.treble *= 0.95;
       }

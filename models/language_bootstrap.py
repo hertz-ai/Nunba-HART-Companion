@@ -5,10 +5,17 @@ Given a HART language, detects hardware, selects best models for each
 subsystem (LLM, TTS, STT, music, video), downloads missing ones, and
 starts them — all in a background thread with status polling.
 
-Reuses: model_catalog, model_orchestrator, vram_manager.
+Thin wrapper around model_orchestrator.auto_load() — all selection logic
+(compute budget, loaded model preference, language routing) lives in
+the orchestrator. This module only adds:
+  1. Background threading (non-blocking startup)
+  2. Step-by-step status for frontend polling
+  3. CUDA torch install for frozen builds (TTS/STT GPU)
+  4. WAMP push for real-time progress updates
 """
 
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -18,13 +25,8 @@ from models.catalog import ModelType
 logger = logging.getLogger('AIBootstrap')
 
 # ── Priority order per model type ──────────────────────────────────
-# Which model types to bootstrap, in load-order (smallest first so
-# they don't block VRAM for the big ones)
-# Uses canonical MODEL_TYPES keys from model_catalog.py:
-# llm, tts, stt, vlm, image_gen, video_gen, audio_gen, embedding
 BOOTSTRAP_ORDER = [ModelType.STT, ModelType.TTS, ModelType.LLM, ModelType.AUDIO_GEN, ModelType.VIDEO_GEN]
 
-# Model types that are always loaded vs on-demand
 ESSENTIAL_TYPES = {ModelType.LLM, ModelType.TTS, ModelType.STT}
 OPTIONAL_TYPES = {ModelType.AUDIO_GEN, ModelType.VIDEO_GEN}
 
@@ -86,9 +88,42 @@ _thread: threading.Thread | None = None
 
 
 def get_status() -> dict:
-    """Poll current bootstrap status (called by API endpoint)."""
+    """Poll current bootstrap status (called by API endpoint).
+
+    When bootstrap is done, refreshes step statuses from the orchestrator
+    so the UI always reflects reality.
+    """
     with _lock:
+        if _state.phase == 'done':
+            _refresh_steps_from_orchestrator()
         return _state.to_dict()
+
+
+def _refresh_steps_from_orchestrator() -> None:
+    """Update step statuses from the live orchestrator (called under _lock)."""
+    try:
+        from models.orchestrator import get_orchestrator
+        orch = get_orchestrator()
+        for model_type, step in _state.steps.items():
+            entry = orch.get_loaded(model_type) if hasattr(orch, 'get_loaded') else None
+            if not entry:
+                # Fallback: scan catalog for loaded model of this type
+                try:
+                    for mid, ent in orch._catalog._models.items():
+                        if ent.model_type == model_type and ent.loaded:
+                            entry = ent
+                            break
+                except Exception:
+                    pass
+            if entry:
+                step.model_id = entry.id
+                step.model_name = entry.name
+                step.status = 'ready'
+                step.run_mode = entry.device or 'cpu'
+                step.detail = f'{entry.name} ({entry.device})'
+                step.vram_gb = entry.vram_gb
+    except Exception:
+        pass
 
 
 def start_bootstrap(language: str = 'en') -> dict:
@@ -124,10 +159,10 @@ def start_bootstrap(language: str = 'en') -> dict:
 
 
 def _bootstrap_worker(language: str) -> None:
-    """Background worker — detects hardware, plans, downloads, loads."""
+    """Background worker — delegates to orchestrator for all model logic."""
     global _state
     try:
-        # ── Phase 1: Detect hardware ──────────────────────────
+        # ── Phase 1: Detect hardware (via orchestrator's vram_manager) ──
         _update(phase='detecting')
         gpu_info = _detect_hardware()
         _update(
@@ -136,21 +171,101 @@ def _bootstrap_worker(language: str) -> None:
             vram_free_gb=gpu_info.get('free_gb', 0),
         )
 
-        # ── Phase 2: Plan — select best model per type ────────
+        # ── Phase 2: Plan — ask orchestrator what it would select ──
         _update(phase='planning')
-        plan = _create_plan(language, gpu_info)
+        from models.orchestrator import get_orchestrator
+        orch = get_orchestrator()
+
+        plan = {}
+        for model_type in BOOTSTRAP_ORDER:
+            step = BootstrapStep(model_type=model_type)
+
+            # Skip optional types with low VRAM
+            if model_type in OPTIONAL_TYPES and gpu_info.get('free_gb', 0) < 6.0:
+                step.status = 'skipped'
+                step.detail = 'Insufficient VRAM for optional model'
+                plan[model_type] = step
+                continue
+
+            lang = language if model_type in (ModelType.TTS, ModelType.LLM, ModelType.STT) else None
+            # select_best already prefers loaded models (+1000 score),
+            # checks compute budget, and routes by language
+            entry = orch.select_best(model_type, language=lang)
+
+            if entry:
+                step.model_id = entry.id
+                step.model_name = entry.name
+                step.vram_gb = entry.vram_gb
+                if entry.loaded:
+                    step.status = 'ready'
+                    step.detail = f'Already running: {entry.name} ({entry.device})'
+                    step.run_mode = entry.device
+                else:
+                    step.status = 'selecting'
+                    step.detail = f'Selected: {entry.name}'
+            else:
+                step.status = 'skipped'
+                step.detail = 'No compatible model found'
+
+            plan[model_type] = step
+
         with _lock:
             _state.steps = plan
 
-        # ── Phase 3: Execute — download + load each ───────────
+        # ── Phase 3: Execute — auto_load handles download + load ──
         _update(phase='running')
-        _execute_plan(language, gpu_info)
+
+        for model_type in BOOTSTRAP_ORDER:
+            step = plan.get(model_type)
+            if not step or step.status in ('skipped', 'failed', 'ready'):
+                continue
+
+            # Ensure CUDA torch for GPU TTS/STT in frozen builds
+            if model_type in (ModelType.TTS, ModelType.STT) and gpu_info.get('cuda_available', False):
+                _ensure_cuda_torch(model_type)
+
+            # Let orchestrator handle everything: download + load + VRAM + lifecycle
+            _update_step(model_type, status='loading', detail=f'Starting {step.model_name}...')
+            try:
+                lang = language if model_type in (ModelType.TTS, ModelType.LLM, ModelType.STT) else None
+                result = orch.auto_load(model_type, language=lang)
+
+                if result:
+                    _update_step(model_type, status='ready',
+                                 detail=f'Running on {result.device}',
+                                 run_mode=result.device)
+                    _refresh_vram()
+                elif model_type in OPTIONAL_TYPES:
+                    _update_step(model_type, status='skipped',
+                                 detail='Could not load (optional)')
+                else:
+                    _update_step(model_type, status='failed',
+                                 detail='Load failed (insufficient resources?)')
+            except Exception as e:
+                _update_step(model_type, status='failed',
+                             detail=f'Load error: {e}')
 
         _update(phase='done', finished_at=time.time())
 
     except Exception as e:
         logger.exception(f"Bootstrap failed: {e}")
         _update(phase='done', error=str(e), finished_at=time.time())
+
+
+def _ensure_cuda_torch(model_type: str) -> None:
+    """Install CUDA torch if needed (frozen build ships CPU-only stub)."""
+    try:
+        from tts.package_installer import has_nvidia_gpu, install_cuda_torch, is_cuda_torch
+        if not is_cuda_torch() and has_nvidia_gpu():
+            _update_step(model_type, status='loading',
+                         detail='Installing CUDA PyTorch (one-time ~2.5GB)...')
+            def _progress(msg):
+                _update_step(model_type, detail=msg)
+            ok, msg = install_cuda_torch(progress_cb=_progress)
+            if not ok:
+                logger.warning(f"CUDA torch install failed: {msg}")
+    except Exception as e:
+        logger.warning(f"CUDA torch check skipped: {e}")
 
 
 def _update(**kwargs) -> None:
@@ -170,149 +285,12 @@ def _detect_hardware() -> dict:
                 'cuda_available': False}
 
 
-def _create_plan(language: str, gpu_info: dict) -> dict[str, BootstrapStep]:
-    """Select best model for each type given language + hardware."""
-    try:
-        from models.orchestrator import get_orchestrator
-        orch = get_orchestrator()
-    except Exception as e:
-        logger.error(f"Cannot get orchestrator: {e}")
-        return {}
-
-    plan = {}
-    for model_type in BOOTSTRAP_ORDER:
-        step = BootstrapStep(model_type=model_type)
-
-        # Optional types only if we have enough VRAM
-        if model_type in OPTIONAL_TYPES:
-            vram_free = gpu_info.get('free_gb', 0)
-            if vram_free < 6.0:
-                step.status = 'skipped'
-                step.detail = 'Insufficient VRAM for optional model'
-                plan[model_type] = step
-                continue
-
-        lang = language if model_type in (ModelType.TTS, ModelType.LLM, ModelType.STT) else None
-        entry = orch.select_best(model_type, language=lang)
-
-        if entry:
-            step.model_id = entry.id
-            step.model_name = entry.name
-            step.vram_gb = entry.vram_gb
-            step.status = 'selecting'
-            step.detail = f'Selected: {entry.name}'
-        else:
-            step.status = 'skipped'
-            step.detail = 'No compatible model found'
-
-        plan[model_type] = step
-
-    return plan
-
-
-def _execute_plan(language: str, gpu_info: dict) -> None:
-    """Download and load each planned model sequentially."""
-    try:
-        from models.orchestrator import get_orchestrator
-        orch = get_orchestrator()
-    except Exception:
-        return
-
-    with _lock:
-        steps = dict(_state.steps)
-
-    for model_type in BOOTSTRAP_ORDER:
-        step = steps.get(model_type)
-        if not step or step.status in ('skipped', 'failed'):
-            continue
-        if not step.model_id:
-            continue
-
-        entry = orch._catalog.get(step.model_id)
-        if not entry:
-            _update_step(model_type, status='failed', detail='Model not in catalog')
-            continue
-
-        # Already loaded?
-        if entry.loaded:
-            _update_step(model_type, status='ready',
-                         detail=f'Already running ({entry.device})',
-                         run_mode=entry.device)
-            continue
-
-        # Check if downloaded
-        loader = orch._loaders.get(model_type)
-        is_downloaded = False
-        if loader:
-            try:
-                is_downloaded = loader.is_downloaded(entry)
-            except Exception:
-                pass
-
-        # Download if needed
-        if not is_downloaded and not entry.downloaded:
-            _update_step(model_type, status='downloading',
-                         detail=f'Downloading {entry.name}...')
-            try:
-                success = orch.download(step.model_id)
-                if not success:
-                    _update_step(model_type, status='failed',
-                                 detail='Download failed')
-                    continue
-            except Exception as e:
-                _update_step(model_type, status='failed',
-                             detail=f'Download error: {e}')
-                continue
-
-        # Ensure CUDA torch is available for GPU models (TTS, STT)
-        # The frozen build ships with a stub torch. If the model needs GPU
-        # and CUDA torch isn't installed, use the existing package_installer.
-        if model_type in (ModelType.TTS, ModelType.STT) and gpu_info.get('cuda_available', False):
-            try:
-                from tts.package_installer import has_nvidia_gpu, install_cuda_torch, is_cuda_torch
-                if not is_cuda_torch() and has_nvidia_gpu():
-                    _update_step(model_type, status='loading',
-                                 detail='Installing CUDA PyTorch (one-time ~2.5GB)...')
-                    def _progress(msg):
-                        _update_step(model_type, detail=msg)
-                    ok, msg = install_cuda_torch(progress_cb=_progress)
-                    if not ok:
-                        logger.warning(f"CUDA torch install failed: {msg}")
-            except ImportError:
-                pass
-
-        # Load
-        _update_step(model_type, status='loading',
-                     detail=f'Starting {entry.name}...')
-        try:
-            result = orch.load(step.model_id)
-            if result:
-                _update_step(model_type, status='ready',
-                             detail=f'Running on {result.device}',
-                             run_mode=result.device)
-                # Service tool registration + VRAM accounting handled
-                # by orchestrator.load() → _register_service_tool()
-                _refresh_vram()
-            else:
-                # Not fatal for optional types
-                if model_type in OPTIONAL_TYPES:
-                    _update_step(model_type, status='skipped',
-                                 detail='Could not load (optional)')
-                else:
-                    _update_step(model_type, status='failed',
-                                 detail='Load failed (insufficient resources?)')
-        except Exception as e:
-            _update_step(model_type, status='failed',
-                         detail=f'Load error: {e}')
-
-
 def _update_step(model_type: str, **kwargs) -> None:
     with _lock:
         step = _state.steps.get(model_type)
         if step:
             for k, v in kwargs.items():
                 setattr(step, k, v)
-        user_id = _state.language  # bootstrapper doesn't track user — use broadcast
     # Push via WAMP so frontend SetupProgressCard updates in real-time
     try:
         from integrations.social.realtime import publish_event
@@ -331,7 +309,7 @@ def _refresh_vram() -> None:
     """Update VRAM readings after a model load."""
     try:
         from integrations.service_tools.vram_manager import vram_manager
-        info = vram_manager.refresh_gpu_info()
+        vram_manager.refresh_gpu_info()
         with _lock:
             _state.vram_free_gb = vram_manager.get_free_vram()
     except Exception:

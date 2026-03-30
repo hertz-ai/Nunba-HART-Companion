@@ -305,21 +305,19 @@ export function useTTS(options = {}) {
       const serverOk = serverAvailableRef.current;
       const browserOk = pocketTTSRef.current?.isReady;
 
-      // Pocket TTS is English-only — non-English must use server TTS (GPU engine)
-      // Check both text content AND user's preferred language
-      const preferredLang = localStorage.getItem('hart_language') || 'en';
-      const isEnglish = _isLikelyEnglish(trimmed) && preferredLang === 'en';
-      const canUseBrowser = browserOk && isEnglish;
-
-      // Browser TTS available → non-blocking fire-and-forget (no await)
-      if (canUseBrowser) {
-        _speakBrowserNonBlocking(trimmed, speakOpts.browserVoice);
-        return null;
-      }
-
-      // Server TTS for non-English or when browser isn't ready
+      // Prefer server GPU engine when available — superior quality
+      // (Chatterbox Turbo for English, Indic Parler for Tamil, CosyVoice3 for CJK)
+      // Browser Pocket TTS is only used when server is unavailable
       if (serverOk) {
         return _speakServer(trimmed, speakOpts);
+      }
+
+      // Fallback: browser Pocket TTS (English only, no server needed)
+      const preferredLang = localStorage.getItem('hart_language') || 'en';
+      const isEnglish = _isLikelyEnglish(trimmed) && preferredLang === 'en';
+      if (browserOk && isEnglish) {
+        _speakBrowserNonBlocking(trimmed, speakOpts.browserVoice);
+        return null;
       }
 
       // Neither available
