@@ -272,6 +272,7 @@ build_exe_options = {
         "shutil",
         "winreg",
         "tkinter",  # Full package tree — ensures messagebox, filedialog etc. are included
+        "unittest",  # Required by transformers/testing_utils.py (imported transitively by Indic Parler TTS)
         "flask_cors",
         "pyautogui",
         "PIL",

@@ -176,7 +176,7 @@ build_exe_options = {
     "zip_exclude_packages": ["*"],  # extract all packages to filesystem (avoids zip import issues on macOS)
     "build_exe": "build/Nunba.app/Contents/MacOS",
     "excludes": [
-        "unittest", "test", "tests",
+        "test", "tests",  # Keep unittest — transformers/testing_utils.py imports it (Indic Parler TTS dep)
         "shapely.plotting", "shapely.tests",
         "torch", "tensorflow", "keras",
         "matplotlib", "scipy", "numpy.tests",

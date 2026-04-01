@@ -267,7 +267,7 @@ build_exe_options = {
     "zip_includes": [],
     "build_exe": "build/Nunba",
     "excludes": [
-        "unittest", "test", "tests",
+        "test", "tests",  # Keep unittest — transformers/testing_utils.py imports it (Indic Parler TTS dep)
         "shapely.plotting", "shapely.tests",
         # Exclude large unnecessary packages
         "cv2", "opencv",

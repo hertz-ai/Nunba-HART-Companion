@@ -1526,14 +1526,27 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
 
         setMessages((prev) => {
           const newMessages = [...prev, assistantMessage];
-          setAnimatingMessageIndex(1);
+          setAnimatingMessageIndex(newMessages.length - 1);
           setShouldScroll(true);
           return newMessages;
         });
 
-        // Speak the response using TTS if enabled and no audio was provided
+        // Speak + typewriter: whichever comes first — audio arrival or 5s timeout
         if (ttsEnabled && tts.isAvailable && extractedText) {
-          tts.speak(extractedText);
+          const wordCount = extractedText.split(/\s+/).length;
+          const estimatedSeconds = Math.max(2, wordCount / 2.5);
+          let typewriterStarted = false;
+          const startTypewriter = () => {
+            if (typewriterStarted) return;
+            typewriterStarted = true;
+            setDuration(estimatedSeconds);
+          };
+          // Race: audio arrival vs 5s timeout
+          const timeout = setTimeout(startTypewriter, 5000);
+          tts.speak(extractedText).then(() => {
+            clearTimeout(timeout);
+            startTypewriter();
+          });
         }
 
         setWaitingText(null);
@@ -2090,6 +2103,13 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   };
 
   const handleStart = () => {
+    // Barge-in: if TTS is playing, stop it before starting mic
+    if (tts.isSpeaking) {
+      tts.stop();
+      setDuration(0);
+      setAnimatingMessageIndex(null);
+    }
+
     // Tier 1: WebSocket streaming STT (GPU faster-whisper, real-time)
     // Tier 2: Batch HTTP STT (GPU faster-whisper, 2s chunks)
     // Tier 3: Browser Web Speech API (fallback)
@@ -2101,7 +2121,14 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
         const { url: wsUrl } = await portResp.json();
         if (!wsUrl) return false;
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 16000,
+          },
+        });
 
         // Connect WebSocket
         const ws = new WebSocket(wsUrl);
@@ -2142,6 +2169,9 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
 
         processor.onaudioprocess = (e) => {
           if (!wsReady) return;
+          // Echo cancellation: don't send mic audio while TTS is playing
+          // (prevents the agent from hearing its own voice)
+          if (tts.isSpeaking || isPlayingResponse) return;
           const float32 = e.inputBuffer.getChannelData(0);
           // Convert float32 [-1,1] to int16 PCM
           const pcm16 = new Int16Array(float32.length);
@@ -2274,6 +2304,36 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
     r.lang = _sttLangMap[_wkLang] || _wkLang;
     r.onresult = (e) => {
       const text = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
+      if (!text) return;
+
+      // Barge-in: speech detected while agent is talking
+      // Must distinguish user speech from echo (mic picking up TTS audio)
+      if (tts.isSpeaking || isPlayingResponse) {
+        // Get the last agent response text
+        const lastAgent = messages.filter(m => m.type === 'assistant').slice(-1)[0];
+        const agentText = (lastAgent?.content || '').toLowerCase();
+
+        // If the detected speech is a substring of what the agent is saying,
+        // it's echo (mic hearing the speakers), not the user — ignore it
+        const isEcho = agentText && (
+          agentText.includes(text) ||
+          text.split(' ').filter(w => w.length > 3).every(w => agentText.includes(w))
+        );
+
+        if (isEcho) return; // ignore echo
+
+        // Real user speech — barge in
+        tts.stop();
+        setDuration(0);
+        setAnimatingMessageIndex(null);
+        if (text.length > 2) {
+          setInputMessage(text);
+          setTimeout(() => { if (handleSendRef.current) handleSendRef.current(); }, 300);
+        }
+        return;
+      }
+
+      // Wake word: "Hey Nunba [command]"
       const wakeIdx = text.indexOf('nunba');
       if (wakeIdx >= 0) {
         const command = text.slice(wakeIdx + 5).trim();
@@ -2550,6 +2610,13 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   };
 
   const handleSend = async () => {
+    // Barge-in: stop any playing TTS when user sends a new message
+    if (tts.isSpeaking) {
+      tts.stop();
+      setDuration(0);
+      setAnimatingMessageIndex(null);
+    }
+
     const origin = window.location.origin.toLowerCase();
     const pathname = window.location.pathname.toLowerCase();
 
@@ -3541,7 +3608,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                   : 'w-full'
               } ${
                 window.innerWidth <= 768 ? (isTextMode ? '' : (videoUrl || mediaMode === 'audio' ? 'h-[35vh] mb-4' : '')) : ''
-              } flex justify-center items-center transition-all duration-300`}
+              } relative flex justify-center items-center transition-all duration-300`}
               style={{ overflow: 'visible' }}
             >
               {!isTextMode && (
@@ -3580,11 +3647,17 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                               style={{display: 'none'}}
                             />
                           )}
-                          <VoiceVisualizer
-                            audioRef={audioRef}
-                            isActive={isPlayingResponse || tts.isSpeaking}
-                            size={window.innerWidth <= 768 ? 180 : Math.min(window.innerWidth * 0.25, 250)}
-                          />
+                          <div className={`${
+                            window.innerWidth <= 768
+                              ? 'absolute top-0 inset-x-0 flex justify-center items-center h-[35vh]'
+                              : 'absolute bottom-44 right-5 flex justify-center items-center'
+                          }`}>
+                            <VoiceVisualizer
+                              audioRef={audioRef}
+                              isActive={isPlayingResponse || tts.isSpeaking}
+                              size={window.innerWidth <= 768 ? 180 : Math.min(window.innerWidth * 0.25, 250)}
+                            />
+                          </div>
                         </>
                       ) : null}
                     </>

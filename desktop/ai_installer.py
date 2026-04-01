@@ -270,9 +270,9 @@ class AIInstaller:
         # Step 0: Upgrade to CUDA torch if GPU available but torch is CPU-only
         if has_gpu:
             try:
-                from tts.package_installer import install_cuda_torch
+                from tts.package_installer import install_gpu_torch
                 self._report_progress("Checking PyTorch CUDA support...", 85)
-                cuda_ok, cuda_msg = install_cuda_torch(
+                cuda_ok, cuda_msg = install_gpu_torch(
                     progress_cb=lambda msg: self._report_progress(msg, 85))
                 results.append(("CUDA PyTorch", cuda_ok, cuda_msg))
             except Exception as e:

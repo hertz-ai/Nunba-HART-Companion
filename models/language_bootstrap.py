@@ -255,13 +255,13 @@ def _bootstrap_worker(language: str) -> None:
 def _ensure_cuda_torch(model_type: str) -> None:
     """Install CUDA torch if needed (frozen build ships CPU-only stub)."""
     try:
-        from tts.package_installer import has_nvidia_gpu, install_cuda_torch, is_cuda_torch
+        from tts.package_installer import has_nvidia_gpu, install_gpu_torch, is_cuda_torch
         if not is_cuda_torch() and has_nvidia_gpu():
             _update_step(model_type, status='loading',
                          detail='Installing CUDA PyTorch (one-time ~2.5GB)...')
             def _progress(msg):
                 _update_step(model_type, detail=msg)
-            ok, msg = install_cuda_torch(progress_cb=_progress)
+            ok, msg = install_gpu_torch(progress_cb=_progress)
             if not ok:
                 logger.warning(f"CUDA torch install failed: {msg}")
     except Exception as e:

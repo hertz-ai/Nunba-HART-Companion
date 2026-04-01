@@ -2398,7 +2398,7 @@ def start_background_services():
                     logging.info("TTS: GPU detected — downloading CUDA PyTorch in background...")
                     def _bg_cuda_install():
                         try:
-                            from tts.package_installer import install_cuda_torch
+                            from tts.package_installer import install_gpu_torch
                             def _progress(msg):
                                 logging.info(f"CUDA torch: {msg}")
                                 try:
@@ -2411,7 +2411,7 @@ def start_background_services():
                                     })
                                 except Exception:
                                     pass
-                            ok, msg = install_cuda_torch(progress_cb=_progress)
+                            ok, msg = install_gpu_torch(progress_cb=_progress)
                             if ok:
                                 logging.info("CUDA torch installed — GPU TTS available on next launch")
                         except Exception as e:

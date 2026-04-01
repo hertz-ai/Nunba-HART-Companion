@@ -176,10 +176,24 @@ def get_user_site_packages() -> str:
 
 
 def ensure_user_site_on_path():
-    """Add ~/.nunba/site-packages/ to sys.path if not already there."""
+    """Add ~/.nunba/site-packages/ to sys.path and set up DLL directories.
+
+    Must run before any torch import — the CUDA torch installed at runtime
+    lives here, and its DLLs need to be discoverable.
+    """
     sp = get_user_site_packages()
     if sp not in sys.path:
         sys.path.insert(0, sp)
+    # Windows: add torch/lib to DLL search path for CUDA DLLs
+    if sys.platform == 'win32':
+        _torch_lib = os.path.join(sp, 'torch', 'lib')
+        if os.path.isdir(_torch_lib):
+            try:
+                os.add_dll_directory(_torch_lib)
+            except Exception:
+                pass
+            if _torch_lib not in os.environ.get('PATH', ''):
+                os.environ['PATH'] = _torch_lib + os.pathsep + os.environ.get('PATH', '')
 
 
 def _run_pip(args: list[str], progress_cb: Callable | None = None,
@@ -234,31 +248,47 @@ def _run_pip(args: list[str], progress_cb: Callable | None = None,
         return False, str(e)
 
 
-def install_cuda_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
-    """Swap torch+cpu for torch+cu124 in python-embed.
+def install_gpu_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
+    """Install GPU-accelerated PyTorch — detects GPU type centrally via vram_manager.
 
-    This is a ~2.5GB download. Only runs if:
-    - GPU detected via nvidia-smi
-    - Current torch is +cpu variant
+    Selects the correct pip index:
+      NVIDIA → cu124 (CUDA 12.4)
+      AMD    → rocm6.2 (ROCm, Linux only)
+      None   → returns False
+
+    ~2.5GB download. Only runs if current torch is +cpu variant.
     """
-    if not has_nvidia_gpu():
-        return False, "No NVIDIA GPU detected"
+    # Central GPU detection — one source of truth
+    try:
+        from integrations.service_tools.vram_manager import vram_manager
+        gpu = vram_manager.detect_gpu()
+        gpu_type = 'nvidia' if gpu.get('cuda_available') else (
+            'amd' if gpu.get('name', '').upper().find('AMD') >= 0 or
+            gpu.get('name', '').upper().find('RADEON') >= 0 else None)
+    except Exception:
+        gpu_type = 'nvidia' if has_nvidia_gpu() else None
+
+    if not gpu_type:
+        return False, "No GPU detected"
 
     variant = get_torch_variant()
     if variant not in ('cpu', 'unknown', 'none'):
-        return True, f"torch already has CUDA ({variant})"
+        return True, f"torch already has GPU support ({variant})"
 
+    label = 'ROCm' if gpu_type == 'amd' else 'CUDA'
     if progress_cb:
-        progress_cb("Installing CUDA PyTorch (~2.5GB download)...")
+        progress_cb(f"Installing {label} PyTorch (~2.5GB download)...")
 
     # Don't uninstall CPU torch from python-embed (read-only Program Files).
-    # Just install CUDA torch to ~/.nunba/site-packages/ — it shadows the
+    # Just install GPU torch to ~/.nunba/site-packages/ — it shadows the
     # CPU stub on sys.path (app.py inserts user site at index 0).
 
-    # Install CUDA torch
+    # Install GPU torch — index URL depends on GPU vendor
+    _torch_index = ('https://download.pytorch.org/whl/rocm6.2' if gpu_type == 'amd'
+                     else 'https://download.pytorch.org/whl/cu124')
     ok, msg = _run_pip([
         'install', 'torch', 'torchaudio',
-        '--index-url', 'https://download.pytorch.org/whl/cu124',
+        '--index-url', _torch_index,
     ], progress_cb, timeout=900)
 
     if ok:
@@ -271,7 +301,6 @@ def install_cuda_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
                 _stub_path = os.path.join(_embed_sp, _stub_dir)
                 if os.path.isdir(_stub_path):
                     try:
-                        # Check if this is the stub (version 0.0.0) not the real one
                         _ver_file = os.path.join(_stub_path, 'version.py')
                         _is_stub = False
                         if os.path.isfile(_ver_file):
@@ -282,6 +311,31 @@ def install_cuda_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
                             logger.info(f"Removed stub {_stub_dir} from python-embed")
                     except Exception as _e:
                         logger.debug(f"Could not remove stub {_stub_dir}: {_e}")
+
+        # Fix torch/_C directory conflict in CUDA install target too
+        # pip creates both _C.cpXYZ.pyd (the real extension) AND _C/ (stubs).
+        # The directory shadows the .pyd → "Failed to load PyTorch C extensions"
+        _user_sp = get_user_site_packages()
+        _torch_c_dir = os.path.join(_user_sp, 'torch', '_C')
+        if os.path.isdir(_torch_c_dir):
+            import shutil
+            shutil.rmtree(_torch_c_dir, ignore_errors=True)
+            logger.info("Removed torch/_C directory conflict from user site-packages")
+        _torch_c_fb = os.path.join(_user_sp, 'torch', '_C_flatbuffer')
+        if os.path.isdir(_torch_c_fb):
+            shutil.rmtree(_torch_c_fb, ignore_errors=True)
+
+        # Ensure user site-packages is on sys.path BEFORE python-embed
+        ensure_user_site_on_path()
+
+        # Add torch/lib to DLL search path (Windows — needed for CUDA DLLs)
+        _torch_lib = os.path.join(_user_sp, 'torch', 'lib')
+        if os.path.isdir(_torch_lib) and sys.platform == 'win32':
+            try:
+                os.add_dll_directory(_torch_lib)
+            except Exception:
+                pass
+            os.environ['PATH'] = _torch_lib + os.pathsep + os.environ.get('PATH', '')
 
         # Invalidate cached import checks
         _invalidate_import_cache()
@@ -339,7 +393,7 @@ def install_backend_packages(backend: str,
         if variant == 'cpu' and has_nvidia_gpu():
             if progress_cb:
                 progress_cb("GPU detected but torch is CPU-only — upgrading to CUDA torch first...")
-            cuda_ok, cuda_msg = install_cuda_torch(progress_cb)
+            cuda_ok, cuda_msg = install_gpu_torch(progress_cb)
             if cuda_ok:
                 # torchaudio was installed with CUDA torch
                 to_install = [p for p in to_install if p != 'torchaudio']

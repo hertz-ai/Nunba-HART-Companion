@@ -202,11 +202,11 @@ class STTLoader(ModelLoader):
     def download(self, entry: ModelEntry) -> bool:
         """Install faster-whisper + CUDA torch if needed."""
         try:
-            from tts.package_installer import has_nvidia_gpu, install_cuda_torch, is_cuda_torch
+            from tts.package_installer import has_nvidia_gpu, install_gpu_torch, is_cuda_torch
             # Ensure CUDA torch is available for GPU whisper
             if has_nvidia_gpu() and not is_cuda_torch():
                 logger.info("STT download: installing CUDA torch for faster-whisper")
-                ok, msg = install_cuda_torch()
+                ok, msg = install_gpu_torch()
                 if not ok:
                     logger.warning(f"CUDA torch install failed: {msg}")
                     return False

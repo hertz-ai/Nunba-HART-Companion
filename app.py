@@ -5810,6 +5810,23 @@ window.addEventListener('unhandledrejection', function(e) {
                 except Exception:
                     pass
 
+            # Force navigation after window is visible — WebView2 sometimes drops
+            # the initial URL passed to create_window, resulting in a blank page.
+            _shown_nav_done = [False]
+            def _on_shown_navigate():
+                if _shown_nav_done[0]:
+                    return
+                _shown_nav_done[0] = True
+                try:
+                    _cur = _window.get_current_url() or ''
+                    if not _cur or 'about:blank' in _cur or _cur == initial_url:
+                        # Page didn't load or is blank — force navigate
+                        logger.info(f"[SHOWN] Forcing navigation to {initial_url}")
+                        _window.load_url(initial_url)
+                except Exception as _e:
+                    logger.debug(f"[SHOWN] Navigation check failed: {_e}")
+            _window.events.shown += _on_shown_navigate
+
             try:
                 logger.info(f"Starting webview with EdgeChromium backend, storage: {_webview_data_dir}")
                 webview.start(gui='edgechromium', storage_path=_webview_data_dir, private_mode=False)
