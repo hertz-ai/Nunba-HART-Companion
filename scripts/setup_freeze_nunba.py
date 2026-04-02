@@ -272,7 +272,9 @@ build_exe_options = {
         "shutil",
         "winreg",
         "tkinter",  # Full package tree — ensures messagebox, filedialog etc. are included
-        "unittest",  # Required by transformers/testing_utils.py (imported transitively by Indic Parler TTS)
+        # unittest: NOT in packages — causes stack overflow when included as a package
+        # in cx_Freeze (deeply recursive mock imports). Instead, kept out of excludes
+        # so cx_Freeze auto-detects it when transformers imports it.
         "flask_cors",
         "pyautogui",
         "PIL",
@@ -351,7 +353,7 @@ build_exe_options = {
     "zip_includes": [],
     "build_exe": "build/Nunba",
     "excludes": [
-        "unittest", "test", "tests",
+        "test", "tests",  # Keep unittest — needed by transformers (Indic Parler TTS dep)
         "shapely.plotting", "shapely.tests",
         # Exclude large unnecessary packages
         "cv2", "opencv",  # pyautogui uses PIL.ImageGrab on Windows, not cv2
