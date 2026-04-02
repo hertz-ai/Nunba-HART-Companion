@@ -960,14 +960,12 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
         current_python_embed_hash = get_directory_hash("python-embed")
 
         _tts_deps = [
-            # (package_name, pip_install_name, check_import, extra_pip_args)
-            # CPU torch bundled (~200MB) — functional baseline for all machines.
-            # GPU users: CUDA torch installed to ~/.nunba/site-packages/ on first
-            # launch (background, ~2.5GB). Shadows CPU torch via sys.path priority.
-            ("torch (CPU)", "torch", "torch",
-             ["--index-url", "https://download.pytorch.org/whl/cpu"]),
-            ("torchaudio (CPU)", "torchaudio", "torchaudio",
-             ["--index-url", "https://download.pytorch.org/whl/cpu"]),
+            # NOTE: torch is NOT installed here. python-embed ships a minimal
+            # torch stub (0.0.0) that satisfies import checks without loading
+            # native DLLs. Full torch (CPU or CUDA) is installed at RUNTIME
+            # to ~/.nunba/site-packages/ by install_gpu_torch().
+            # Installing full torch here causes stack overflow: torch.__init__
+            # loads _C.pyd → needs torch_cpu.dll → DLL loader recurses → crash.
             ("chatterbox-tts", "chatterbox-tts", "chatterbox", []),
             ("parler-tts", "parler-tts", "parler_tts", []),
             # STT — CTranslate2 bundles platform-specific CUDA runtime
