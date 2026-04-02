@@ -1049,6 +1049,22 @@ if ('build' in sys.argv or 'build_exe' in sys.argv) and not _skip_python_embed_c
             os.remove(_pth_file)
             print("Post-build: removed distutils-precedence.pth (fixes runtime pip)")
 
+        # ── Copy unittest into python-embed ──
+        # transformers/testing_utils.py imports unittest (transitively via Indic Parler TTS).
+        # Can't add to cx_Freeze packages (causes stack overflow from deep mock imports).
+        # Can't rely on cx_Freeze auto-detect (not in app.py import chain).
+        # Direct file copy is the safe path.
+        _unittest_dst = os.path.join(_dst_embed, 'Lib', 'unittest')
+        if not os.path.isdir(_unittest_dst):
+            import sysconfig
+            _stdlib = sysconfig.get_paths()['stdlib']
+            _unittest_src = os.path.join(_stdlib, 'unittest')
+            if os.path.isdir(_unittest_src):
+                shutil.copytree(_unittest_src, _unittest_dst)
+                print(f"Post-build: copied unittest to python-embed ({_unittest_src})")
+            else:
+                print("WARNING: unittest not found in stdlib — TTS may fail")
+
         # ── torch CPU is bundled (real, not a stub) ──
         # Provides functional CPU inference for all packages at startup.
         # At runtime, if GPU detected, CUDA torch is installed to
