@@ -2410,7 +2410,29 @@ def start_background_services():
                             pass
                     ok, msg = install_gpu_torch(progress_cb=_progress)
                     if ok:
-                        logging.info("CUDA torch installed — GPU TTS ready this session")
+                        logging.info("CUDA torch installed — GPU TTS active on next restart")
+                        # Notify user in their language that voice is upgrading
+                        _voice_msgs = {
+                            'en': "I'm upgrading my voice. Next time we talk, I'll sound much better.",
+                            'ta': "என் குரலை மேம்படுத்திக்கொண்டிருக்கிறேன். அடுத்த முறை நான் இன்னும் நன்றாக பேசுவேன்.",
+                            'hi': "मैं अपनी आवाज़ बेहतर कर रहा हूँ. अगली बार बात करेंगे तो और अच्छा लगेगा.",
+                            'ja': "声をアップグレード中。次に話す時はもっと自然に聞こえるよ。",
+                            'ko': "목소리를 업그레이드하고 있어요. 다음에 만나면 더 좋아질 거예요.",
+                            'zh': "正在升级我的声音。下次聊天时会好听很多。",
+                            'es': "Estoy mejorando mi voz. La próxima vez que hablemos, sonaré mucho mejor.",
+                            'fr': "J'améliore ma voix. La prochaine fois, je sonnerai beaucoup mieux.",
+                        }
+                        _vmsg = _voice_msgs.get(preferred_lang, _voice_msgs['en'])
+                        try:
+                            from integrations.social.realtime import publish_event
+                            publish_event('setup_progress', {
+                                'type': 'setup_progress',
+                                'job_type': 'cuda_torch',
+                                'status': 'done',
+                                'message': _vmsg,
+                            })
+                        except Exception:
+                            pass
                     else:
                         logging.warning(f"CUDA torch install failed: {msg} — using CPU TTS")
             except Exception:
