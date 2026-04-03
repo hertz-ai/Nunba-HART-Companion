@@ -172,7 +172,7 @@ const ChatMessageList = ({
               key={`llm-setup-${index}`}
               className="rounded-lg p-6 shadow-sm animate-slide-in-left"
               style={{
-                maxWidth: '75%',
+                maxWidth: '90%',
                 backgroundColor: '#1a2332',
                 color: '#FFFFFF',
                 border: '1px solid #6C63FF',
@@ -250,7 +250,7 @@ const ChatMessageList = ({
               key={`plan-card-${index}`}
               className="rounded-lg p-6 shadow-sm animate-slide-in-left"
               style={{
-                maxWidth: '75%',
+                maxWidth: '90%',
                 backgroundColor: '#1a2332',
                 color: '#FFFFFF',
                 border: '1px solid #6C63FF',
@@ -340,7 +340,7 @@ const ChatMessageList = ({
             <div
               className={`rounded-lg p-6 shadow-sm overflow-visible ${message.type === 'user' ? 'animate-slide-in-right' : 'animate-slide-in-left'}`}
               style={{
-                maxWidth: '75%',
+                maxWidth: '90%',
                 backgroundColor:
                   message.type === 'user' ? '#EFEAAA' : '#212A31',
                 color: message.type === 'user' ? '#000000' : '#FFFFFF',
