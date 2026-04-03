@@ -1241,39 +1241,19 @@ if getattr(args, 'setup_ai', False):
             _setup_logger.info(
                 f"--setup-ai: already configured — binary={_found_binary}, "
                 f"model={_has_model}, custom_api={_has_custom_api}, first_run=False. "
-                f"Skipping wizard, starting server directly.")
-            # Auto-start the server if not already running
-            import socket as _setup_sock
-            _setup_port = int(_sc.config.get('port', 8080))
-            _port_busy = False
-            try:
-                _ts = _setup_sock.socket(_setup_sock.AF_INET, _setup_sock.SOCK_STREAM)
-                _ts.settimeout(1)
-                _ts.connect(('127.0.0.1', _setup_port))
-                _ts.close()
-                _port_busy = True
-            except Exception:
-                pass
-            if not _port_busy:
-                try:
-                    _sc.start_server()
-                    _setup_logger.info("--setup-ai: auto-started llama.cpp server")
-                except Exception as _ase:
-                    _setup_logger.warning(f"--setup-ai: auto-start failed: {_ase}")
-            else:
-                _setup_logger.info("--setup-ai: server already running")
+                f"Skipping wizard, exiting immediately.")
+            # Don't start the server here — main Nunba.exe handles it.
+            # Starting here causes a 30s+ delay (port conflict retries)
+            # that creates a visible gap between splash screens.
             _skip_wizard = True
     except Exception as _fast_err:
         _setup_logger.debug(f"--setup-ai: fast-path check failed: {_fast_err}")
 
     if _skip_wizard:
         _setup_logger.info("--setup-ai: wizard skipped (already configured), exiting")
-        # Destroy early splash if present
-        if _early_splash:
-            try:
-                _early_splash[0].destroy()
-            except Exception:
-                pass
+        # Keep splash visible during exit — avoids visual gap between
+        # --setup-ai exit and main Nunba.exe splash creation.
+        # OS cleans up the window when the process terminates.
         sys.exit(0)
 
     _setup_logger.info("--setup-ai: starting interactive AI setup wizard")
