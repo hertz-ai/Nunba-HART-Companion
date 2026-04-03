@@ -3647,11 +3647,8 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                               style={{display: 'none'}}
                             />
                           )}
-                          <div className={`${
-                            window.innerWidth <= 768
-                              ? 'absolute top-0 inset-x-0 flex justify-center items-center h-[35vh]'
-                              : 'absolute bottom-44 right-5 flex justify-center items-center'
-                          }`}>
+                          <div className="sticky top-0 z-10 flex justify-center items-center bg-black"
+                            style={{ height: window.innerWidth <= 768 ? '35vh' : '100%' }}>
                             <VoiceVisualizer
                               audioRef={audioRef}
                               isActive={isPlayingResponse || tts.isSpeaking}
