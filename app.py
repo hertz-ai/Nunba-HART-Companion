@@ -6320,6 +6320,17 @@ if __name__ == "__main__":
                     logger.error(f"[STARTUP] main.py import eventually failed: {_import_error[0]}")
                 else:
                     logger.info("[STARTUP] main.py import complete (background)")
+                    # flask_app is now set — the WSGI dispatcher routes to the
+                    # full app.  But the webview may be stuck on a blank page
+                    # from when gui_app was serving (React failed to mount with
+                    # the stub backend).  Force-reload so the real app renders.
+                    try:
+                        if _window:
+                            time.sleep(2)  # let flask_app finish registering routes
+                            _window.load_url(f"http://localhost:{args.port}/local")
+                            logger.info("[STARTUP] Webview reloaded after late main.py import")
+                    except Exception as _reload_err:
+                        logger.warning(f"[STARTUP] Post-import reload failed: {_reload_err}")
             threading.Thread(target=_wait_for_import, daemon=True,
                              name='import_waiter').start()
         else:
