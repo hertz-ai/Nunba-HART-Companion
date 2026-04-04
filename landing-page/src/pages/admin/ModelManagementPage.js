@@ -107,6 +107,9 @@ function ModelCard({ model, onLoad, onUnload, onDownload }) {
         {model.ram_gb > 0 && <span>RAM: {model.ram_gb}GB</span>}
         {model.disk_gb > 0 && <span>Disk: {model.disk_gb}GB</span>}
         <span>Backend: {model.backend}</span>
+        {model.cost_per_1k > 0 && (
+          <span style={{ color: '#FF9800' }}>${model.cost_per_1k.toFixed(4)}/1K tok</span>
+        )}
         {model.languages?.length > 0 && (
           <span>Lang: {model.languages.slice(0, 5).join(', ')}{model.languages.length > 5 ? '...' : ''}</span>
         )}
@@ -321,11 +324,16 @@ export default function ModelManagementPage() {
   const [filter, setFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [providerCaps, setProviderCaps] = useState(null);
 
   const fetchModels = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/models');
-      if (res.ok) setData(await res.json());
+      const [modelsRes, capsRes] = await Promise.all([
+        fetch('/api/admin/models').then(r => r.ok ? r.json() : null),
+        fetch('/api/admin/providers/capabilities').then(r => r.ok ? r.json() : null),
+      ]);
+      if (modelsRes) setData(modelsRes);
+      if (capsRes) setProviderCaps(capsRes.capabilities);
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
@@ -368,6 +376,11 @@ export default function ModelManagementPage() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: '#8899aa' }}>
             {data.loaded_count} loaded / {data.downloaded_count} downloaded / {data.total_models} total
+            {providerCaps && Object.keys(providerCaps).length > 0 && (
+              <span style={{ color: '#6C63FF', marginLeft: 8 }}>
+                · {Object.values(providerCaps).flat().filter((v, i, a) => a.indexOf(v) === i).length} cloud providers
+              </span>
+            )}
           </span>
           <button onClick={() => setShowAdd(true)} style={{ ...btnStyle('#6C63FF'), padding: '6px 14px' }}>
             + Add Model
