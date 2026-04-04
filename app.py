@@ -5141,6 +5141,17 @@ def main():
             # Don't exit - continue with normal startup
             logger.info("Continuing with normal startup despite protocol error")
 
+    # ── Resource Governor — hard OS-level caps BEFORE any heavy work ──
+    # Sets BELOW_NORMAL priority, CPU rate limit via Job Object, RAM cap.
+    # Must run before Flask/LLM so Nunba NEVER slows down the host OS.
+    try:
+        from core.resource_governor import get_governor
+        _gov = get_governor()
+        _gov.start()
+        logger.info("[STARTUP] ResourceGovernor started (enforcer active)")
+    except Exception as _gov_err:
+        logger.debug("[STARTUP] ResourceGovernor not available: %s", _gov_err)
+
     _startup_phase = 'flask_start'
     logger.info("=== STARTING FLASK SERVER ===")
     _splash_update('Starting server...')
