@@ -1084,8 +1084,19 @@ class TTSEngine:
 
         inst = self._backends.get(self._active_backend)
         if not inst:
-            logger.error("TTS backend not initialized")
-            return None
+            # Backend switch may be in progress — wait briefly
+            if getattr(self, '_pending_backend', None):
+                import time as _time
+                for _ in range(10):  # Wait up to 5s
+                    _time.sleep(0.5)
+                    inst = self._backends.get(self._active_backend)
+                    if inst:
+                        break
+            if not inst:
+                logger.error("TTS backend not initialized: active=%s, available=%s, pending=%s",
+                             self._active_backend, list(self._backends.keys()),
+                             getattr(self, '_pending_backend', None))
+                return None
 
         try:
             result = inst.synthesize(text=text, output_path=output_path,
