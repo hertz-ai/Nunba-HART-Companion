@@ -651,48 +651,16 @@ class TTSEngine:
                     else:
                         logger.info(f"torch {torch.__version__} CUDA available — GPU TTS enabled")
                 except (ImportError, OSError) as _torch_err:
-                    # torch._C DLL load failure in frozen builds.
-                    # The stub torch (0.0.0) in python-embed poisons sys.modules,
-                    # making in-process retry impossible. Instead, subprocess check
-                    # using python-embed/python.exe (which has correct sys.path).
-                    _retried = False
+                    # Stub torch poisons sys.modules — use shared subprocess probe
                     try:
-                        import subprocess as _sp, os as _os, sys as _sys
-                        _usp = _os.path.join(_os.path.expanduser('~'), '.nunba', 'site-packages')
-                        _tlib = _os.path.join(_usp, 'torch', 'lib')
-                        # Find python-embed python.exe (frozen builds)
-                        _py = None
-                        if getattr(_sys, 'frozen', False):
-                            _embed = _os.path.join(_os.path.dirname(_sys.executable), 'python-embed', 'python.exe')
-                            if _os.path.isfile(_embed):
-                                _py = _embed
-                        if _py and _os.path.isdir(_tlib):
-                            # Subprocess: clean Python process, no stub pollution
-                            _result = _sp.run(
-                                [_py, '-c',
-                                 f'import sys,os;'
-                                 f'sys.path.insert(0,r"{_usp}");'
-                                 f'os.add_dll_directory(r"{_tlib}");'
-                                 f'import torch;'
-                                 f'print(torch.__version__,torch.cuda.is_available())'],
-                                capture_output=True, text=True, timeout=15,
-                            )
-                            if _result.returncode == 0:
-                                _parts = _result.stdout.strip().split()
-                                _ver = _parts[0] if _parts else '?'
-                                _cuda = _parts[1] == 'True' if len(_parts) > 1 else False
-                                TTSEngine._import_check_cache['_torch_cuda'] = _cuda
-                                _retried = True
-                                logger.info(f"torch {_ver} CUDA={_cuda} (verified via python-embed subprocess)")
-                                if _cuda:
-                                    # Set env so HARTOS model loading uses correct paths
-                                    _os.environ['TORCH_USER_SP'] = _usp
-                                    _os.environ['TORCH_LIB_DIR'] = _tlib
-                            else:
-                                logger.info(f"python-embed torch check failed: {_result.stderr[:200]}")
-                    except Exception as _retry_err:
-                        logger.info(f"torch subprocess check failed: {_retry_err}")
-                    if not _retried:
+                        from tts._torch_probe import check_cuda_available
+                        _cuda = check_cuda_available()
+                        TTSEngine._import_check_cache['_torch_cuda'] = _cuda
+                        if _cuda:
+                            logger.info("torch CUDA verified via subprocess — GPU TTS enabled")
+                        else:
+                            logger.info(f"torch not available — GPU TTS disabled ({_torch_err})")
+                    except Exception as _probe_err:
                         TTSEngine._import_check_cache['_torch_cuda'] = False
                         logger.info(f"torch not available — GPU TTS disabled ({_torch_err})")
             if not TTSEngine._import_check_cache['_torch_cuda']:
