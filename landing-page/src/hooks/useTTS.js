@@ -88,7 +88,9 @@ export function useTTS(options = {}) {
   const isProcessingRef = useRef(false);
   const pocketTTSRef = useRef(null);
   const voiceCacheRef = useRef(new Map()); // avatarId → encoded voice
-  const serverAvailableRef = useRef(false);
+  // Server TTS is ALWAYS available on Nunba (Piper CPU runs on any machine).
+  // Don't wait for async CDN probe — it hangs in pywebview (no internet).
+  const serverAvailableRef = useRef(true);
   const probeRef = useRef(null); // cached capability probe result
 
   // --- Helper: wire callbacks and init a browser TTS engine instance ---
