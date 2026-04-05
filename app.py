@@ -247,6 +247,17 @@ if getattr(sys, 'frozen', False):
     _embed_site_packages = os.path.join(_app_dir, 'python-embed', 'Lib', 'site-packages')
     if os.path.isdir(_embed_site_packages) and _embed_site_packages not in sys.path:
         sys.path.append(_embed_site_packages)
+    # Remove stale torchvision/_C.pyd from frozen lib/ — it conflicts with
+    # the real CUDA torch in user site-packages (entry point mismatch error).
+    # torch/torchvision should ONLY come from ~/.nunba/site-packages/.
+    for _stale_pkg in ('torchvision', 'torchaudio'):
+        _stale_pyd = os.path.join(_lib_dir, _stale_pkg, '_C.pyd')
+        if os.path.isfile(_stale_pyd):
+            try:
+                os.rename(_stale_pyd, _stale_pyd + '.disabled')
+            except OSError:
+                pass  # Locked or no admin — harmless, DLL won't load from renamed path
+
     # User site-packages (~/.nunba/site-packages/) — runtime pip installs go here.
     # INSERT at 0 so CUDA torch (if installed) shadows the 0.0.0 stub in python-embed.
     # Verified: python-embed/python.exe loads CUDA torch correctly with this path order.

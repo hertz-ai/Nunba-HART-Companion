@@ -354,7 +354,7 @@ build_exe_options = {
         "shapely.plotting", "shapely.tests",
         # Exclude large unnecessary packages
         "cv2", "opencv",  # pyautogui uses PIL.ImageGrab on Windows, not cv2
-        "torch", "tensorflow", "keras",
+        "torch", "torchvision", "torchaudio", "tensorflow", "keras",
         # embodied_ai/hevolveai are pip-installed but their heavy deps
         # (torch, transformers) are bundled via python-embed, not cx_Freeze
         "embodied_ai", "hevolveai",
