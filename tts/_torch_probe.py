@@ -57,8 +57,12 @@ def _run_in_embed(code: str, extra_argv: list = None, timeout: int = 15) -> subp
     if extra_argv:
         cmd.extend(extra_argv)
 
+    # CREATE_NO_WINDOW prevents console popups on Windows
+    kwargs = {}
+    if sys.platform == 'win32':
+        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
     return subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout,
+        cmd, capture_output=True, text=True, timeout=timeout, **kwargs,
     )
 
 
