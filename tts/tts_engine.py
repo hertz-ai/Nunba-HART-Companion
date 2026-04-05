@@ -1381,7 +1381,17 @@ class _LazyIndicParler:
         import torch
         from parler_tts import ParlerTTSForConditionalGeneration
         from transformers import AutoTokenizer
-        self._device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        # Use GPU only if enough free VRAM (model ~1.2GB + inference ~2GB)
+        _use_gpu = False
+        if torch.cuda.is_available():
+            try:
+                _free = torch.cuda.mem_get_info()[0] / (1024**3)
+                _use_gpu = _free >= 4.0  # Need ~4GB for model + inference
+                if not _use_gpu:
+                    logger.info(f"Indic Parler: {_free:.1f}GB VRAM free < 4GB — using CPU")
+            except Exception:
+                pass
+        self._device = 'cuda:0' if _use_gpu else 'cpu'
         self._model = ParlerTTSForConditionalGeneration.from_pretrained(
             'ai4bharat/indic-parler-tts').to(self._device)
         self._tokenizer = AutoTokenizer.from_pretrained('ai4bharat/indic-parler-tts')
