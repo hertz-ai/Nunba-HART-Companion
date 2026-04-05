@@ -1170,7 +1170,14 @@ class LlamaConfig:
             except Exception:
                 ctx_size = 8192  # safe default
         else:
-            ctx_size = self.config.get("context_size", 4096)
+            ctx_size = self.config.get("context_size", 8192)
+
+        # Cap context size to leave VRAM for TTS (Indic Parler, F5, etc.)
+        # and never use more than 10K (diminishing returns vs VRAM cost)
+        ctx_size = min(ctx_size, 10240)
+
+        # Cap threads to 75% of cores — leave headroom for OS + TTS
+        max_threads = max(1, int((os.cpu_count() or 4) * 0.75))
 
         # Build server command — zinc uses simpler CLI than llama.cpp
         if _use_zinc:
@@ -1183,7 +1190,7 @@ class LlamaConfig:
                 "--model", model_path,
                 "--port", str(desired_port),
                 "--ctx-size", str(ctx_size),
-                "--threads", str(os.cpu_count() or 4),
+                "--threads", str(max_threads),
                 "--host", "127.0.0.1",
                 "--jinja",
                 "--reasoning-format", "deepseek",
