@@ -894,6 +894,27 @@ def build_windows(python_exe, app_only=False, installer_only=False):
     # Slim python-embed (remove pip, setuptools, tests, etc.)
     slim_python_embed()
 
+    # ── Post-build: extract missing stdlib modules from python312.zip ──
+    # cx_Freeze's lib/ often misses stdlib modules that GPU TTS backends
+    # need at runtime (unittest, email.mime.application, fileinput, etc.).
+    # Extract any .pyc from python312.zip that isn't already in lib/.
+    _zip_path = os.path.join('build', 'Nunba', 'python-embed', 'python312.zip')
+    _lib_dir = os.path.join('build', 'Nunba', 'lib')
+    if os.path.isfile(_zip_path) and os.path.isdir(_lib_dir):
+        import zipfile
+        _extracted = 0
+        with zipfile.ZipFile(_zip_path) as _zf:
+            for _zname in _zf.namelist():
+                if _zname.endswith('.pyc'):
+                    _dst = os.path.join(_lib_dir, _zname)
+                    if not os.path.exists(_dst):
+                        os.makedirs(os.path.dirname(_dst), exist_ok=True)
+                        with open(_dst, 'wb') as _f:
+                            _f.write(_zf.read(_zname))
+                        _extracted += 1
+        if _extracted:
+            print_info(f"Extracted {_extracted} missing stdlib .pyc from python312.zip to lib/")
+
     if app_only:
         return True
 
