@@ -153,6 +153,10 @@ export function useTTS(options = {}) {
           console.warn(`[TTS] Fallback ${probe.fallback} also failed:`, fallbackErr);
         }
       }
+      // Browser TTS failed but server TTS is always available
+      // (Piper CPU runs on any machine, no internet needed)
+      serverAvailableRef.current = true;
+      setIsAvailable(true);
       setBrowserTTSLoading(false);
     }
   }, [browserTTSLoading, _wireAndInit]);
