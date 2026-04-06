@@ -40,9 +40,7 @@ BACKEND_PACKAGES = {
         'torchaudio',
         'sentencepiece',
         'descript-audio-codec',
-        'descript-audiotools',  # transitive of dac, but pip --target skips it when system has it
-        'tensorboard',          # transitive of audiotools, same issue
-        'parler-tts==0.2.2',    # 0.2.3 has DacModel.decode() API mismatch with dac 1.0
+        'parler-tts==0.2.2',  # 0.2.3 has DacModel.decode() API mismatch with dac 1.0
     ],
     'cosyvoice3': [
         'torchaudio',
