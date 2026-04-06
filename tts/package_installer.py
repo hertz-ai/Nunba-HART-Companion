@@ -39,6 +39,7 @@ BACKEND_PACKAGES = {
     'indic_parler': [
         'torchaudio',
         'sentencepiece',
+        'tensorboard',  # transitive: dac → audiotools → tensorboard
         'descript-audio-codec',
         'parler-tts==0.2.2',  # 0.2.3 has DacModel.decode() API mismatch with dac 1.0
     ],
