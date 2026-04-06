@@ -14,7 +14,7 @@ const defaultAgentData = {
     is_public: true, create_agent: false, is_active: true, user_id: 10077,
     image_url: "http://aws_rasa.hertzai.com:5459/output/25dfe16e-a6a4-11ef-a097-42010aa00006.png",
     teacher_avatar_id: 2759, video_url: null, video_text: "This is Static Description",
-    teacher_image_url: "https://azurekong.hertzai.com/mkt-aws/txt/voice_dump/8f4c3958-9cropped_image.png",
+    teacher_image_url: "./HevolveLogo.png",  // Local asset — works offline
     description: "https://azurekong.hertzai.com/mkt-azure/examples/74eaec428f4c3958-9cropped_image_pred_fls_f4203dae_bf375f78-eLily_audio_embed.mp4",
     image_name: "8f4c3958-9cropped_image.png",
     fillers: [
@@ -470,13 +470,13 @@ const AgentPage = () => {
                 </div>
 
                 {/* Desktop */}
-                <div className="hidden md:block h-full" style={entranceStyle(heroEntrance)}>
+                <div className="hidden md:flex md:flex-col h-full" style={entranceStyle(heroEntrance)}>
                     <h1 className="text-2xl font-semibold text-white ml-4 mt-4">HevolveAI</h1>
                     <div className="relative h-full flex items-center justify-center flex-col text-center">
-                        <div className="w-full mb-72">
+                        <div className="w-full mb-16 md:mb-24 lg:mb-48">
                             <HeroContent {...heroProps} mobile={false} />
                         </div>
-                        <img src={heroImg} alt="hero" className="absolute bottom-44 right-5 object-cover rounded-lg"
+                        <img src={heroImg} alt="hero" className="absolute bottom-20 md:bottom-32 lg:bottom-44 right-5 object-cover rounded-lg"
                             style={{ width: getVideoWidthforMobile(), animation: 'heroFloat 4s ease-in-out infinite' }} />
                     </div>
                 </div>
