@@ -39,7 +39,6 @@ BACKEND_PACKAGES = {
     'indic_parler': [
         'torchaudio',
         'sentencepiece',
-        'tensorboard',  # transitive: dac → audiotools → tensorboard
         'descript-audio-codec',
         'parler-tts==0.2.2',  # 0.2.3 has DacModel.decode() API mismatch with dac 1.0
     ],
@@ -245,6 +244,7 @@ def _run_pip(args: list[str], progress_cb: Callable | None = None,
         args = args[:1] + [
             '--target', user_sp,
             '--no-build-isolation',  # Use system setuptools (pip's isolated build fails in frozen builds)
+            '--ignore-installed',    # Don't skip deps found in system Python — they're not in --target
         ] + args[1:]
 
     cmd = [python_exe, '-m', 'pip'] + args
