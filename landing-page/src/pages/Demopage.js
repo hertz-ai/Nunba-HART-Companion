@@ -2758,7 +2758,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
               agent_id: currentAgent?.id || currentAgent?.prompt_id || 'local_assistant',
               agent_type: currentAgent?.type || 'local',
               conversation_id: conversationId,
-              video_req: false,
+              media_mode: mediaMode || 'audio',
               prompt_id: currentAgent?.prompt_id ?? 0,
               create_agent: currentAgent?.create_agent || false,
               autonomous_creation: currentAgent?.autonomous_creation || false,

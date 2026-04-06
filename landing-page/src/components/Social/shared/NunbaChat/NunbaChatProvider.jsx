@@ -292,7 +292,7 @@ export default function NunbaChatProvider({children}) {
             agent_id: currentAgent?.prompt_id || 'local_assistant',
             agent_type: 'local',
             conversation_id: conversationIdRef.current,
-            video_req: false,
+            media_mode: localStorage.getItem('nunba_media_mode') || 'audio',
             prompt_id: currentAgent?.prompt_id || null,
             create_agent: false,
             autonomous_creation: false,
