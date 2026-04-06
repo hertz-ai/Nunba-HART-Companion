@@ -14,7 +14,7 @@ const defaultAgentData = {
     is_public: true, create_agent: false, is_active: true, user_id: 10077,
     image_url: "http://aws_rasa.hertzai.com:5459/output/25dfe16e-a6a4-11ef-a097-42010aa00006.png",
     teacher_avatar_id: 2759, video_url: null, video_text: "This is Static Description",
-    teacher_image_url: "./HevolveLogo.png",  // Local asset — works offline
+    teacher_image_url: "https://azurekong.hertzai.com/mkt-aws/txt/voice_dump/8f4c3958-9cropped_image.png",
     description: "https://azurekong.hertzai.com/mkt-azure/examples/74eaec428f4c3958-9cropped_image_pred_fls_f4203dae_bf375f78-eLily_audio_embed.mp4",
     image_name: "8f4c3958-9cropped_image.png",
     fillers: [
