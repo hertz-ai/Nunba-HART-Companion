@@ -62,7 +62,9 @@ export function useTTS(options = {}) {
   } = options;
 
   // --- State ---
-  const [isAvailable, setIsAvailable] = useState(false);
+  // Server TTS is always available on Nunba (Piper CPU on localhost).
+  // Start as true so Demopage's tts.isAvailable check passes immediately.
+  const [isAvailable, setIsAvailable] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
