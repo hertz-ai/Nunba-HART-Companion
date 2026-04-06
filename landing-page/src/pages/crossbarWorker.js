@@ -382,6 +382,11 @@ const handleTopicData = (data, topic) => {
       postWorkerMessage('SOCIAL_EVENT', processedData);
     }
 
+    // Dispatch pupit/TTS audio events — realtimeService picks these up for NunbaChat
+    if (topic.includes('pupit.')) {
+      postWorkerMessage('SOCIAL_EVENT', {type: 'pupit', data: processedData});
+    }
+
     if (topic.includes('hevolve.action')) {
       logResponse('ACTION_TRIGGERED', {actionData: processedData});
       executeAction(processedData);

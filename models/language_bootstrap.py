@@ -143,6 +143,16 @@ def start_bootstrap(language: str = 'en') -> dict:
             started_at=time.time(),
         )
 
+    # Persist language for TTS warm-up on next startup
+    try:
+        _lang_path = os.path.join(
+            os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
+        os.makedirs(os.path.dirname(_lang_path), exist_ok=True)
+        with open(_lang_path, 'w') as _f:
+            json.dump({'language': language}, _f)
+    except Exception:
+        pass
+
     _thread = threading.Thread(
         target=_bootstrap_worker,
         args=(language,),

@@ -17,6 +17,7 @@ import {v4 as uuidv4} from 'uuid';
 import {chatApi} from '../../../../services/socialApi';
 import {useTTS} from '../../../../hooks/useTTS';
 import {useSocial} from '../../../../contexts/SocialContext';
+import realtimeService from '../../../../services/realtimeService';
 import {
   classifyError,
   getBackoff,
@@ -108,6 +109,7 @@ export default function NunbaChatProvider({children}) {
 
   const conversationIdRef = useRef(uuidv4());
   const currentAgentRef = useRef(null); // race-condition guard
+  const latestRequestIdRef = useRef(null); // stale-audio guard (Android parity)
 
   // TTS — wired to existing hook
   const tts = useTTS({enabled: ttsEnabled, autoSpeak: false});
@@ -138,6 +140,22 @@ export default function NunbaChatProvider({children}) {
         /* backend not up */
       });
   }, [userId]);
+
+  // Sync HART preferences from browser → backend (one-time on mount).
+  // Browser localStorage is the source of truth for HART identity
+  // (set during LightYourHART onboarding). Backend needs hart_language.json
+  // for TTS warm-up. This closes the gap when onboarding happened on the
+  // Demopage route but NunbaChat is the active route on next launch.
+  useEffect(() => {
+    const lang = localStorage.getItem('hart_language');
+    if (lang && lang !== 'en') {
+      fetch('/api/ai/bootstrap', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({language: lang}),
+      }).catch(() => {});
+    }
+  }, []);
 
   // Listen for external agent selection (e.g., "Chat with HART" buttons)
   useEffect(() => {
@@ -312,7 +330,10 @@ export default function NunbaChatProvider({children}) {
             },
           ]);
 
-          if (ttsEnabled && tts.isAvailable) tts.speak(reply);
+          // TTS: backend synthesizes async, pushes audio via SSE/WAMP.
+          // Track request_id so we only play audio for the latest request
+          // (same pattern as Android AbstractChatActivity.latestRequestId).
+          latestRequestIdRef.current = data.request_id || msgId;
 
           setIsLoading(false);
           setIsTyping(false);
@@ -360,6 +381,42 @@ export default function NunbaChatProvider({children}) {
   const deleteMessage = useCallback((messageId) => {
     setMessages((prev) => prev.filter((m) => m.messageId !== messageId));
   }, []);
+
+  // Listen for backend-pushed TTS audio via SSE/WAMP (com.hertzai.pupit.{userId}).
+  // Same pattern as Android's onEventPupitVideo → settingVideoResponse → play.
+  // Stale-request guard: only play audio matching latestRequestIdRef.
+  useEffect(() => {
+    const handleTTSPush = (payload) => {
+      const data = payload?.data || payload;
+      if (data?.action !== 'TTS' || !data?.generated_audio_url) return;
+
+      // Android parity: skip stale audio (request_id mismatch)
+      if (latestRequestIdRef.current &&
+          data.request_id && data.request_id !== latestRequestIdRef.current) {
+        return;
+      }
+
+      // Play the pushed audio file directly — same as Android's processVideoQueue.
+      // Uses a simple Audio element; the existing useTTS hook doesn't have a
+      // play-from-url method, but the pattern is identical to _speakServer's
+      // audioRef.current.src = url; audioRef.current.play();
+      try {
+        const audio = new Audio(data.generated_audio_url);
+        audio.play().catch(() => {});
+      } catch {
+        // Autoplay blocked — user will see text, can replay manually
+      }
+    };
+
+    // Subscribe to both SSE event types and crossbar worker messages
+    realtimeService.on('pupit', handleTTSPush);
+    realtimeService.on('message', handleTTSPush); // SSE generic messages
+
+    return () => {
+      realtimeService.off('pupit', handleTTSPush);
+      realtimeService.off('message', handleTTSPush);
+    };
+  }, [tts]);
 
   const clearMessages = useCallback(() => {
     const agentKey = currentAgent?.prompt_id || 'default';

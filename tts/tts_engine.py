@@ -948,6 +948,226 @@ class TTSEngine:
             return _LazyPiper()
         return None
 
+    def _synthesize_multilingual(self, segments, output_path=None, voice=None,
+                                  speed=1.0, **kwargs):
+        """Synthesize multi-type segments: speech, music, singing, lyrics.
+
+        Segments from language_segmenter.segment():
+          speech: {'type': 'speech', 'lang': 'ta', 'text': '...'}
+          music:  {'type': 'music',  'text': '...', 'genre': '...', 'duration': 30}
+          sing:   {'type': 'sing',   'text': '...', 'duration': 30}
+          lyrics: {'type': 'lyrics', 'text': '...'}
+
+        Routes each to the right backend, stitches all audio into one WAV.
+        Uses agent_ledger task tracking when called from an agent context —
+        tasks can be paused/resumed via the ledger.
+        """
+        import tempfile
+        import wave
+
+        # Register as ledger task if agent context exists (story agents etc.)
+        task_id = kwargs.get('task_id')
+        ledger = None
+        if task_id:
+            try:
+                from agent_ledger.core import SmartLedger, TaskStatus
+                ledger = SmartLedger.get_instance()
+            except Exception:
+                pass
+
+        wav_parts = []
+        for seg in segments:
+            seg_type = seg.get('type', 'speech')
+            text = seg.get('text', '').strip()
+            if not text:
+                continue
+
+            # Check ledger: if task was paused/cancelled, stop generating
+            if ledger and task_id:
+                try:
+                    task = ledger.get_task(task_id)
+                    if task and task.status in ('paused', 'cancelled', 'user_stopped'):
+                        logger.info(f"Multilingual synth {task.status} via ledger")
+                        break
+                except Exception:
+                    pass
+
+            tmp = tempfile.NamedTemporaryFile(suffix='.wav', delete=False,
+                                              prefix=f'_tts_{seg_type}_')
+            tmp.close()
+            try:
+                result = None
+                if seg_type == 'speech':
+                    result = self._synth_speech_segment(
+                        text, seg.get('lang', 'en'), tmp.name, **kwargs)
+                elif seg_type == 'music':
+                    result = self._synth_music_segment(
+                        text, seg.get('genre', ''), seg.get('duration', 30),
+                        tmp.name)
+                elif seg_type == 'sing':
+                    result = self._synth_sing_segment(
+                        text, seg.get('duration', 30), tmp.name)
+                elif seg_type == 'lyrics':
+                    # Lyrics = singing voice synthesis of the text
+                    result = self._synth_sing_segment(text, 30, tmp.name)
+
+                if result and os.path.isfile(result) and os.path.getsize(result) > 100:
+                    wav_parts.append(result)
+                else:
+                    try:
+                        os.unlink(tmp.name)
+                    except OSError:
+                        pass
+            except Exception as e:
+                logger.warning(f"Segment synth failed ({seg_type}): {e}")
+                try:
+                    os.unlink(tmp.name)
+                except OSError:
+                    pass
+
+        if not wav_parts:
+            return None
+
+        # Single segment — just return it
+        if len(wav_parts) == 1:
+            if output_path:
+                import shutil
+                shutil.move(wav_parts[0], output_path)
+                return output_path
+            return wav_parts[0]
+
+        # Concatenate WAV files
+        out = output_path or tempfile.mktemp(suffix='.wav', prefix='_tts_multi_')
+        try:
+            with wave.open(wav_parts[0], 'rb') as first:
+                params = first.getparams()
+            with wave.open(out, 'wb') as outf:
+                outf.setparams(params)
+                for part in wav_parts:
+                    try:
+                        with wave.open(part, 'rb') as inp:
+                            outf.writeframes(inp.readframes(inp.getnframes()))
+                    except Exception:
+                        pass
+            for part in wav_parts:
+                try:
+                    os.unlink(part)
+                except OSError:
+                    pass
+            return out
+        except Exception as e:
+            logger.error(f"WAV concatenation failed: {e}")
+            return wav_parts[0] if wav_parts else None
+
+    def _synth_speech_segment(self, text, lang, out_path, **kwargs):
+        """Synthesize one speech segment with language-appropriate TTS engine."""
+        if lang != self._language:
+            self.set_language(lang)
+            import time as _t
+            for _ in range(20):
+                if not getattr(self, '_pending_backend', None):
+                    break
+                _t.sleep(0.25)
+
+        self._ensure_initialized()
+        inst = self._backends.get(self._active_backend)
+        if inst:
+            return inst.synthesize(text=text, output_path=out_path,
+                                   language=lang, **kwargs)
+        return None
+
+    def _synth_media_segment(self, modality, text, out_path,
+                              genre='', duration=30, **kwargs):
+        """Route any non-speech segment via HARTOS generate_media + poll.
+
+        Compute-aware: checks VRAMManager before dispatching. If GPU is
+        occupied by another task, reports unavailability instead of blocking.
+        Uses agent_ledger task_id for pause/resume tracking.
+        Delegates ALL routing decisions to media_agent (which uses
+        ModelCatalog + ModelOrchestrator for capability-based selection).
+        """
+        import json as _json
+
+        # Compute-awareness: check if the required service can run
+        try:
+            from integrations.service_tools.vram_manager import vram_manager
+            gpu_info = vram_manager.detect_gpu()
+            free_gb = gpu_info.get('free_gb', 0)
+            if free_gb < 2.0 and not gpu_info.get('cuda_available', False):
+                logger.info(f"Media gen skipped: only {free_gb:.1f}GB VRAM free, "
+                            f"service may not fit alongside active models")
+        except Exception:
+            pass
+
+        try:
+            from integrations.service_tools.media_agent import (
+                generate_media, check_media_status)
+            raw = generate_media(
+                context=text, output_modality=modality,
+                input_text=text, duration=duration, style=genre)
+            result = _json.loads(raw) if isinstance(raw, str) else raw
+
+            # Completed synchronously — URL may be top-level or inside results[]
+            url = (result.get('url') or result.get('audio_url')
+                   or (result.get('results', [{}])[0].get('url')
+                       if result.get('results') else None))
+            if result.get('status') == 'completed' and url:
+                import urllib.request
+                urllib.request.urlretrieve(url, out_path)
+                return out_path
+
+            # Async — poll until done, respecting ledger pause/cancel
+            task_id = result.get('task_id') or result.get('pending_task_id')
+            ledger_task_id = kwargs.get('task_id')  # agent_ledger task
+            if task_id:
+                import time as _t
+                deadline = _t.time() + 120
+                while _t.time() < deadline:
+                    # Check ledger: paused tasks wait, cancelled tasks abort
+                    if ledger_task_id:
+                        try:
+                            from agent_ledger.core import SmartLedger
+                            ledger = SmartLedger.get_instance()
+                            ltask = ledger.get_task(ledger_task_id)
+                            if ltask:
+                                if ltask.status in ('cancelled', 'user_stopped'):
+                                    logger.info(f"Media task {task_id} stopped via ledger")
+                                    return None
+                                if ltask.status == 'paused':
+                                    _t.sleep(1)
+                                    continue  # Wait — don't poll, don't abort
+                        except Exception:
+                            pass
+                    _t.sleep(2)
+                    poll_raw = check_media_status(task_id)
+                    poll = _json.loads(poll_raw) if isinstance(poll_raw, str) else poll_raw
+                    if poll.get('status') == 'completed':
+                        dl_url = (poll.get('url') or poll.get('audio_url')
+                                  or (poll.get('results', [{}])[0].get('url')
+                                      if poll.get('results') else None))
+                        if dl_url:
+                            import urllib.request
+                            urllib.request.urlretrieve(dl_url, out_path)
+                            return out_path
+                        return None
+                    elif poll.get('status') == 'failed':
+                        logger.warning(f"Media task failed: {poll.get('error')}")
+                        return None
+        except Exception as e:
+            logger.warning(f"Media gen ({modality}) failed: {e}")
+        return None
+
+    def _synth_music_segment(self, prompt, genre, duration, out_path):
+        """Music generation — delegates to media_agent 'audio_music'."""
+        return self._synth_media_segment(
+            'audio_music', prompt, out_path, genre=genre, duration=duration)
+
+    def _synth_sing_segment(self, lyrics, duration, out_path):
+        """Singing voice — tries 'audio_music' with lyrics as prompt.
+        DiffRhythm routing handled inside media_agent via _select_audio_tool."""
+        return self._synth_media_segment(
+            'audio_music', f"Singing: {lyrics}", out_path, duration=duration)
+
     def _ensure_initialized(self):
         if not self._initialized and self.auto_init:
             # Non-blocking: if another thread is loading, don't wait
@@ -1062,9 +1282,25 @@ class TTSEngine:
 
         Checks pre-synth cache first for instant playback.
         Routes to the best engine for the given language.
+        Cancels any in-flight generation from a previous request.
         """
         if not text or not text.strip():
             return None
+
+        # Multi-language / multi-modal segmentation: split text by script
+        # and media tags (<music>, <sing>, <lyrics>), synth each segment
+        # with the right engine, concatenate into one audio file.
+        try:
+            from tts.language_segmenter import segment
+            segments = segment(text)
+            has_media = any(s.get('type') != 'speech' for s in segments)
+            has_multi_lang = len(set(s.get('lang') for s in segments
+                                     if s.get('type') == 'speech')) > 1
+            if has_media or has_multi_lang or len(segments) > 1:
+                return self._synthesize_multilingual(
+                    segments, output_path, voice, speed, **kwargs)
+        except Exception:
+            pass  # Fallback to single-language path
 
         # Route to correct engine for language
         if language and language != self._language:
@@ -1098,6 +1334,18 @@ class TTSEngine:
                              getattr(self, '_pending_backend', None))
                 return None
 
+        # Ensure enough VRAM for inference — evict idle models if needed.
+        # Without this, loaded TTS model + LLM + Whisper can exhaust VRAM,
+        # causing "paging file too small" (OS error 1455) on synthesis.
+        try:
+            from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+            lcm = get_model_lifecycle_manager()
+            cap = _get_engine_capabilities().get(self._active_backend, {})
+            needed = max(cap.get('vram_gb', 1.0) * 0.3, 0.5)  # 30% of model size for buffers
+            lcm.ensure_inference_headroom(needed, requester=self._active_backend)
+        except Exception:
+            pass  # Lifecycle manager not available — proceed anyway
+
         try:
             result = inst.synthesize(text=text, output_path=output_path,
                                      language=self._language, **kwargs)
@@ -1114,6 +1362,14 @@ class TTSEngine:
             return result
         except Exception as e:
             logger.error(f"Synthesis failed ({self._active_backend}): {e}")
+        finally:
+            # Restore evicted models (e.g., Whisper back to GPU for STT).
+            # Immediate — don't wait for lifecycle daemon's 15s tick.
+            try:
+                from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+                get_model_lifecycle_manager()._process_swap_queue()
+            except Exception:
+                pass
             # ── Fallback chain: try next engines in preference order ──
             # If the selected engine fails (missing package, CUDA error, model
             # not downloaded), walk the preference chain and try each remaining
