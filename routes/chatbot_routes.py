@@ -1826,6 +1826,33 @@ def chat_route():
     if not text.strip():
         return jsonify({'error': 'Text is required'}), 400
 
+    # Async TTS: after ANY successful response, synthesize audio in background
+    # and push via WAMP/SSE.
+    # Unified flag: media_mode ('audio'|'video'|'text') — same across all platforms.
+    # Backwards compat: video_req=true maps to 'video', default='audio' for bundled.
+    media_mode = data.get('media_mode')
+    if not media_mode:
+        if video_req:
+            media_mode = 'video'
+        elif bool(os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False)):
+            media_mode = 'audio'  # Nunba desktop default
+        else:
+            media_mode = 'text'   # Cloud/web default
+    audio_mode = media_mode in ('audio', 'video')
+    if audio_mode:
+        from flask import after_this_request
+        @after_this_request
+        def _tts_after_response(response):
+            try:
+                resp_data = response.get_json(silent=True) or {}
+                resp_text = resp_data.get('text') or resp_data.get('response') or ''
+                if resp_text and response.status_code == 200:
+                    from hart_intelligence_entry import _tts_synthesize_and_publish
+                    _tts_synthesize_and_publish(resp_text, user_id, request_id)
+            except Exception:
+                pass
+            return response
+
     # Find the agent configuration
     agent_config = None
     all_agents = LOCAL_AGENTS + CLOUD_AGENTS
