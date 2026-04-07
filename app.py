@@ -214,48 +214,7 @@ if getattr(sys, 'frozen', False):
     import builtins as _builtins
     _builtins._nunba_trace = _trace
 
-    # ── AOP: trace EVERY function call/return until agent is visible ──
-    # Uses sys.settrace — logs to startup_trace.log with immediate flush.
-    # Auto-disables after 60s or when _nunba_trace_stop() is called.
-    _trace_active = [True]
-    _trace_deadline = _startup_t0 + 60  # auto-stop after 60s
-
-    def _call_tracer(frame, event, arg):
-        if not _trace_active[0]:
-            return None
-        if _time.time() > _trace_deadline:
-            _trace_active[0] = False
-            _trace("=== AOP trace auto-stopped (60s) ===")
-            return None
-        try:
-            if event == 'call':
-                fn = frame.f_code.co_name
-                mod = frame.f_globals.get('__name__', '?')
-                # Skip noisy internal modules
-                if mod and (mod.startswith('importlib') or mod.startswith('_') or
-                           mod.startswith('zipimport') or mod.startswith('encodings')):
-                    return None
-                line = frame.f_lineno
-                _trace(f"CALL {mod}:{fn}:{line}")
-                return _call_tracer
-            elif event == 'exception':
-                fn = frame.f_code.co_name
-                mod = frame.f_globals.get('__name__', '?')
-                exc_type = arg[0].__name__ if arg and arg[0] else '?'
-                _trace(f"EXCEPTION {mod}:{fn} → {exc_type}: {arg[1] if arg and len(arg)>1 else ''}")
-        except Exception:
-            pass
-        return None
-
-    sys.settrace(_call_tracer)
-    _trace("AOP call tracer ACTIVE (60s or until stopped)")
-
-    def _nunba_trace_stop():
-        _trace_active[0] = False
-        sys.settrace(None)
-        _trace("=== AOP trace stopped manually ===")
-
-    _builtins._nunba_trace_stop = _nunba_trace_stop
+    _builtins._nunba_trace_stop = lambda: None  # no-op placeholder
 
 import os
 import sys
