@@ -54,7 +54,7 @@ BACKEND_NONE = "none"
 _FALLBACK_ENGINE_CAPABILITIES = {
     BACKEND_F5: {
         'name': 'F5-TTS (Flow Matching)',
-        'vram_gb': 2.0,
+        'vram_gb': 3.0,  # model 2GB + vocos 200MB + CUDA context + inference buffers
         'languages': {'en', 'zh'},
         'paralinguistic': [],
         'emotion_tags': [],
