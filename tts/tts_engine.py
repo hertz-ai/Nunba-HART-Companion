@@ -1336,13 +1336,22 @@ class TTSEngine:
 
         # VRAM safety: check actual free VRAM before GPU synthesis.
         # CUDA OOM can kill the ENTIRE process (C-level abort, uncatchable by Python).
-        # If truly insufficient, clear cache first, then try, then fall back.
+        # Must check model_size + inference_buffer, not just a flat threshold.
         cap = _get_engine_capabilities().get(self._active_backend, {})
         vram_needed = cap.get('vram_gb', 0)
         if vram_needed > 0:
             try:
                 from integrations.service_tools.vram_manager import vram_manager
                 free_gb = vram_manager.get_free_vram()
+                # Need model size + 0.5GB inference buffer. If not enough, CPU fallback.
+                _min_required = vram_needed + 0.5
+                if free_gb < _min_required:
+                    logger.warning(
+                        f"VRAM insufficient for {self._active_backend}: "
+                        f"{free_gb:.1f}GB free < {_min_required:.1f}GB needed "
+                        f"(model={vram_needed}GB + 0.5GB buffer). Using CPU fallback.")
+                    return self._synthesize_with_fallback(
+                        text, output_path, voice, self._language, **kwargs)
                 if free_gb < 0.3:  # Less than 300MB — clear cache first
                     try:
                         import torch
