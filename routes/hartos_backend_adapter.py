@@ -957,6 +957,9 @@ def create_proxy_blueprint():
             conversation_id=data.get('conversation_id'),
             request_id=data.get('request_id')
         )
+        # TTS is fired from hart_intelligence_entry.py line 5431 (inside HARTOS /chat handler)
+        # No duplicate call needed here — proxy_chat calls HARTOS via test_client
+        # which goes through the full /chat handler including _tts_synthesize_and_publish.
         return jsonify(result)
 
     @proxy_bp.route('/prompts', methods=['GET'])

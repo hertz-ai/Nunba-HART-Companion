@@ -1285,6 +1285,18 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
         return;
       }
 
+      // TTS audio pushed from backend — play immediately
+      if (parsed.action === 'TTS' && parsed.generated_audio_url) {
+        logger.log('TTS AUDIO RECEIVED:', parsed.generated_audio_url);
+        try {
+          const audio = new Audio(parsed.generated_audio_url);
+          audio.play().catch(() => {});
+        } catch (e) {
+          logger.log('TTS audio play failed:', e);
+        }
+        return;
+      }
+
       if (Number(parsed.priority) === 49 && parsed.action === 'Thinking') {
         const traceRequestId = parsed.request_id || 'unknown';
 

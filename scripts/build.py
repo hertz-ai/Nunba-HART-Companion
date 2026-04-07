@@ -341,6 +341,35 @@ def _stamp_version_in_file(filepath, pattern, replacement):
     return False
 
 
+def generate_build_hashes():
+    """Generate build_hashes.json with git commit hashes of all repos.
+
+    Queried at runtime via GET /api/harthash (@HARTHASH magic word).
+    """
+    import json, datetime
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    project_dir = os.path.dirname(scripts_dir)
+    repos = {
+        'nunba': project_dir,
+        'hartos': os.path.join(project_dir, '..', 'HARTOS'),
+        'hevolve_database': os.path.join(project_dir, '..', 'Hevolve_Database'),
+        'hevolveai': os.path.join(project_dir, '..', 'hevolveai'),
+    }
+    hashes = {}
+    for name, path in repos.items():
+        try:
+            r = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'],
+                               capture_output=True, text=True, cwd=path, timeout=5)
+            hashes[name] = r.stdout.strip() if r.returncode == 0 else 'unknown'
+        except Exception:
+            hashes[name] = 'unknown'
+    hashes['build_time'] = datetime.datetime.now().isoformat()
+    out_path = os.path.join(project_dir, 'build_hashes.json')
+    with open(out_path, 'w') as f:
+        json.dump(hashes, f, indent=2)
+    print_info(f"Build hashes: {hashes}")
+
+
 def stamp_version():
     """Stamp VERSION from deps.py into runtime files that can't import it."""
     scripts_dir = os.path.dirname(os.path.abspath(__file__))

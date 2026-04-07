@@ -4,6 +4,20 @@ import {FileText} from 'lucide-react';
 import Lottie from 'lottie-react';
 import hourglassAnimation from '../../assets/hourglass-lottie.json';
 import TypeWriterForSubtitle from './TypeWriterSubtitle';
+
+// Timestamp format — ported from Hevolve.ai ConversationHistoryPanel.js
+function formatTimestamp(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'});
+}
 import ThinkingProcessContainer from './ThinkingProcessContainer';
 import WorkflowFlowchart from './WorkflowFlowchart';
 import SetupProgressCard from './SetupProgressCard';
@@ -418,20 +432,25 @@ const ChatMessageList = ({
                       ) : (
                         <div>{message.content}</div>
                       )}
-                      {/* Intelligence source badge */}
-                      {message.source && (
-                        <div className="flex items-center gap-1 mt-2 opacity-50 text-xs">
-                          <span
-                            className="inline-block w-2 h-2 rounded-full"
-                            style={{
-                              backgroundColor: message.source?.includes('local')
-                                ? '#2ECC71'
-                                : '#6C63FF',
-                            }}
-                          />
-                          {message.source?.includes('local') ? 'Local' : 'Hive'}
-                        </div>
-                      )}
+                      {/* Intelligence source badge + timestamp */}
+                      <div className="flex items-center justify-between mt-2 opacity-50 text-xs">
+                        {message.source && (
+                          <div className="flex items-center gap-1">
+                            <span
+                              className="inline-block w-2 h-2 rounded-full"
+                              style={{
+                                backgroundColor: message.source?.includes('local')
+                                  ? '#2ECC71'
+                                  : '#6C63FF',
+                              }}
+                            />
+                            {message.source?.includes('local') ? 'Local' : 'Hive'}
+                          </div>
+                        )}
+                        {message.timestamp && (
+                          <span>{formatTimestamp(message.timestamp)}</span>
+                        )}
+                      </div>
                     </>
                   )}
 
