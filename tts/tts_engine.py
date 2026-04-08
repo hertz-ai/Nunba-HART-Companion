@@ -1439,9 +1439,13 @@ class TTSEngine:
                 if mode == 'cpu_only' and getattr(inst, '_device', None) == 'cuda':
                     logger.warning(
                         f"VRAM insufficient for {self._active_backend} "
-                        f"(loaded on cuda, vram_manager says cpu_only). CPU fallback.")
+                        f"(loaded on cuda, vram_manager says cpu_only). CPU fallback (transient).")
+                    # Transient VRAM pressure — use Piper for THIS request only.
+                    # Do NOT permanently switch _active_backend. F5 will be
+                    # retried on next request when VRAM may be free again.
                     return self._synthesize_with_fallback(
-                        text, output_path, voice, self._language, **kwargs)
+                        text, output_path, voice, self._language,
+                        _transient=True, **kwargs)
             except Exception:
                 pass
 
@@ -1484,7 +1488,11 @@ class TTSEngine:
         (e.g. ImportError for missing package, RuntimeError for CUDA).
         Walks LANG_ENGINE_PREFERENCE skipping the failed engine and any
         already-tried engines. Piper is always the last resort.
+
+        _transient=True: VRAM pressure fallback — don't permanently switch
+        _active_backend. The GPU engine will be retried on next request.
         """
+        transient = kwargs.pop('_transient', False)
         failed = self._active_backend
         prefs = _get_lang_preference(language or 'en')
         # Build fallback list: remaining prefs + Piper (if not already in list)
@@ -1502,9 +1510,13 @@ class TTSEngine:
                 result = inst.synthesize(text=text, output_path=output_path,
                                          language=language, **kwargs)
                 if result:
-                    logger.info(f"Fallback succeeded: {failed} -> {candidate}")
-                    # Switch active backend so future calls skip the broken engine
-                    self._active_backend = candidate
+                    if transient:
+                        logger.info(f"Transient fallback: {failed} -> {candidate} "
+                                    f"(keeping {failed} as primary)")
+                    else:
+                        logger.info(f"Fallback succeeded: {failed} -> {candidate}")
+                        # Permanent switch — engine crashed, don't retry
+                        self._active_backend = candidate
                     return result
             except Exception as fallback_err:
                 logger.debug(f"Fallback {candidate} also failed: {fallback_err}")
