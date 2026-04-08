@@ -1805,13 +1805,26 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   // dedup, and guest/JWT auth internally.
   useEffect(() => {
     // TTS audio — play when received, skip stale request_ids
+    // Persistent audio element — survives across TTS events.
+    // WebView2 autoplay policy blocks new Audio().play() from async callbacks.
+    // A persistent element primed by user interaction (handleSend click) is allowed.
+    const ttsAudio = document.getElementById('nunba-tts-audio') || (() => {
+      const el = document.createElement('audio');
+      el.id = 'nunba-tts-audio';
+      el.preload = 'auto';
+      document.body.appendChild(el);
+      return el;
+    })();
+
     const unsubTts = realtimeService.on('tts', (data) => {
       if (data.request_id && requestIdRef.current && data.request_id !== requestIdRef.current) {
         return; // stale audio from previous request
       }
       if (data.generated_audio_url) {
-        const audio = new Audio(data.generated_audio_url);
-        audio.play().catch(() => {});
+        ttsAudio.src = data.generated_audio_url;
+        ttsAudio.play().catch((err) => {
+          console.warn('TTS autoplay blocked:', err.message);
+        });
       }
     });
 
