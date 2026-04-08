@@ -1785,6 +1785,18 @@ def broadcast_sse_event(event_type, data, user_id=None):
                 _sse_clients.pop(uid, None)
 
 
+# Expose on __main__ so HARTOS can find it via `import __main__`.
+# In frozen builds, __main__ is app.py (Nunba.exe). main.py is loaded as
+# a module by _import_main_app(). Without this, HARTOS's
+# `__main__.broadcast_sse_event` is undefined and SSE events are silently dropped.
+try:
+    import __main__ as _main_ref
+    if not hasattr(_main_ref, 'broadcast_sse_event'):
+        _main_ref.broadcast_sse_event = broadcast_sse_event
+except Exception:
+    pass
+
+
 @app.route('/api/social/events/stream')
 def sse_event_stream():
     """Local SSE endpoint — fallback transport for flat/desktop topology.
