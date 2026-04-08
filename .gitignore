@@ -104,6 +104,17 @@ nul
 # TrueFlow runtime injector (deployed by plugin, not source)
 .pycharm_plugin/
 
+# Runtime agent data (user-specific, machine-generated)
+agent_data/
+langchain_config.json
+
+# MCP server config (local dev tool)
+.mcp.json
+
+# Business/sales documents (not source code, kept on disk only)
+Hevolve_Sales_Outreach_Embodied_AI.md
+outreach_sender.html
+
 # Claude Code
 .claude/
 
