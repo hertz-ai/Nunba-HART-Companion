@@ -310,15 +310,30 @@ _INFERENCE_TIMEOUT_S = 120
 
 
 def _run_with_timeout(fn, timeout_s=_INFERENCE_TIMEOUT_S):
-    """Run fn() with a hard timeout. Raises TimeoutError if exceeded."""
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix='tts-infer') as ex:
-        future = ex.submit(fn)
+    """Run fn() with a hard timeout. Uses a bare thread — no executor.
+
+    ThreadPoolExecutor creates/destroys per call and fails with
+    'cannot schedule new futures after interpreter shutdown' during
+    process cleanup. A bare thread avoids this.
+    """
+    result = [None]
+    error = [None]
+
+    def _worker():
         try:
-            return future.result(timeout=timeout_s)
-        except FutTimeout:
-            logger.error(f"GPU inference timed out after {timeout_s}s")
-            raise TimeoutError(f"TTS inference exceeded {timeout_s}s")
+            result[0] = fn()
+        except Exception as e:
+            error[0] = e
+
+    t = threading.Thread(target=_worker, daemon=True, name='tts-infer-timeout')
+    t.start()
+    t.join(timeout=timeout_s)
+    if t.is_alive():
+        logger.error(f"GPU inference timed out after {timeout_s}s")
+        raise TimeoutError(f"TTS inference exceeded {timeout_s}s")
+    if error[0] is not None:
+        raise error[0]
+    return result[0]
 
 
 # Minimum free VRAM (GB) required before starting GPU inference.
