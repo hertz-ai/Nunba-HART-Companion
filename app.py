@@ -326,9 +326,115 @@ if getattr(sys, 'frozen', False):
     if _is_stream_broken(sys.stderr):
         sys.stderr = _safe_devnull()
 
+
+# ════════════════════════════════════════════════════════════════════
+# STATIC SPLASH — must appear BEFORE frozen fixes (which take 20+s).
+# Only needs tkinter + PIL (lightweight, bundled by cx_Freeze).
+# ════════════════════════════════════════════════════════════════════
+
+def _safe_tk_update_early(root, budget_ms=50):
+    """Pump tkinter events. Inlined here so splash can use it before frozen fixes."""
+    try:
+        if sys.platform != 'darwin':
+            root.update()
+            return
+        import _tkinter
+        import time as _t
+        deadline = _t.monotonic() + budget_ms / 1000.0
+        while _t.monotonic() < deadline:
+            if not root.tk.dooneevent(_tkinter.DONT_WAIT):
+                break
+    except Exception:
+        pass
+
+_early_splash = None
+_eroot = None
+
+if getattr(sys, 'frozen', False) and '--validate' not in sys.argv and '--install-ai' not in sys.argv and '--background' not in sys.argv and '--help' not in sys.argv and '-h' not in sys.argv:
+    # DPI awareness before any Tk window
+    try:
+        import ctypes as _ct_dpi
+        _ct_dpi.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+    # macOS Tcl/Tk path fix
+    if sys.platform == 'darwin':
+        _macos_dir = os.path.dirname(sys.executable)
+        _tcl_dir = os.path.join(_macos_dir, 'share', 'tcl8.6')
+        _tk_dir = os.path.join(_macos_dir, 'share', 'tk8.6')
+        if os.path.isdir(_tcl_dir):
+            os.environ['TCL_LIBRARY'] = _tcl_dir
+        if os.path.isdir(_tk_dir):
+            os.environ['TK_LIBRARY'] = _tk_dir
+    try:
+        import tkinter as _estk
+        _eroot = _estk.Tk()
+        _eroot.withdraw()
+        _app_base = os.path.dirname(os.path.abspath(sys.executable))
+        _esp_path = os.path.join(_app_base, 'splash.png')
+        if os.path.isfile(_esp_path):
+            from PIL import Image as _ESImg, ImageTk as _ESTk
+            _es_img = _ESImg.open(_esp_path)
+            _ESW, _ESH = _es_img.size
+            if _ESW > 900 or _ESH > 560:
+                _es_img = _es_img.resize((900, 560), _ESImg.LANCZOS)
+                _ESW, _ESH = 900, 560
+            _es_top = _estk.Toplevel(_eroot)
+            _es_top.overrideredirect(True)
+            _es_top.attributes('-topmost', True)
+            _esx = (_es_top.winfo_screenwidth() - _ESW) // 2
+            _esy = (_es_top.winfo_screenheight() - _ESH) // 2
+            _es_top.geometry(f"{_ESW}x{_ESH}+{_esx}+{_esy}")
+            _es_photo = _ESTk.PhotoImage(_es_img)
+            _es_canvas = _estk.Canvas(_es_top, width=_ESW, height=_ESH,
+                                       highlightthickness=0, bd=0)
+            _es_canvas.pack(fill='both', expand=True)
+            _es_canvas.create_image(0, 0, image=_es_photo, anchor='nw')
+            _es_canvas._ref = _es_photo
+            _es_status = _estk.StringVar(value='Starting up...')
+            _es_status_id = _es_canvas.create_text(
+                _ESW // 2, _ESH - 32, text='Starting up...',
+                font=('Bahnschrift Light', 10), fill='#72757E', anchor='center')
+            def _es_on_status(*_a):
+                try:
+                    _es_canvas.itemconfig(_es_status_id, text=_es_status.get())
+                except Exception:
+                    pass
+            _es_status.trace_add('write', _es_on_status)
+            _es_bar_y = _ESH - 14
+            _es_bar_w = 220
+            _es_bar_x = (_ESW - _es_bar_w) // 2
+            _es_canvas.create_rectangle(_es_bar_x, _es_bar_y,
+                                         _es_bar_x + _es_bar_w, _es_bar_y + 3,
+                                         fill='#1A1929', outline='')
+            _es_bar_rect = _es_canvas.create_rectangle(
+                _es_bar_x, _es_bar_y, _es_bar_x + 40, _es_bar_y + 3,
+                fill='#6C63FF', outline='')
+            _es_anim = {'pos': 0, 'dir': 1}
+            def _es_animate():
+                try:
+                    _es_anim['pos'] += _es_anim['dir'] * 4
+                    if _es_anim['pos'] >= _es_bar_w - 40:
+                        _es_anim['dir'] = -1
+                    elif _es_anim['pos'] <= 0:
+                        _es_anim['dir'] = 1
+                    px = _es_bar_x + _es_anim['pos']
+                    _es_canvas.coords(_es_bar_rect, px, _es_bar_y, px + 40, _es_bar_y + 3)
+                    _es_top.after(30, _es_animate)
+                except Exception:
+                    pass
+            _es_animate()
+            _safe_tk_update_early(_eroot)
+            _eroot.after(300000, lambda: _eroot.destroy())
+            _early_splash = (_eroot, _es_top, _es_canvas, _es_status, _es_photo)
+        else:
+            _eroot.destroy()
+    except Exception:
+        _early_splash = None
+
+
 # ── Frozen build import fixes (langchain, torch, transformers) ──
-# These take 30+ seconds. SKIPPED here, run AFTER splash is visible.
-# See _FROZEN_FIXES_DONE flag check below.
+# These take 20-30s. Splash is already visible above.
 _FROZEN_FIXES_DONE = False
 if getattr(sys, 'frozen', False):
     # Suppress ALL warnings before importing langchain/autogen — they try to write
@@ -649,110 +755,8 @@ def _load_deferred_config():
     if _llm_configured:
         os.environ.setdefault('HEVOLVE_AGENT_ENGINE_ENABLED', 'true')
 
-# ── Show static splash.png IMMEDIATELY (before any heavy imports) ──
-# flask, requests, PIL etc. take seconds to import. Show splash first.
-_early_splash = None   # (root, canvas, status_var, photo_ref)
-_eroot = None
-# Make Tkinter DPI-aware BEFORE creating any windows (early or animated).
-# Without this, Windows upscales the splash (e.g. 900x560 → 1350x840 at 150% DPI)
-# and positions it off-center.
-try:
-    import ctypes as _ct_dpi
-    _ct_dpi.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
-except Exception:
-    pass  # Linux/macOS or older Windows — no-op
-# cx_Freeze puts tcl/tk in Contents/MacOS/share/ but tkinter looks in
-# Contents/Resources/share/.  Set env vars so every Tk() call finds init.tcl.
-if getattr(sys, 'frozen', False) and sys.platform == 'darwin':
-    _macos_dir = os.path.dirname(sys.executable)
-    _tcl_dir = os.path.join(_macos_dir, 'share', 'tcl8.6')
-    _tk_dir = os.path.join(_macos_dir, 'share', 'tk8.6')
-    if os.path.isdir(_tcl_dir):
-        os.environ['TCL_LIBRARY'] = _tcl_dir
-    if os.path.isdir(_tk_dir):
-        os.environ['TK_LIBRARY'] = _tk_dir
-
-# Early splash only in frozen builds — two Tk() instances cause ghost white window
-if getattr(sys, 'frozen', False) and '--validate' not in sys.argv and '--install-ai' not in sys.argv and '--background' not in sys.argv and '--help' not in sys.argv and '-h' not in sys.argv:
-    try:
-        import tkinter as _estk
-        _eroot = _estk.Tk()
-        _eroot.withdraw()  # hidden root — setup-ai wizard can use Toplevel on it
-        _app_base = os.path.dirname(os.path.abspath(
-            sys.executable if getattr(sys, 'frozen', False) else __file__))
-        _esp_path = os.path.join(_app_base, 'splash.png')
-        if os.path.isfile(_esp_path):
-            from PIL import Image as _ESImg
-            from PIL import ImageTk as _ESTk
-            _es_img = _ESImg.open(_esp_path)
-            # Scale to match animated splash size (900x560) if larger
-            _ESW, _ESH = _es_img.size
-            if _ESW > 900 or _ESH > 560:
-                _es_img = _es_img.resize((900, 560), _ESImg.LANCZOS)
-                _ESW, _ESH = 900, 560
-            # Toplevel for the splash image (centered, borderless)
-            _es_top = _estk.Toplevel(_eroot)
-            _es_top.overrideredirect(True)
-            _es_top.attributes('-topmost', True)
-            _esx = (_es_top.winfo_screenwidth() - _ESW) // 2
-            _esy = (_es_top.winfo_screenheight() - _ESH) // 2
-            _es_top.geometry(f"{_ESW}x{_ESH}+{_esx}+{_esy}")
-            _es_photo = _ESTk.PhotoImage(_es_img)
-            _es_canvas = _estk.Canvas(_es_top, width=_ESW, height=_ESH,
-                                       highlightthickness=0, bd=0)
-            _es_canvas.pack(fill='both', expand=True)
-            _es_canvas.create_image(0, 0, image=_es_photo, anchor='nw')
-            _es_canvas._ref = _es_photo
-            _es_status = _estk.StringVar(value='Starting up...')
-            # Draw status on canvas (not Label widget) so it blends with splash image
-            _es_status_id = _es_canvas.create_text(
-                _ESW // 2, _ESH - 32, text='Starting up...',
-                font=('Bahnschrift Light', 10), fill='#72757E', anchor='center')
-            def _es_on_status(*_a):
-                try:
-                    _es_canvas.itemconfig(_es_status_id, text=_es_status.get())
-                except Exception:
-                    pass
-            _es_status.trace_add('write', _es_on_status)
-            # Progress bar
-            _es_bar_y = _ESH - 14
-            _es_bar_w = 220
-            _es_bar_x = (_ESW - _es_bar_w) // 2
-            _es_canvas.create_rectangle(_es_bar_x, _es_bar_y,
-                                         _es_bar_x + _es_bar_w, _es_bar_y + 3,
-                                         fill='#1A1929', outline='')
-            _es_bar_rect = _es_canvas.create_rectangle(
-                _es_bar_x, _es_bar_y, _es_bar_x + 40, _es_bar_y + 3,
-                fill='#6C63FF', outline='')
-            _es_anim = {'pos': 0, 'dir': 1}
-
-            def _es_animate():
-                try:
-                    _es_anim['pos'] += _es_anim['dir'] * 4
-                    if _es_anim['pos'] >= _es_bar_w - 40:
-                        _es_anim['dir'] = -1
-                    elif _es_anim['pos'] <= 0:
-                        _es_anim['dir'] = 1
-                    px = _es_bar_x + _es_anim['pos']
-                    _es_canvas.coords(_es_bar_rect, px, _es_bar_y, px + 40, _es_bar_y + 3)
-                    _es_top.after(30, _es_animate)
-                except Exception:
-                    pass
-
-            _es_animate()
-            _safe_tk_update(_eroot)  # use safe pump — plain update() freezes macOS Cocoa loop
-            # Self-destruct: if splash is still alive after 5 min, something hung — kill it
-            _eroot.after(300000, lambda: _eroot.destroy())
-            # Store: (hidden_root, toplevel, canvas, status_var, photo_ref)
-            _early_splash = (_eroot, _es_top, _es_canvas, _es_status, _es_photo)
-        else:
-            _eroot.destroy()
-    except Exception:
-        _early_splash = None
-
-# Frozen fixes already ran at line 328 (before splash).
-# _run_frozen_import_fixes() deferred approach was reverted — it caused
-# double imports and tkinter threading crashes.
+# Static splash was shown BEFORE frozen fixes (line 329).
+# _early_splash and _eroot are already set.
 
 import argparse
 import atexit

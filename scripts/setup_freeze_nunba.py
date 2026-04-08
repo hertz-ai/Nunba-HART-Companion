@@ -949,7 +949,7 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
                 _r = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "--no-deps",
                      "--target", _embed_sp, "--upgrade", _sib_path],
-                    capture_output=True, text=True, timeout=120)
+                    capture_output=True, text=True, timeout=600)
                 if _r.returncode == 0:
                     print(f"python-embed: {_pkg_name} updated OK")
                 else:
