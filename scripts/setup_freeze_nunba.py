@@ -920,6 +920,37 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     if _removed:
         print(f"Post-build: removed {_removed} __pycache__ dirs from build")
 
+# ── Post-build: verify .pyc magic numbers match runtime Python ──
+# Catches cross-version .pyc files that would cause silent ImportError at runtime.
+# The build Python and frozen runtime Python MUST be the same version.
+if 'build' in sys.argv or 'build_exe' in sys.argv:
+    import importlib.util as _ilu_magic
+    _expected_magic = _ilu_magic.MAGIC_NUMBER
+    _build_dir_verify = os.path.abspath(build_exe_options["build_exe"])
+    _bad_pyc = []
+    for _root_v, _dirs_v, _files_v in os.walk(_build_dir_verify):
+        for _fv in _files_v:
+            if _fv.endswith('.pyc'):
+                _fpath = os.path.join(_root_v, _fv)
+                try:
+                    with open(_fpath, 'rb') as _fh:
+                        _file_magic = _fh.read(4)
+                    if _file_magic != _expected_magic:
+                        _bad_pyc.append((_fpath.replace(_build_dir_verify, ''), _file_magic.hex()))
+                except Exception:
+                    pass
+    if _bad_pyc:
+        print(f"[WARNING] {len(_bad_pyc)} .pyc files have WRONG magic number "
+              f"(expected {_expected_magic.hex()}):")
+        for _bp, _bm in _bad_pyc[:10]:
+            print(f"  {_bm} {_bp}")
+        if len(_bad_pyc) > 10:
+            print(f"  ... and {len(_bad_pyc) - 10} more")
+        print("  These will cause 'bad magic number' ImportError at runtime!")
+        print("  Fix: ensure build Python matches frozen runtime Python version.")
+    else:
+        print(f"Post-build: all .pyc files verified (magic={_expected_magic.hex()})")
+
 # ── Pre-copy: install TTS packages into python-embed ──
 # GPU TTS backends need pip packages in python-embed's site-packages.
 # python-embed's own pip is broken (distutils-precedence.pth), so we use
