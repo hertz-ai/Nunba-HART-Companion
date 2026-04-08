@@ -212,8 +212,16 @@ class RealtimeService {
   // ── Internal: dispatch (transport-agnostic, idempotent) ─────────────
 
   _isDuplicate(payload) {
-    const id = payload.request_id || payload.id;
-    if (!id) return false; // no ID = can't dedup, always deliver
+    // Explicit ID (TTS request_id, notification id, etc.)
+    let id = payload.request_id || payload.id;
+    // No explicit ID — generate content hash so identical payloads from
+    // different transports (WAMP + SSE) dedup correctly.
+    if (!id) {
+      const key = (payload.action || payload.type || '') + '|' +
+        (payload.generated_audio_url || payload.agent_id || '') + '|' +
+        (payload.message || payload.content || payload.text || '').slice(0, 100);
+      id = '_h:' + key;
+    }
     const now = Date.now();
     if (this._seenIds.has(id) && now - this._seenIds.get(id) < DEDUP_WINDOW_MS) {
       return true; // seen within dedup window
