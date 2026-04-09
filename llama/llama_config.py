@@ -1172,9 +1172,10 @@ class LlamaConfig:
         else:
             ctx_size = self.config.get("context_size", 8192)
 
-        # Cap context size to leave VRAM for TTS (Indic Parler, F5, etc.)
-        # and never use more than 10K (diminishing returns vs VRAM cost)
-        ctx_size = min(ctx_size, 10240)
+        # Cap context size to leave VRAM for TTS (F5 needs 2.5GB on same GPU).
+        # 8K context uses ~1GB KV cache for 4B Q4 model.
+        # 10K+ starves F5 and causes inference hangs.
+        ctx_size = min(ctx_size, 8192)
 
         # Cap threads to 75% of cores — leave headroom for OS + TTS
         max_threads = max(1, int((os.cpu_count() or 4) * 0.75))
