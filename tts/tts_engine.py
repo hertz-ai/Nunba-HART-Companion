@@ -1656,7 +1656,23 @@ class _LazyF5:
             file_wave=output_path,
             speed=1.0,
         ), self._device))
+        # Schedule idle unload — keeps F5 on GPU for back-to-back messages,
+        # frees VRAM after 60s of silence so llama KV cache can expand.
+        if self._device == 'cuda':
+            self._schedule_idle_unload()
         return output_path
+
+    def _schedule_idle_unload(self, timeout_s=60):
+        """Unload F5 from GPU after timeout_s of no synthesis."""
+        if hasattr(self, '_idle_timer') and self._idle_timer:
+            self._idle_timer.cancel()
+        self._idle_timer = threading.Timer(timeout_s, self._idle_unload)
+        self._idle_timer.daemon = True
+        self._idle_timer.start()
+
+    def _idle_unload(self):
+        logger.info("F5: idle 60s — unloading from GPU (freeing VRAM for LLM)")
+        self.unload_model()
 
     def unload_model(self):
         if self._model:
