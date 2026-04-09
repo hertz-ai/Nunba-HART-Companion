@@ -1509,11 +1509,16 @@ class TTSEngine:
         """
         transient = kwargs.pop('_transient', False)
         failed = self._active_backend
-        prefs = _get_lang_preference(language or 'en')
-        # Build fallback list: remaining prefs + Piper (if not already in list)
-        candidates = [b for b in prefs if b != failed]
-        if BACKEND_PIPER not in candidates:
-            candidates.append(BACKEND_PIPER)
+        if transient:
+            # VRAM pressure: skip all GPU-capable engines, go straight to Piper.
+            # Loading torch-based engines on CPU still touches CUDA internals
+            # and crashes when VRAM is exhausted.
+            candidates = [BACKEND_PIPER]
+        else:
+            prefs = _get_lang_preference(language or 'en')
+            candidates = [b for b in prefs if b != failed]
+            if BACKEND_PIPER not in candidates:
+                candidates.append(BACKEND_PIPER)
 
         for candidate in candidates:
             try:
