@@ -2001,6 +2001,7 @@ def chat_route():
                     request_id=request_id,
                     create_agent=bool(create_agent),
                     casual_conv=_is_casual,
+                    media_mode=media_mode,
                     autonomous=bool(autonomous_creation),
                     agentic_execute=bool(agentic_execute),
                     agentic_plan=agentic_plan,

@@ -322,6 +322,7 @@ def chat(
     casual_conv: bool = False,
     video_req: bool = False,
     media_request: bool = False,
+    media_mode: str = 'text',
     autonomous: bool = False,
     agentic_execute: bool = False,
     agentic_plan: dict = None,
@@ -368,6 +369,7 @@ def chat(
         "tools": None,
         "video_req": video_req,
         "media_request": media_request,
+        "media_mode": media_mode,  # TODO: HARTOS /chat needs data.get('media_mode') to use this
         "autonomous": autonomous,
         "agentic_execute": agentic_execute,
     }

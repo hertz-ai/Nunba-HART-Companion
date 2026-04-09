@@ -228,16 +228,17 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), duration);
   }, []);
 
+  const CAPABILITY_LABELS = useMemo(() => ({
+    stt: 'I can hear you now',
+    tts: 'I can speak now',
+    llm: 'Your Nunba is fully awake',
+    vlm: 'I can see you now',
+    audio_gen: 'I can compose music for you',
+    video_gen: 'I can create videos for you',
+  }), []);
   const announcedCapsRef = useRef(new Set());
   useEffect(() => {
     const startTime = Date.now();
-    const CAPABILITY_LABELS = {
-      stt: 'I can hear you now',
-      tts: 'I can speak now',
-      llm: 'Your Nunba is fully awake',
-      audio_gen: 'I can compose music for you',
-      video_gen: 'I can create videos for you',
-    };
     let pollId = null;
     const poll = async () => {
       if (Date.now() - startTime > 60000) { clearInterval(pollId); return; }
@@ -1888,7 +1889,16 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       });
     });
 
-    return () => { unsubTts(); unsubSetup(); };
+    // Capability updates — "I can see/talk/hear" when models load
+    const unsubCapability = realtimeService.on('capability_update', (data) => {
+      const label = CAPABILITY_LABELS[data.capability];
+      if (label && !announcedCapsRef.current.has(data.capability)) {
+        announcedCapsRef.current.add(data.capability);
+        pushNotification({ type: 'success', message: label });
+      }
+    });
+
+    return () => { unsubTts(); unsubSetup(); unsubCapability(); };
   }, []);
 
   useEffect(() => {
