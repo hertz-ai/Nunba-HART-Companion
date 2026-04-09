@@ -511,17 +511,44 @@ class LlamaConfig:
             progress_callback('diagnosing', 0.05)
 
         # ── 1. Resolve model selection ─────────────────────────────
+        # Dynamic VRAM-aware: reserve VRAM for other models (TTS, STT, VLM)
+        # that will coexist on the same GPU. Pick the largest LLM that fits.
         if model_index is not None and 0 <= model_index < len(MODEL_PRESETS):
             model_idx = model_index
         elif 'downgrade_model' in diag['actions']:
-            # Current best model is too big — find the largest that fits
             model_idx = self._find_best_fitting_model(diag['compute_budget_mb'])
             logger.info(f"Downgraded model selection: {MODEL_PRESETS[model_idx].display_name} "
                         f"(fits {diag['compute_budget_mb']}MB budget)")
         else:
             model_idx = diag['best_model_index']
 
+        # VRAM coexistence: if other GPU models need VRAM (F5-TTS, whisper, VLM),
+        # reduce the LLM budget to leave room. Transparent to user — just picks
+        # the best model that fits alongside everything else.
         preset = MODEL_PRESETS[model_idx]
+        try:
+            vram_mgr = self._get_vram_manager()
+            if vram_mgr and diag.get('gpu_type') == 'nvidia':
+                total_gb = vram_mgr.get_total_vram()
+                # Estimate VRAM needed by non-LLM models that will likely load:
+                # F5-TTS (2.5GB if audio mode) is the main consumer.
+                tts_reserve_gb = 2.5  # F5 model + inference buffers
+                kv_reserve_gb = 1.5   # KV cache for 10K context
+                os_reserve_gb = 0.5   # display + OS
+                available_for_llm_mb = int((total_gb - tts_reserve_gb
+                                            - kv_reserve_gb - os_reserve_gb) * 1024)
+                if preset.size_mb > available_for_llm_mb:
+                    better_idx = self._find_best_fitting_model(available_for_llm_mb)
+                    if better_idx != model_idx:
+                        logger.info(
+                            f"VRAM coexistence: {preset.display_name} ({preset.size_mb}MB) "
+                            f"too large for {available_for_llm_mb}MB budget "
+                            f"(total={total_gb}GB - TTS={tts_reserve_gb}GB - KV={kv_reserve_gb}GB). "
+                            f"Selecting {MODEL_PRESETS[better_idx].display_name}")
+                        model_idx = better_idx
+                        preset = MODEL_PRESETS[model_idx]
+        except Exception as _e:
+            logger.debug(f"VRAM coexistence check skipped: {_e}")
 
         # ── 2. Ensure model is on disk ─────────────────────────────
         if progress_callback:
@@ -1172,10 +1199,9 @@ class LlamaConfig:
         else:
             ctx_size = self.config.get("context_size", 8192)
 
-        # Cap context size to leave VRAM for TTS (F5 needs 2.5GB on same GPU).
-        # 8K context uses ~1GB KV cache for 4B Q4 model.
-        # 10K+ starves F5 and causes inference hangs.
-        ctx_size = min(ctx_size, 8192)
+        # Cap context: 10K balances quality + VRAM for F5-TTS coexistence.
+        # KV cache cost: ~1GB per 8K for 4B, ~0.5GB per 8K for 2B.
+        ctx_size = min(ctx_size, 10240)
 
         # Cap threads to 75% of cores — leave headroom for OS + TTS
         max_threads = max(1, int((os.cpu_count() or 4) * 0.75))
