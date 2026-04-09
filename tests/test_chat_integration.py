@@ -101,6 +101,45 @@ class TestCasualConvOptimization:
                               casual_conv=False)
         assert isinstance(result, dict)
 
+    def test_bundled_mode_never_casual(self):
+        """In bundled mode (NUNBA_BUNDLED/frozen), casual_conv must be False
+        so all tools (Visual_Context_Camera, memory, watchers) are visible."""
+        import os
+        # Simulate bundled mode
+        old = os.environ.get('NUNBA_BUNDLED')
+        os.environ['NUNBA_BUNDLED'] = '1'
+        try:
+            _is_bundled = bool(os.environ.get('NUNBA_BUNDLED'))
+            _is_casual = (
+                True  # no prompt_id, no create_agent, no agentic — would be casual
+                and not _is_bundled
+            )
+            assert not _is_casual, "Bundled mode should never be casual"
+        finally:
+            if old is None:
+                os.environ.pop('NUNBA_BUNDLED', None)
+            else:
+                os.environ['NUNBA_BUNDLED'] = old
+
+    def test_non_bundled_default_is_casual(self):
+        """Non-bundled (cloud/web) default chat should still be casual for performance."""
+        import os
+        old = os.environ.pop('NUNBA_BUNDLED', None)
+        try:
+            import sys
+            was_frozen = getattr(sys, 'frozen', False)
+            sys.frozen = False
+            _is_bundled = bool(os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False))
+            _is_casual = (
+                True  # no prompt_id, no create_agent, no agentic
+                and not _is_bundled
+            )
+            assert _is_casual, "Non-bundled default should be casual for performance"
+            sys.frozen = was_frozen
+        finally:
+            if old:
+                os.environ['NUNBA_BUNDLED'] = old
+
 
 # ============================================================
 # Thinking traces — batched, not streamed

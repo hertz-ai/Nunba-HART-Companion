@@ -1980,14 +1980,17 @@ def chat_route():
                     # Note: autonomous_creation is now detected by the LLM (Create_Agent tool)
                     # and passed back via the response from hart_intelligence, NOT by pattern matching
 
-                # casual_conv=True disables ALL LangChain tools (memory, visual
-                # context, etc.).  Only safe when there's no agent prompt AND no
-                # agentic flow active — i.e. a pure default-agent chat turn.
+                # casual_conv=True hides tool descriptions from the LLM prompt.
+                # In bundled mode (Nunba desktop), the agent needs ALL tools
+                # (Visual_Context_Camera, memory, watchers, etc.) to compose
+                # capabilities agentically. Never casual in bundled mode.
+                _is_bundled = bool(os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False))
                 _is_casual = (
                     not langchain_prompt_id
                     and not create_agent
                     and not agentic_execute
                     and not agentic_plan
+                    and not _is_bundled
                 )
 
                 result = hevolve_chat(
