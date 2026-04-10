@@ -1174,12 +1174,28 @@ def admin_models_update(model_id):
 
 @app.route('/api/admin/models/<model_id>', methods=["DELETE"])
 def admin_models_delete(model_id):
-    """Remove a model from the catalog."""
+    """Remove a model from the catalog.
+
+    If the model is currently loaded, unload it first so the worker
+    subprocess stops and VRAM is released. Otherwise deleting the
+    catalog entry would orphan a running worker.
+    """
     if not _is_local_request():
         return jsonify({"error": "local only"}), 403
     try:
         from models.catalog import get_catalog
+        from models.orchestrator import get_orchestrator
         catalog = get_catalog()
+        entry = catalog.get(model_id)
+        if entry is None:
+            return jsonify({"success": False, "error": "not found"}), 404
+        # Unload before delete so the worker subprocess stops
+        # and VRAM/process resources are released.
+        if entry.loaded:
+            try:
+                get_orchestrator().unload(model_id)
+            except Exception as e:
+                logging.warning(f"Unload before delete failed for {model_id}: {e}")
         removed = catalog.unregister(model_id)
         return jsonify({"success": removed})
     except Exception as e:
@@ -1293,11 +1309,47 @@ def admin_models_auto_select():
 
 @app.route('/api/admin/models/health', methods=["GET"])
 def admin_models_health():
-    """Full lifecycle health dashboard: process health, crash state, swap queue, pressure."""
+    """Full lifecycle health dashboard: process health, crash state, swap queue, pressure.
+
+    Cross-checks the catalog flags against live loader.is_loaded() probes
+    so idle auto-stops, subprocess crashes, and out-of-band process kills
+    show up as drift warnings instead of stale loaded:True entries.
+    """
     try:
         from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+        from models.orchestrator import get_orchestrator
         mlm = get_model_lifecycle_manager()
-        return jsonify(mlm.get_status())
+
+        # Sync catalog flags with live loader state BEFORE building the
+        # response so the UI always sees reality.
+        drift = []
+        try:
+            orch = get_orchestrator()
+            # Build drift list before reconciling so we can report
+            # the entries whose state was stale.
+            for entry in orch._catalog.list_all():
+                loader = orch._loaders.get(entry.model_type)
+                if loader is None:
+                    continue
+                try:
+                    live = bool(loader.is_loaded(entry))
+                except Exception:
+                    continue
+                if live != bool(entry.loaded):
+                    drift.append({
+                        'model_id': entry.id,
+                        'catalog_loaded': bool(entry.loaded),
+                        'live_loaded': live,
+                    })
+            orch.reconcile_live_state()
+        except Exception as e:
+            logging.warning(f"Health: reconcile failed: {e}")
+
+        status = mlm.get_status()
+        if isinstance(status, dict):
+            status['drift_detected'] = drift
+            status['drift_count'] = len(drift)
+        return jsonify(status)
     except ImportError:
         return jsonify({"error": "Lifecycle manager not available"}), 503
     except Exception as e:
@@ -1306,24 +1358,61 @@ def admin_models_health():
 
 @app.route('/api/admin/models/swap', methods=["POST"])
 def admin_models_swap():
-    """Request a model swap: evict a GPU model to make room for another.
+    """Atomically swap models: evict an existing GPU model and load a new one.
 
     Body: {"needed_model": "model_id", "evict_target": "optional_target_id"}
+
+    Coordinates both halves of the swap via the orchestrator:
+      1. Request eviction of the current GPU model (or explicit evict_target)
+         through ModelLifecycleManager — this stops its worker subprocess
+         and releases VRAM.
+      2. Load the new model via ModelOrchestrator.load(), which goes through
+         the matching loader (TTSLoader/STTLoader/VLMLoader/LlamaLoader)
+         and eagerly spawns the new worker subprocess.
+      3. On load failure, report the error so the caller can decide whether
+         to retry or manually restore the evicted model.
     """
     if not _is_local_request():
         return jsonify({"error": "local only"}), 403
     try:
         from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+        from models.orchestrator import get_orchestrator
         data = request.get_json(silent=True) or {}
         needed = data.get('needed_model')
         if not needed:
             return jsonify({"error": "needed_model required"}), 400
+
         mlm = get_model_lifecycle_manager()
-        success = mlm.request_swap(
+        orch = get_orchestrator()
+
+        # 1. Evict old model to free VRAM (its worker subprocess stops here)
+        evict_ok = mlm.request_swap(
             needed_model=needed,
             evict_target=data.get('evict_target'),
         )
-        return jsonify({"success": success, "needed_model": needed})
+        if not evict_ok:
+            return jsonify({
+                "success": False,
+                "needed_model": needed,
+                "error": "no evictable model found",
+            }), 409
+
+        # 2. Load new model (eagerly spawns the new worker subprocess)
+        new_entry = orch.load(needed)
+        if new_entry is None:
+            return jsonify({
+                "success": False,
+                "needed_model": needed,
+                "evicted": True,
+                "error": "eviction succeeded but new model load failed",
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "needed_model": needed,
+            "device": new_entry.device,
+            "evicted": True,
+        })
     except ImportError:
         return jsonify({"error": "Lifecycle manager not available"}), 503
     except Exception as e:
@@ -2062,16 +2151,25 @@ def _deferred_social_init():
             logging.warning(f"hart-backend migrations: {mig_err}")
         logging.info(f"hart-backend DB initialized: {NUNBA_DB_PATH}")
 
-        # Channel adapters (Telegram, Discord — background daemon threads)
+        # Channel adapters — env-gated, each registers only if its token/URL is set
         try:
             from core.port_registry import get_port
             from integrations.channels.flask_integration import init_channels
-            init_channels(app, {
+            channels = init_channels(app, {
                 'agent_api_url': f'http://localhost:{get_port("backend")}/chat',
                 'default_user_id': 10077,
                 'default_prompt_id': 8888,
                 'device_id': DEVICE_ID,
             })
+            channels.register_telegram()    # needs TELEGRAM_BOT_TOKEN
+            channels.register_discord()     # needs DISCORD_BOT_TOKEN
+            channels.register_whatsapp()    # needs WHATSAPP_API_URL
+            channels.register_slack()       # needs SLACK_BOT_TOKEN
+            channels.register_signal()      # needs SIGNAL_PHONE_NUMBER
+            channels.register_imessage()    # needs BLUEBUBBLES_PASSWORD
+            channels.register_google_chat() # needs GOOGLE_CHAT_WEBHOOK or GOOGLE_CHAT_SA_FILE
+            channels.register_web_chat()    # always available (WebSocket)
+            channels.start()
             logging.info("Channel adapters initialized")
         except Exception as ch_err:
             logging.debug(f"Channel adapters skipped: {ch_err}")

@@ -383,15 +383,76 @@ class STTLoader(ModelLoader):
 
 
 class VLMLoader(ModelLoader):
-    """Loader for VLM models (MiniCPM sidecar)."""
+    """Loader for VLM models (MiniCPM sidecar).
 
-    def load(self, entry: ModelEntry, run_mode: str) -> bool:
+    VisionService owns the MiniCPM subprocess + WS server + description
+    loop. It's a runtime singleton managed by hart_intelligence_entry
+    (standalone mode) or by Nunba's __main__ (bundled mode). This loader
+    resolves the singleton, calls .start()/.stop() on it, and reflects
+    the running state on the catalog entry.
+    """
+
+    def _get_service(self):
+        """Return the VisionService singleton. Creates a fresh instance
+        and stashes it as the canonical one if none exists yet — matches
+        hart_intelligence_entry.get_vision_service() lookup order so
+        both loader and runtime see the same object."""
         try:
             from integrations.vision.vision_service import VisionService
-            VisionService()
+            import hart_intelligence_entry as _hie
+        except ImportError as e:
+            logger.error(f"VLM imports failed: {e}")
+            return None
+
+        svc = _hie.get_vision_service()
+        if svc is None:
+            svc = VisionService()
+            _hie._vision_service = svc  # make sure get_vision_service finds it
+        return svc
+
+    def load(self, entry: ModelEntry, run_mode: str) -> bool:
+        svc = self._get_service()
+        if svc is None:
+            entry.loaded = False
+            entry.error = 'VisionService unavailable'
+            return False
+        try:
+            # run_mode 'gpu' → full (MiniCPM), 'cpu'/'cpu_offload' → lite
+            mode = 'full' if run_mode == 'gpu' else 'lite'
+            svc.start(mode=mode)
+            entry.loaded = True
+            entry.device = 'cuda' if mode == 'full' else 'cpu'
+            entry.error = None
+            logger.info(f"VLM started in {mode} mode (entry.device={entry.device})")
             return True
         except Exception as e:
-            logger.error(f"VLM load failed: {e}")
+            logger.error(f"VLM start failed: {e}")
+            entry.loaded = False
+            entry.error = str(e)
+            return False
+
+    def unload(self, entry: ModelEntry) -> None:
+        svc = self._get_service()
+        if svc is None:
+            entry.loaded = False
+            return
+        try:
+            svc.stop()
+            entry.loaded = False
+            entry.device = None
+            entry.error = None
+            logger.info(f"VLM stopped ({entry.id})")
+        except Exception as e:
+            logger.warning(f"VLM stop failed: {e}")
+            entry.error = str(e)
+
+    def is_loaded(self, entry: ModelEntry) -> bool:
+        """Live probe: is the VisionService actually running?"""
+        try:
+            import hart_intelligence_entry as _hie
+            svc = _hie.get_vision_service()
+            return bool(svc is not None and getattr(svc, '_running', False))
+        except Exception:
             return False
 
 
