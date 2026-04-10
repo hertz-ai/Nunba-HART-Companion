@@ -151,20 +151,23 @@ export default function ChannelsPage() {
       try {
         const res = await channelsApi.list();
 
-        // ✅ FIX: Normalize to array to avoid crash (blank page) when backend returns an object
+        // Normalize: backend returns PaginatedResponse { items: [...] }
+        // wrapped in APIResponse { success, data: { items, total, ... } }
         const data = res?.data;
         const list = Array.isArray(data)
           ? data
-          : Array.isArray(data?.channels)
-            ? data.channels
-            : [];
+          : Array.isArray(data?.items)
+            ? data.items
+            : Array.isArray(data?.channels)
+              ? data.channels
+              : [];
 
         setChannels(list);
       } catch (err) {
         console.error('[ChannelsPage] Failed to load channels:', err);
         const msg = err?.error || err?.message || '';
-        if (msg.includes('Authorization') || msg.includes('token')) {
-          setError('Authentication required. Please log in with an admin account.');
+        if (msg.includes('Authentication') || msg.includes('Authorization') || msg.includes('token')) {
+          setError('Authentication required. Please log in as a registered user.');
         }
         setChannels([]);
       }
@@ -197,7 +200,7 @@ export default function ChannelsPage() {
     } catch (err) {
       console.error('[ChannelsPage] Failed to create channel:', err);
       const msg = err?.error || err?.message || 'Failed to create channel';
-      setError(msg.includes('Authorization') ? 'Admin authentication required to create channels.' : msg);
+      setError(msg.includes('Authentication') || msg.includes('Authorization') ? 'Authentication required to create channels.' : msg);
     }
     setActionLoading(null);
   };
@@ -252,8 +255,12 @@ export default function ChannelsPage() {
     setActionLoading(null);
   };
 
-  // ✅ FIX: use a guaranteed array for rendering
-  const channelsList = Array.isArray(channels) ? channels : [];
+  // Normalize: backend returns channel_type (not id/type), ensure both exist
+  const channelsList = (Array.isArray(channels) ? channels : []).map((c) => ({
+    ...c,
+    id: c.id || c.channel_type || c.type,
+    type: c.type || c.channel_type,
+  }));
 
   return (
     <Fade in={true} timeout={300}>
@@ -365,7 +372,7 @@ export default function ChannelsPage() {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => setDialogOpen(true)}
+                onClick={() => setWizardOpen(true)}
                 sx={{
                   background: 'linear-gradient(135deg, #6C63FF 0%, #9B94FF 100%)',
                   borderRadius: 2,
@@ -539,7 +546,13 @@ export default function ChannelsPage() {
             // Refresh channels list
             channelsApi.list().then(res => {
               const data = res?.data;
-              const list = Array.isArray(data) ? data : Array.isArray(data?.channels) ? data.channels : [];
+              const list = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.items)
+                  ? data.items
+                  : Array.isArray(data?.channels)
+                    ? data.channels
+                    : [];
               setChannels(list);
             }).catch(() => {});
           }}

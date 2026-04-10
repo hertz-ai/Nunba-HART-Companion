@@ -262,9 +262,10 @@ export default function UnifiedGameScreen() {
         </Button>
 
         <AdultLobby
-          catalogEntry={catalogEntry}
           multiplayer={multiplayer}
-          onStart={handleGameStart}
+          onStartSolo={handleGameStart}
+          onGameStart={handleGameStart}
+          gameTitle={catalogEntry?.title || 'Game'}
         />
       </Box>
     );

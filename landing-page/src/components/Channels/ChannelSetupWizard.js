@@ -123,6 +123,23 @@ export default function ChannelSetupWizard({ open, onClose, onSuccess }) {
     setError('');
     setTestResult(null);
     try {
+      // Create admin channel config (shows in ChannelsPage list)
+      try {
+        await channelsApi.create({
+          channel_type: selectedChannel.channel_type,
+          name: selectedChannel.display_name || selectedChannel.channel_type,
+          enabled: true,
+          config: formData,
+        });
+      } catch (adminErr) {
+        // Channel may already exist (duplicate) — continue with binding
+        const adminMsg = adminErr?.error || adminErr?.message || '';
+        if (!adminMsg.includes('already exists')) {
+          console.warn('[ChannelSetupWizard] Admin channel config:', adminMsg);
+        }
+      }
+
+      // Create user-level channel binding
       const payload = {
         channel_type: selectedChannel.channel_type,
         config: formData,
@@ -143,7 +160,7 @@ export default function ChannelSetupWizard({ open, onClose, onSuccess }) {
         });
       }
     } catch (err) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to create channel binding';
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.error || err?.message || 'Failed to create channel binding';
       setError(msg);
       setTestResult({ success: false });
     } finally {
