@@ -199,6 +199,39 @@ class TestIsCasualMessage:
     def test_none(self):
         assert self.is_casual(None) is False
 
+    # Regression: 'wht do you do' was routed to the full LangChain
+    # pipeline because it was 4 words (>3-word gate) and not in the
+    # allowlist, making the bundled UI "think forever".
+    def test_what_do_you_do(self):
+        assert self.is_casual("what do you do") is True
+
+    def test_what_do_you_do_typo(self):
+        assert self.is_casual("wht do you do") is True
+
+    def test_what_can_you_do(self):
+        assert self.is_casual("what can you do") is True
+
+    def test_who_are_you(self):
+        assert self.is_casual("who are you") is True
+
+    def test_how_do_you_work(self):
+        assert self.is_casual("how do you work") is True
+
+    def test_tell_me_about_yourself(self):
+        assert self.is_casual("tell me about yourself") is True
+
+    def test_what_do_u_do_informal(self):
+        # Informal 'u' for 'you' should still classify as casual
+        assert self.is_casual("what do u do") is True
+
+    def test_self_referential_pattern_catches_paraphrase(self):
+        # Not in allowlist but matches self-referential pattern
+        assert self.is_casual("how do you help") is True
+
+    def test_loosened_gate_does_not_break_tool_triggers(self):
+        # 4 words, but 'open' is a tool trigger — must stay False
+        assert self.is_casual("please open notepad now") is False
+
 
 class TestExtractResourceRequest:
     """Test the RESOURCE_REQUEST marker extraction."""

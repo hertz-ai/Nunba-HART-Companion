@@ -213,6 +213,17 @@ _CASUAL_EXACT = {
     'stop', 'cancel', 'nvm', 'never mind', 'forget it',
     'how are you', 'how are you doing', 'hows it going', "how's it going",
     "what's up", 'whats up',
+    # Self-identity / capability questions — these are pure chat, no
+    # tool use required to answer. Include common typos ('wht') and
+    # short/long forms so the classifier doesn't trip on a missing
+    # apostrophe or dropped vowel.
+    'what do you do', 'wht do you do', 'what do u do', 'wht do u do',
+    'what can you do', 'wht can you do', 'what can u do', 'wht can u do',
+    'what are you', 'what are u', 'who are you', 'who are u',
+    'what is your name', 'whats your name', "what's your name",
+    'tell me about yourself', 'tell me about you', 'introduce yourself',
+    'what do you think', 'how do you work', 'how do u work',
+    'help', 'help me', 'what help', 'need help',
 }
 
 # Verbs / nouns that always require TOOL access. If the message contains any,
@@ -235,12 +246,23 @@ _TOOL_TRIGGER_TOKENS = {
 def _is_casual_message(text):
     """True if the message is simple chit-chat that doesn't need any tools.
 
-    Rules:
-      1. Must be ≤8 words (beyond that, assume it's substantive)
-      2. Must match a known casual phrase OR contain zero tool-trigger tokens
-      3. Must not end with '?' followed by content that needs lookup
-         (short acknowledgement questions like 'ok?' still count as casual)
-      4. Must not contain any tool-trigger token
+    Rules (in order):
+      1. Empty / whitespace → False
+      2. >8 words → False (assume substantive)
+      3. Contains any tool-trigger token → False
+      4. Exact match in _CASUAL_EXACT → True (covers greetings + typos
+         + self-identity questions like 'wht do you do')
+      5. Self-referential pattern (who/what/how + you/u) at ≤6 words →
+         True (catches paraphrases the allowlist missed)
+      6. ≤5 words and no tool trigger → True (short ack / small-talk)
+      7. Otherwise → False (let the full tool pipeline handle it)
+
+    The previous 3-word gate was too tight — 'wht do you do' (4 words,
+    no tool trigger) was getting routed to the full LangChain pipeline
+    and taking 10+ seconds because the agent had to resolve every tool
+    description before realising nothing applied. Loosening to 5 words
+    + self-referential pattern covers the overwhelming majority of
+    'talk to me' prompts without losing any real tool dispatch.
     """
     if not text:
         return False
@@ -254,11 +276,18 @@ def _is_casual_message(text):
     for tok in _TOOL_TRIGGER_TOKENS:
         if tok in t:
             return False
-    # Exact-phrase allowlist OR very short
+    # Exact-phrase allowlist (greetings, identity questions, common typos)
     if t in _CASUAL_EXACT:
         return True
-    if len(words) <= 3:
-        # Short and no tool trigger — probably ack/greeting
+    # Self-referential pattern: 'who/what/how ... you/u'
+    # Short questions aimed at the assistant itself have no tools to call.
+    if len(words) <= 6:
+        first = words[0]
+        if first in ('who', 'what', 'wht', 'how', 'why', 'can'):
+            if any(w in ('you', 'u', 'your', 'yours', 'urs') for w in words):
+                return True
+    # Short fallback: ≤5 words with no tool trigger — probably ack/small-talk
+    if len(words) <= 5:
         return True
     return False
 
