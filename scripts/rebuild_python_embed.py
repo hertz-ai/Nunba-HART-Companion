@@ -196,6 +196,65 @@ def main():
     else:
         print("  WARNING: hart-backend source not found, skipping")
 
+    # 7c. Write sitecustomize.py — injects ~/.nunba/site-packages at the
+    # FRONT of sys.path for every python-embed subprocess. Without this,
+    # gpu_worker subprocesses spawned by the frozen Nunba app can't see
+    # the real CUDA torch that install_gpu_torch() drops into
+    # ~/.nunba/site-packages — they get the 0.0.0 stub instead, and every
+    # transformers-based TTS/VLM worker crashes with torch.types missing.
+    # PYTHONPATH doesn't help because python-embed's _pth file disables it.
+    step("7c. Writing sitecustomize.py (~/.nunba/site-packages injector)")
+    sitecustomize_path = os.path.join(sp_dir, "sitecustomize.py")
+    with open(sitecustomize_path, "w", encoding="utf-8") as f:
+        f.write('''"""sitecustomize.py — auto-runs at Python startup via site.py.
+
+Injects ~/.nunba/site-packages at the FRONT of sys.path so that gpu_worker
+subprocesses spawned by the frozen Nunba app can see the real CUDA torch,
+numpy, transformers deps, etc. that get installed there at runtime by
+install_gpu_torch().
+
+python-embed uses a `_pth` file which disables PYTHONPATH processing,
+so environment-based injection doesn't work — we have to modify sys.path
+from within Python itself. sitecustomize is the standard CPython hook.
+
+Also appends the cx_Freeze lib/ directory as a last-resort fallback for
+deps that happen to be bundled there but not in python-embed.
+"""
+
+import os
+import sys
+
+
+def _inject_path(path, front=True):
+    if os.path.isdir(path) and path not in sys.path:
+        if front:
+            sys.path.insert(0, path)
+        else:
+            sys.path.append(path)
+
+
+_home = os.path.expanduser("~")
+_nunba_sp = os.path.join(_home, ".nunba", "site-packages")
+_inject_path(_nunba_sp, front=True)
+
+if sys.platform == "win32":
+    _torch_lib = os.path.join(_nunba_sp, "torch", "lib")
+    if os.path.isdir(_torch_lib):
+        try:
+            os.add_dll_directory(_torch_lib)
+        except (OSError, AttributeError):
+            pass
+        os.environ["PATH"] = _torch_lib + os.pathsep + os.environ.get("PATH", "")
+
+# cx_Freeze lib/ — only present inside frozen Nunba build
+_self = os.path.dirname(os.path.abspath(__file__))
+_embed_dir = os.path.dirname(os.path.dirname(_self))
+_app_dir = os.path.dirname(_embed_dir)
+_lib_dir = os.path.join(_app_dir, "lib")
+_inject_path(_lib_dir, front=False)
+''')
+    print(f"  Wrote: {sitecustomize_path}")
+
     # 8. Verify key imports
     step("8. Verification")
     result = run([python_exe, "-c",

@@ -110,6 +110,15 @@ EMBED_DEPS = {
     "tokenizers": "0.22.2",
     "safetensors": "0.7.0",
     "huggingface_hub": "1.4.1",
+    # transformers/torch deps that must live inside python-embed because the
+    # frozen Nunba app sets PYTHONNOUSERSITE=1 (app.py:61), so gpu_worker
+    # subprocesses spawned from python-embed/python.exe CAN'T see the cx_Freeze
+    # lib/ numpy/regex/tqdm/yaml. Without these pins every transformers-based TTS
+    # worker (Indic Parler, Chatterbox, F5) crashes on load.
+    "regex": "2024.11.6",
+    "numpy": "1.26.4",
+    "tqdm": "4.67.1",
+    "pyyaml": "6.0.2",
     # Vector DB
     "chromadb": "1.5.0",
     "faiss-cpu": "1.13.2",
