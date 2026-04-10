@@ -710,16 +710,188 @@ class TestCreateBackend:
             result = engine._create_backend(BACKEND_PIPER)
         MockPiper.assert_called_once()
 
-    def test_create_f5(self):
+    def test_create_f5_uses_subprocess_adapter(self):
+        """GPU backends (F5, Chatterbox, CosyVoice, Indic Parler) are all
+        routed through the single _SubprocessTTSBackend adapter, which
+        forwards to the HARTOS subprocess tool. No per-engine _Lazy*
+        classes exist anymore."""
         engine = TTSEngine(auto_init=False)
-        with patch('tts.tts_engine._LazyF5') as MockF5:
+        with patch('tts.tts_engine._SubprocessTTSBackend') as MockAdapter:
             result = engine._create_backend(BACKEND_F5)
-        MockF5.assert_called_once()
+        MockAdapter.assert_called_once_with('f5_tts')
+
+    def test_create_chatterbox_turbo_uses_subprocess_adapter(self):
+        engine = TTSEngine(auto_init=False)
+        with patch('tts.tts_engine._SubprocessTTSBackend') as MockAdapter:
+            engine._create_backend(BACKEND_CHATTERBOX_TURBO)
+        MockAdapter.assert_called_once_with('chatterbox_turbo')
+
+    def test_create_chatterbox_ml_uses_subprocess_adapter(self):
+        engine = TTSEngine(auto_init=False)
+        with patch('tts.tts_engine._SubprocessTTSBackend') as MockAdapter:
+            engine._create_backend(BACKEND_CHATTERBOX_ML)
+        MockAdapter.assert_called_once_with('chatterbox_ml')
 
     def test_create_unknown_returns_none(self):
         engine = TTSEngine(auto_init=False)
         result = engine._create_backend("totally_unknown")
         assert result is None
+
+
+# ===========================================================================
+# 16b. _SubprocessTTSBackend adapter — behavior regression tests.
+#
+# These verify the adapter's contract with HARTOS tool modules WITHOUT
+# needing any real GPU libs (f5_tts, chatterbox, cosyvoice, parler_tts).
+# Every test mocks _resolve so the tool module import never happens.
+# ===========================================================================
+
+class TestSubprocessTTSBackend:
+
+    def _make_adapter(self, engine_id, mock_synthesize_fn, mock_worker=None):
+        """Construct an adapter with its tool module already "resolved"."""
+        from tts.tts_engine import _SubprocessTTSBackend
+        adapter = _SubprocessTTSBackend(engine_id)
+        adapter._worker = mock_worker or MagicMock()
+        adapter._synthesize_fn = mock_synthesize_fn
+        return adapter
+
+    def test_unknown_engine_id_raises(self):
+        from tts.tts_engine import _SubprocessTTSBackend
+        with pytest.raises(ValueError, match='Unknown TTS engine_id'):
+            _SubprocessTTSBackend('totally_not_a_real_engine')
+
+    def test_cpu_only_engine_raises(self):
+        """CPU-only engines (luxtts, espeak) have no tool_worker_attr
+        so the adapter refuses to construct — it's for subprocess
+        workers only."""
+        from tts.tts_engine import _SubprocessTTSBackend
+        with pytest.raises(ValueError, match='not subprocess-capable'):
+            _SubprocessTTSBackend('luxtts')
+
+    def test_synthesize_forwards_text_language_voice_output(self):
+        mock_fn = MagicMock(return_value='{"path": "/out.wav", "duration": 1.0}')
+        adapter = self._make_adapter('f5_tts', mock_fn)
+        adapter.synthesize(text='hi', output_path='/out.wav', language='en')
+        mock_fn.assert_called_once()
+        kwargs = mock_fn.call_args.kwargs
+        assert kwargs['text'] == 'hi'
+        assert kwargs['language'] == 'en'
+        assert kwargs['output_path'] == '/out.wav'
+
+    def test_synthesize_forwards_speed_kwarg_when_present(self):
+        """F5's speed= kwarg must survive the adapter boundary so
+        synthesize_text(..., speed=0.8) still affects F5 infer()."""
+        mock_fn = MagicMock(return_value='{"path": "/out.wav", "duration": 1.0}')
+        adapter = self._make_adapter('f5_tts', mock_fn)
+        adapter.synthesize(text='hi', output_path='/out.wav', speed=0.8)
+        assert mock_fn.call_args.kwargs.get('speed') == 0.8
+
+    def test_synthesize_retries_without_speed_on_typeerror(self):
+        """Engines whose public function doesn't accept `speed` (e.g.
+        chatterbox) shouldn't crash when a caller passes it — the
+        adapter retries without it."""
+        call_count = {'n': 0}
+
+        def fake_fn(**kw):
+            call_count['n'] += 1
+            if 'speed' in kw:
+                raise TypeError("unexpected keyword 'speed'")
+            return '{"path": "/out.wav", "duration": 1.0}'
+
+        adapter = self._make_adapter('chatterbox_turbo', fake_fn)
+        adapter.synthesize(text='hi', output_path='/out.wav', speed=0.8)
+        assert call_count['n'] == 2  # first with speed, retry without
+
+    def test_error_response_raises_runtime_error(self):
+        mock_fn = MagicMock(return_value='{"error": "out of memory"}')
+        adapter = self._make_adapter('f5_tts', mock_fn)
+        with pytest.raises(RuntimeError, match='out of memory'):
+            adapter.synthesize(text='hi', output_path='/out.wav')
+
+    def test_transient_flag_propagates_on_exception(self):
+        """Worker crashes set transient=True in the response — the
+        adapter must re-raise as RuntimeError with .transient=True so
+        TTSEngine can short-circuit to Piper instead of trying every
+        other GPU engine."""
+        mock_fn = MagicMock(
+            return_value='{"error": "f5_tts crashed: died", "transient": true}'
+        )
+        adapter = self._make_adapter('f5_tts', mock_fn)
+        try:
+            adapter.synthesize(text='hi', output_path='/out.wav')
+            assert False, 'expected RuntimeError'
+        except RuntimeError as e:
+            assert getattr(e, 'transient', False) is True
+
+    def test_malformed_json_raises_runtime_error(self):
+        mock_fn = MagicMock(return_value='not a json string at all')
+        adapter = self._make_adapter('f5_tts', mock_fn)
+        with pytest.raises(RuntimeError, match='malformed worker response'):
+            adapter.synthesize(text='hi', output_path='/out.wav')
+
+    def test_unload_stops_only_this_variant(self):
+        """Calling unload_model() on a chatterbox_turbo adapter must
+        stop ONLY the turbo worker, not the ml worker. Regression
+        test for the cross-variant unload bug where the adapter used
+        to call module-level unload_chatterbox() which stopped both."""
+        mock_worker = MagicMock()
+        adapter = self._make_adapter(
+            'chatterbox_turbo',
+            MagicMock(return_value='{}'),
+            mock_worker=mock_worker,
+        )
+        adapter.unload_model()
+        mock_worker.stop.assert_called_once()
+
+    def test_unload_is_idempotent(self):
+        mock_worker = MagicMock()
+        adapter = self._make_adapter(
+            'f5_tts',
+            MagicMock(return_value='{}'),
+            mock_worker=mock_worker,
+        )
+        adapter.unload_model()
+        adapter.unload_model()
+        # Two calls, two stop()s — no exception
+        assert mock_worker.stop.call_count == 2
+
+    def test_device_returns_cuda_when_worker_alive(self):
+        mock_worker = MagicMock()
+        mock_worker.is_alive.return_value = True
+        adapter = self._make_adapter(
+            'f5_tts', MagicMock(return_value='{}'), mock_worker=mock_worker,
+        )
+        assert adapter._device == 'cuda'
+
+    def test_device_returns_none_when_worker_not_alive(self):
+        mock_worker = MagicMock()
+        mock_worker.is_alive.return_value = False
+        adapter = self._make_adapter(
+            'f5_tts', MagicMock(return_value='{}'), mock_worker=mock_worker,
+        )
+        assert adapter._device is None
+
+    def test_all_gpu_engines_in_registry_have_worker_attr(self):
+        """Every GPU-only engine in ENGINE_REGISTRY must have
+        tool_worker_attr set so the subprocess adapter can find the
+        ToolWorker instance. Missing this field = silent CPU fallback."""
+        from integrations.channels.media.tts_router import (
+            ENGINE_REGISTRY, TTSDevice,
+        )
+        gpu_engines = [
+            eid for eid, spec in ENGINE_REGISTRY.items()
+            if spec.device in (TTSDevice.GPU_ONLY, TTSDevice.GPU_PREFERRED)
+        ]
+        assert gpu_engines, "no GPU engines registered"
+        for eid in gpu_engines:
+            spec = ENGINE_REGISTRY[eid]
+            assert spec.tool_module, f"{eid} missing tool_module"
+            assert spec.tool_function, f"{eid} missing tool_function"
+            assert spec.tool_worker_attr, (
+                f"{eid} missing tool_worker_attr — subprocess adapter "
+                f"can't find its ToolWorker"
+            )
 
 
 # ===========================================================================
@@ -1140,39 +1312,44 @@ class TestGlobalSingleton:
 
 
 # ===========================================================================
-# 26. LazyIndicParler._split_sentences (static, safe to test directly)
+# 26. Indic Parler sentence splitting
+#
+# The sentence-splitting logic used to live in Nunba's _LazyIndicParler,
+# but after the subprocess-isolation refactor it moved to HARTOS's
+# indic_parler_tool (the single source of truth for Indic Parler). These
+# tests now verify the HARTOS implementation directly.
 # ===========================================================================
 
 class TestIndicParlerSplitSentences:
     def test_single_sentence_returns_as_is(self):
-        from tts.tts_engine import _LazyIndicParler
-        result = _LazyIndicParler._split_sentences("Hello world")
+        from integrations.service_tools.indic_parler_tool import _split_sentences
+        result = _split_sentences("Hello world")
         assert result == ["Hello world"]
 
     def test_two_sentences_split(self):
-        from tts.tts_engine import _LazyIndicParler
+        from integrations.service_tools.indic_parler_tool import _split_sentences
         # The regex requires non-dot/non-space before period + whitespace after
-        result = _LazyIndicParler._split_sentences(
+        result = _split_sentences(
             "This is the first long sentence here. And this is the second sentence that is also long enough")
         assert len(result) == 2
 
     def test_ellipsis_not_split(self):
-        from tts.tts_engine import _LazyIndicParler
-        result = _LazyIndicParler._split_sentences("Hey... I was waiting")
+        from integrations.service_tools.indic_parler_tool import _split_sentences
+        result = _split_sentences("Hey... I was waiting")
         # Ellipsis should NOT cause a split
         assert len(result) == 1
 
     def test_short_fragments_merged(self):
-        from tts.tts_engine import _LazyIndicParler
+        from integrations.service_tools.indic_parler_tool import _split_sentences
         # Short trailing fragment (<15 chars) should be merged with previous
-        result = _LazyIndicParler._split_sentences(
+        result = _split_sentences(
             "This is a long enough first sentence. This is a long enough second sentence. OK")
         # "OK" is < 15 chars, so it gets merged; result should be 2 not 3
         assert len(result) <= 2
 
     def test_question_mark_splits(self):
-        from tts.tts_engine import _LazyIndicParler
-        result = _LazyIndicParler._split_sentences(
+        from integrations.service_tools.indic_parler_tool import _split_sentences
+        result = _split_sentences(
             "How are you doing today? I am fine thanks for asking and hope you are well too")
         assert len(result) == 2
 

@@ -3209,14 +3209,25 @@ def register_routes(app):
     def tts_serve_audio(filename):
         """Serve a TTS audio file by filename. Used by frontend after WAMP/SSE push."""
         import tempfile
+        from pathlib import Path
         from flask import send_file, abort
         # Security: only serve from temp dir, no path traversal
         if '..' in filename or '/' in filename or '\\' in filename:
             abort(400)
-        path = os.path.join(tempfile.gettempdir(), filename)
-        if not os.path.isfile(path):
-            abort(404)
-        return send_file(path, mimetype='audio/wav')
+        # Search all TTS cache directories — each engine writes to its own cache
+        _home = Path.home()
+        search_dirs = [
+            _home / '.nunba' / 'piper' / 'cache',
+            _home / '.nunba' / 'vibevoice' / 'cache',
+            _home / '.nunba' / 'tts_cache' / 'presynth',
+            _home / '.nunba' / 'tts_cache',
+            Path(tempfile.gettempdir()),
+        ]
+        for d in search_dirs:
+            path = d / filename
+            if path.is_file():
+                return send_file(str(path), mimetype='audio/wav')
+        abort(404)
     app.route("/tts/audio/<filename>", methods=["GET"])(tts_serve_audio)
 
     # TTS routes (original)
