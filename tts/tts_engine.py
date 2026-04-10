@@ -161,40 +161,68 @@ _DEFAULT_PREFERENCE = [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML, BACKEND_INDIC_
 # ════════════════════════════════════════════════════════════════════
 # CATALOG ↔ BACKEND ID MAPPING
 #
-# HARTOS catalog uses 'f5_tts' as the entry id; Nunba's backend
-# constant is 'f5'.  Map both directions so catalog lookups translate
-# cleanly to the backend strings used everywhere in this file.
+# Nunba backend constants (BACKEND_F5 = "f5") differ from the HARTOS
+# tts_router.ENGINE_REGISTRY keys (e.g. 'f5_tts'), and the HARTOS
+# ModelCatalog uses yet another form ('f5-tts' with hyphens and no
+# 'tts-' prefix). Rather than maintaining three parallel lookup
+# tables that drift apart, we declare ONE bridge —
+# `_BACKEND_TO_REGISTRY_KEY` — that maps every GPU backend to its
+# canonical ENGINE_REGISTRY key. Everything downstream (catalog IDs,
+# VRAM tool names, required pip packages) is derived from that.
 # ════════════════════════════════════════════════════════════════════
 
-# catalog entry id (without 'tts-' prefix) → Nunba backend constant
-# Catalog IDs use hyphens (tts-f5-tts → strip prefix → f5-tts)
-# Nunba backend constants use underscores (BACKEND_F5 = "f5")
-_CATALOG_TO_BACKEND: dict[str, str] = {
-    # Hyphenated form (from HARTOS tts_router.populate_tts_catalog)
-    'f5-tts': BACKEND_F5,
-    'chatterbox-turbo': BACKEND_CHATTERBOX_TURBO,
-    'chatterbox-ml': BACKEND_CHATTERBOX_ML,
-    'indic-parler': BACKEND_INDIC_PARLER,
-    'cosyvoice3': BACKEND_COSYVOICE3,
-    'pocket-tts': BACKEND_PIPER,  # pocket_tts maps to piper in Nunba
-    'piper': BACKEND_PIPER,
-    'espeak': BACKEND_PIPER,      # espeak is piper fallback
-    # Legacy underscore form (backward compat)
-    'f5_tts': BACKEND_F5,
-    'chatterbox_turbo': BACKEND_CHATTERBOX_TURBO,
-    'chatterbox_multilingual': BACKEND_CHATTERBOX_ML,
-    'indic_parler': BACKEND_INDIC_PARLER,
+# SINGLE SOURCE OF TRUTH: Nunba backend constant → HARTOS ENGINE_REGISTRY key.
+# CPU-only backends (PIPER, ESPEAK) are handled separately in the
+# derived maps below because they don't have a 1:1 match — espeak is a
+# fallback of piper in Nunba, and neither has a GPU ToolWorker.
+_BACKEND_TO_REGISTRY_KEY: dict[str, str] = {
+    BACKEND_F5:               'f5_tts',
+    BACKEND_CHATTERBOX_TURBO: 'chatterbox_turbo',
+    BACKEND_CHATTERBOX_ML:    'chatterbox_ml',
+    BACKEND_INDIC_PARLER:     'indic_parler',
+    BACKEND_COSYVOICE3:       'cosyvoice3',
 }
 
-# Reverse: Nunba backend constant → catalog entry id (hyphenated, without 'tts-' prefix)
+
+def _get_engine_registry():
+    """Lazy import — tts_router imports vram_manager which imports torch."""
+    try:
+        from integrations.channels.media.tts_router import ENGINE_REGISTRY
+        return ENGINE_REGISTRY
+    except Exception:
+        return {}
+
+
+def _registry_key_to_catalog_id(registry_key: str) -> str:
+    """Convert 'f5_tts' → 'f5-tts' (HARTOS ModelCatalog uses hyphens)."""
+    return registry_key.replace('_', '-')
+
+
+# Derived: Nunba backend constant → catalog entry id (hyphenated,
+# without 'tts-' prefix). Builds from the single bridge above.
 _BACKEND_TO_CATALOG: dict[str, str] = {
-    BACKEND_F5:               'f5-tts',
-    BACKEND_CHATTERBOX_TURBO: 'chatterbox-turbo',
-    BACKEND_CHATTERBOX_ML:    'chatterbox-ml',
-    BACKEND_INDIC_PARLER:     'indic-parler',
-    BACKEND_COSYVOICE3:       'cosyvoice3',
-    BACKEND_PIPER:            'piper',
+    backend: _registry_key_to_catalog_id(key)
+    for backend, key in _BACKEND_TO_REGISTRY_KEY.items()
 }
+_BACKEND_TO_CATALOG[BACKEND_PIPER] = 'piper'  # CPU-only alias
+
+
+# Derived: catalog entry id → Nunba backend constant.
+# Inverse of _BACKEND_TO_CATALOG plus CPU-only aliases that all route
+# to Piper (Nunba doesn't have separate implementations for espeak /
+# pocket_tts — they fall through to Piper as the last-resort CPU engine).
+_CATALOG_TO_BACKEND: dict[str, str] = {
+    catalog_id: backend for backend, catalog_id in _BACKEND_TO_CATALOG.items()
+}
+# Also accept the underscore-form the HARTOS registry key uses,
+# so both 'f5-tts' (catalog) and 'f5_tts' (registry key) map back.
+for _backend, _key in _BACKEND_TO_REGISTRY_KEY.items():
+    _CATALOG_TO_BACKEND.setdefault(_key, _backend)
+# CPU alias fallbacks — all route to Piper in Nunba
+_CATALOG_TO_BACKEND.setdefault('pocket-tts', BACKEND_PIPER)
+_CATALOG_TO_BACKEND.setdefault('pocket_tts', BACKEND_PIPER)
+_CATALOG_TO_BACKEND.setdefault('espeak', BACKEND_PIPER)
+_CATALOG_TO_BACKEND.setdefault('chatterbox_multilingual', BACKEND_CHATTERBOX_ML)  # legacy name
 
 
 def _entry_to_legacy_caps(entry) -> dict:
@@ -205,13 +233,26 @@ def _entry_to_legacy_caps(entry) -> dict:
     """
     caps = entry.capabilities or {}
     langs_raw = getattr(entry, 'languages', None) or []
+    # Two catalog populators exist in the tree and use different key
+    # names for the same concept: the in-tree TTS spec populator writes
+    # `voice_clone` (matching the TTSEngineSpec dataclass field), while
+    # older entries persisted from the subsystems populator use
+    # `voice_cloning`. Accept either so the Nunba feature list matches
+    # reality regardless of which populator wrote the entry. Same for
+    # emotion_tags which is sometimes a list, sometimes a bool.
+    _voice_cloning = caps.get('voice_cloning')
+    if _voice_cloning is None:
+        _voice_cloning = caps.get('voice_clone', False)
+    _emotion_tags = caps.get('emotion_tags', [])
+    if isinstance(_emotion_tags, bool):
+        _emotion_tags = ['emotion'] if _emotion_tags else []
     return {
         'name':          entry.name,
         'vram_gb':       getattr(entry, 'vram_gb', 0) or 0,
         'languages':     set(langs_raw),
         'paralinguistic': caps.get('paralinguistic', []),
-        'emotion_tags':  caps.get('emotion_tags', []),
-        'voice_cloning': caps.get('voice_cloning', False),
+        'emotion_tags':  _emotion_tags,
+        'voice_cloning': bool(_voice_cloning),
         'streaming':     caps.get('streaming', False),
         'sample_rate':   caps.get('sample_rate', 22050),
         'quality':       ('highest' if getattr(entry, 'quality_score', 0.5) >= 0.93
@@ -698,26 +739,35 @@ class TTSEngine:
             self._hw_detected = True
             self._detect_hardware()
 
-    # Map backend names to VRAMManager tool names
-    _VRAM_TOOL_MAP = {
-        BACKEND_F5: 'tts_f5',
-        BACKEND_CHATTERBOX_TURBO: 'tts_chatterbox_turbo',
-        BACKEND_CHATTERBOX_ML: 'tts_chatterbox_ml',
-        BACKEND_INDIC_PARLER: 'tts_indic_parler',
-        BACKEND_COSYVOICE3: 'tts_cosyvoice3',
-    }
+    @classmethod
+    def _get_vram_tool_name(cls, backend: str) -> Optional[str]:
+        """Nunba backend constant → VRAMManager tool name.
 
-    # Map backend names to the Python packages they need at runtime.
-    # _can_run_backend uses this to skip backends whose deps aren't installed
-    # (e.g. frozen build without chatterbox-tts pip package).
-    _BACKEND_REQUIRED_IMPORTS = {
-        BACKEND_F5: 'f5_tts',
-        BACKEND_CHATTERBOX_TURBO: 'chatterbox',
-        BACKEND_CHATTERBOX_ML: 'chatterbox',
-        BACKEND_INDIC_PARLER: 'parler_tts',
-        BACKEND_COSYVOICE3: 'cosyvoice',
-        # Piper has no external dep — it's bundled
-    }
+        Derives from HARTOS ENGINE_REGISTRY[key].vram_key — no local
+        lookup table, so adding a new engine's VRAM budget only
+        requires updating the canonical registry in tts_router.
+        """
+        key = _BACKEND_TO_REGISTRY_KEY.get(backend)
+        if not key:
+            return None
+        registry = _get_engine_registry()
+        spec = registry.get(key)
+        return spec.vram_key if spec else None
+
+    @classmethod
+    def _get_required_package(cls, backend: str) -> Optional[str]:
+        """Nunba backend constant → pip package required for in-process run.
+
+        Derives from HARTOS ENGINE_REGISTRY[key].required_package.
+        Returns None if the backend has no extra pip dep (Piper is
+        bundled, espeak is a system binary, makeittalk is cloud-only).
+        """
+        key = _BACKEND_TO_REGISTRY_KEY.get(backend)
+        if not key:
+            return None
+        registry = _get_engine_registry()
+        spec = registry.get(key)
+        return spec.required_package if spec else None
 
     # Cache results of import checks (module name -> bool)
     _import_check_cache = {}
@@ -737,7 +787,7 @@ class TTSEngine:
         # ── Software check: is the required package actually importable? ──
         # Uses subprocess probe (python-embed) to avoid stub torch poisoning.
         # find_spec only checks if the .py exists, not if imports succeed.
-        required_pkg = self._BACKEND_REQUIRED_IMPORTS.get(backend)
+        required_pkg = self._get_required_package(backend)
         if required_pkg:
             if required_pkg not in TTSEngine._import_check_cache:
                 try:
@@ -826,7 +876,7 @@ class TTSEngine:
                 return False
 
             # Quick check — maybe packages landed since last cache refresh
-            required_pkg = self._BACKEND_REQUIRED_IMPORTS.get(backend)
+            required_pkg = self._get_required_package(backend)
             if required_pkg:
                 import importlib.util
                 if importlib.util.find_spec(required_pkg) is not None:
@@ -876,7 +926,7 @@ class TTSEngine:
     def _is_missing_packages(self, backend):
         """Return True if this backend failed _can_run_backend due to missing
         packages (as opposed to insufficient VRAM or no CUDA)."""
-        required_pkg = self._BACKEND_REQUIRED_IMPORTS.get(backend)
+        required_pkg = self._get_required_package(backend)
         if not required_pkg:
             return False
         cached = TTSEngine._import_check_cache.get(required_pkg)
@@ -980,7 +1030,7 @@ class TTSEngine:
                 _clear_cuda_cache()
                 # Release VRAM allocation via VRAMManager
                 if hasattr(self, '_vram_manager') and self._vram_manager:
-                    tool_name = self._VRAM_TOOL_MAP.get(old)
+                    tool_name = self._get_vram_tool_name(old)
                     if tool_name:
                         self._vram_manager.release(tool_name)
                 logger.info(f"Unloaded {old}")
@@ -988,7 +1038,7 @@ class TTSEngine:
         self._active_backend = new_backend
         # Allocate VRAM for new backend
         if hasattr(self, '_vram_manager') and self._vram_manager:
-            tool_name = self._VRAM_TOOL_MAP.get(new_backend)
+            tool_name = self._get_vram_tool_name(new_backend)
             if tool_name:
                 self._vram_manager.allocate(tool_name)
         self._initialized = False
@@ -1044,17 +1094,6 @@ class TTSEngine:
         finally:
             self._init_lock.release()
 
-    # Nunba backend constant → HARTOS tts_router ENGINE_REGISTRY key.
-    # Nunba uses BACKEND_CHATTERBOX_ML = 'chatterbox_multilingual' while the
-    # HARTOS registry uses 'chatterbox_ml' — this map bridges the gap.
-    _BACKEND_TO_REGISTRY_KEY = {
-        BACKEND_F5:               'f5_tts',
-        BACKEND_CHATTERBOX_TURBO: 'chatterbox_turbo',
-        BACKEND_CHATTERBOX_ML:    'chatterbox_ml',
-        BACKEND_INDIC_PARLER:     'indic_parler',
-        BACKEND_COSYVOICE3:       'cosyvoice3',
-    }
-
     def _create_backend(self, backend):
         # Piper is CPU-only (no subprocess needed) — still uses its
         # legacy in-process wrapper.
@@ -1065,7 +1104,10 @@ class TTSEngine:
         # subprocess worker. Use the generic adapter driven by
         # ENGINE_REGISTRY so adding a new GPU engine requires zero
         # changes here — just register it in tts_router.
-        registry_key = self._BACKEND_TO_REGISTRY_KEY.get(backend)
+        # Reads from the module-level _BACKEND_TO_REGISTRY_KEY (single
+        # source of truth for the Nunba-constant ↔ HARTOS-registry
+        # bridge — see the top of this file).
+        registry_key = _BACKEND_TO_REGISTRY_KEY.get(backend)
         if registry_key is None:
             return None
         try:
@@ -1467,7 +1509,7 @@ class TTSEngine:
         # When the model is ALREADY loaded on CUDA, we only need free VRAM for
         # inference buffers (~300-500MB), not the full model load size (1.3GB).
         # suggest_offload_mode checks against load size — wrong for hot models.
-        tool_name = self._VRAM_TOOL_MAP.get(self._active_backend)
+        tool_name = self._get_vram_tool_name(self._active_backend)
         if tool_name:
             try:
                 from integrations.service_tools.vram_manager import vram_manager

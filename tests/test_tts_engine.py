@@ -1414,19 +1414,27 @@ class TestEnginePipelineAndPresynth:
 # ===========================================================================
 
 class TestVRAMToolMap:
+    """TTSEngine exposes VRAM tool names via _get_vram_tool_name() which
+    derives from HARTOS ENGINE_REGISTRY — no local lookup table. These
+    tests verify the derived mapping matches the canonical values the
+    vram_manager expects."""
+
     def test_f5_tool_name(self):
-        assert TTSEngine._VRAM_TOOL_MAP[BACKEND_F5] == 'tts_f5'
+        assert TTSEngine._get_vram_tool_name(BACKEND_F5) == 'tts_f5'
 
     def test_chatterbox_turbo_tool_name(self):
-        assert TTSEngine._VRAM_TOOL_MAP[BACKEND_CHATTERBOX_TURBO] == 'tts_chatterbox_turbo'
+        assert TTSEngine._get_vram_tool_name(BACKEND_CHATTERBOX_TURBO) == 'tts_chatterbox_turbo'
 
-    def test_piper_not_in_vram_map(self):
-        assert BACKEND_PIPER not in TTSEngine._VRAM_TOOL_MAP
+    def test_piper_returns_none(self):
+        """Piper is CPU-only — no VRAM tool name."""
+        assert TTSEngine._get_vram_tool_name(BACKEND_PIPER) is None
 
-    def test_all_gpu_backends_in_map(self):
+    def test_all_gpu_backends_have_tool_name(self):
         for be in [BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
                     BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3]:
-            assert be in TTSEngine._VRAM_TOOL_MAP
+            assert TTSEngine._get_vram_tool_name(be) is not None, (
+                f"backend {be!r} has no vram tool name"
+            )
 
 
 # ===========================================================================
