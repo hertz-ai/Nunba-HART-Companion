@@ -233,43 +233,35 @@ class TestIsCasualMessage:
         assert self.is_casual("please open notepad now") is False
 
 
-class TestDetectCorrectionIntent:
-    """Deterministic marker-based detector: the user's message reads as
-    a correction of the previous assistant turn. Runs 0-ms, no model
-    call. A follow-up background thread pushes the correction into
-    HevolveAI via WorldModelBridge.submit_correction."""
+class TestCorrectionIntentFromDraftModel:
+    """Correction intent is classified by the HARTOS draft-first
+    dispatcher's Qwen3.5-0.8B model, NOT a hardcoded phrase list.
+    The chat handler reads ``is_correction`` off the chat result dict
+    and fires ``_submit_correction_async`` only when the draft flagged
+    the current turn as a correction of the previous assistant response.
 
-    @pytest.fixture(autouse=True)
-    def _import(self):
-        from routes.chatbot_routes import _detect_correction_intent
-        self.detect = _detect_correction_intent
+    These tests lock that contract: the handler must check the draft
+    flag (not regex-match the user text) and must NOT import any
+    removed hardcoded detector."""
 
-    @pytest.mark.parametrize('text', [
-        "no that's wrong",
-        "actually, the capital of France is Paris",
-        'I meant Python 3.11 not 3.10',
-        "You're wrong about that",
-        'Correction: the answer is 42',
-        'Not quite right',
-        "That's not right",
-        'incorrect',
-    ])
-    def test_positive_markers(self, text):
-        assert self.detect(text) is True
+    def test_no_hardcoded_detector_remains(self):
+        """Guard against the hardcoded _detect_correction_intent and
+        _CORRECTION_MARKERS ever coming back. The draft model is the
+        single source of truth for correction classification."""
+        import routes.chatbot_routes as cr
+        assert not hasattr(cr, '_detect_correction_intent'), \
+            ('Hardcoded correction detector resurfaced — correction '
+             'intent must come from the draft model, not a phrase list.')
+        assert not hasattr(cr, '_CORRECTION_MARKERS'), \
+            ('Hardcoded _CORRECTION_MARKERS tuple resurfaced — the draft '
+             'classifier owns this decision now.')
 
-    @pytest.mark.parametrize('text', [
-        'thanks',
-        'how do you work',
-        'open notepad',
-        'what is python',
-        'could you explain more',
-        '',
-    ])
-    def test_negative_no_marker(self, text):
-        assert self.detect(text) is False
-
-    def test_none_input_safe(self):
-        assert self.detect(None) is False
+    def test_submit_correction_still_exported(self):
+        """The async submitter must stay — it's the bridge to
+        WorldModelBridge that the chat handler calls after reading
+        is_correction from the draft result."""
+        from routes.chatbot_routes import _submit_correction_async
+        assert callable(_submit_correction_async)
 
 
 class TestSubmitCorrectionAsync:

@@ -197,32 +197,19 @@ def _detect_channel_connect_intent(text):
 
 # ---------------------------------------------------------------------------
 # Correction intent: "no, that's wrong", "actually ...", "I meant ...".
-# When detected, the user's latest message is an expert correction of the
-# immediately preceding assistant response and should flow to HevolveAI's
-# RL-EF / Kernel Continual Learner via WorldModelBridge.submit_correction
-# so the hive learns from the correction in real-time. Deterministic
-# 0-ms detector — no model call, no parallel path.
+# When the HARTOS draft-first dispatcher's Qwen3.5-0.8B classifier flags
+# ``is_correction=true`` on the user message, the current turn is treated
+# as an expert correction of the immediately preceding assistant response
+# and flows to HevolveAI's RL-EF / Kernel Continual Learner via
+# WorldModelBridge.submit_correction so the hive learns from it in real
+# time.
+#
+# There is NO hardcoded phrase list here — the 0.8B draft is already the
+# intent classifier for every default chat turn (see
+# speculative_dispatcher._build_draft_classifier_prompt), so correction
+# detection rides that same model call for zero extra cost and adapts
+# to paraphrases the way a static string match never could.
 # ---------------------------------------------------------------------------
-_CORRECTION_MARKERS = (
-    "no that's wrong", "no that is wrong", "that's wrong", "that is wrong",
-    "you're wrong", "you are wrong", "you got it wrong", "wrong answer",
-    'actually', 'i meant', 'what i meant', 'to correct',
-    'correction:', 'fix:', 'not quite', "that's not right", 'that is not right',
-    'incorrect', "you're incorrect", 'you are incorrect',
-    'let me correct', 'correcting you',
-)
-
-
-def _detect_correction_intent(text):
-    """Return True if the user message reads like a correction of the
-    last assistant response. Runs in ~microseconds — no model call."""
-    if not text:
-        return False
-    t = text.lower().strip()
-    for marker in _CORRECTION_MARKERS:
-        if marker in t:
-            return True
-    return False
 
 
 def _submit_correction_async(original_response, corrected_text, user_id):
@@ -2193,17 +2180,6 @@ def chat_route():
                     # Note: autonomous_creation is now detected by the LLM (Create_Agent tool)
                     # and passed back via the response from hart_intelligence, NOT by pattern matching
 
-                # Correction intent: if the user is correcting the previous
-                # assistant turn, fire a WorldModelBridge.submit_correction
-                # in the background so HevolveAI's RL-EF learns from it in
-                # real-time. Fire-and-forget — doesn't block the current
-                # response or change its content.
-                if _detect_correction_intent(text):
-                    with _sessions_lock:
-                        _prev_assistant = sessions.get(str(user_id), {}).get(
-                            'last_assistant_text', '')
-                    _submit_correction_async(_prev_assistant, text, user_id)
-
                 # Deterministic channel-connect nudge: if the user said "connect
                 # whatsapp" / "add telegram" / "link slack", inject a hint in
                 # front of the text so the LangChain LLM reliably picks the
@@ -2292,8 +2268,22 @@ def chat_route():
                 response_text = result.get('text') or result.get('response')
                 if response_text and not result.get('error'):
                     logger.info(f'LangChain local response: {response_text[:100]}...')
+                    # Correction intent: the HARTOS draft-first dispatcher's
+                    # Qwen3.5-0.8B classifier tags every default chat turn
+                    # with is_correction (true/false) inside the /chat
+                    # response envelope. When true, the CURRENT user message
+                    # was correcting the PREVIOUS assistant turn — fire a
+                    # fire-and-forget WorldModelBridge.submit_correction so
+                    # HevolveAI's RL-EF / Kernel Continual Learner learns in
+                    # real time. We read the prev_assistant from sessions
+                    # BEFORE we overwrite it with the new response below.
+                    if result.get('is_correction'):
+                        with _sessions_lock:
+                            _prev_assistant = sessions.get(str(user_id), {}).get(
+                                'last_assistant_text', '')
+                        _submit_correction_async(_prev_assistant, text, user_id)
                     # Retain the last assistant turn on the user's session so
-                    # the next turn's correction detector has context. Kept
+                    # the next turn's correction classifier has context. Kept
                     # tiny (last message only) — no transcript buffering here.
                     with _sessions_lock:
                         sessions.setdefault(str(user_id), {})['last_assistant_text'] = response_text[:4000]
