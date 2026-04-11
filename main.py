@@ -380,6 +380,33 @@ def _deferred_platform_init():
     except Exception as e:
         logging.debug(f"Caption server event subscription skipped: {e}")
 
+    # Eager-start the 0.8B caption/draft server so HARTOS's draft-first
+    # dispatcher has a live endpoint the moment the first /chat request
+    # arrives. Before this, the caption server was only started lazily
+    # on the first video frame, which meant chat draft-first always
+    # fell through to the 4B main model — defeating the intent of the
+    # fast-path classifier. The 0.8B is small enough (~550MB + mmproj)
+    # that paying its start cost once at boot is far cheaper than
+    # paying the 4B's full latency on every "hi". Disable with
+    # HEVOLVE_DRAFT_FIRST=0.
+    if os.environ.get('HEVOLVE_DRAFT_FIRST', '').strip() != '0':
+        def _boot_draft_server():
+            try:
+                from llama.llama_config import LlamaConfig
+                port = int(os.environ.get('HEVOLVE_VLM_CAPTION_PORT', 8081))
+                ok = LlamaConfig().start_caption_server(port=port)
+                if ok:
+                    logging.info(f"Draft server (0.8B) ready on port {port}")
+                else:
+                    logging.warning(
+                        "Draft server failed to start — chat draft-first will "
+                        "fall through to the 4B main model")
+            except Exception as e:
+                logging.warning(f"Draft server boot failed: {e}")
+
+        threading.Thread(target=_boot_draft_server, daemon=True,
+                         name='draft-server-boot').start()
+
 threading.Thread(target=_deferred_platform_init, daemon=True,
                  name='platform-init').start()
 
