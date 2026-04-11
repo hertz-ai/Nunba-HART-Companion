@@ -357,78 +357,12 @@ def _detect_missing_key_in_response(text):
     }
 
 
-# ---------------------------------------------------------------------------
-# LLM auto-start when chat hits an unreachable llama.cpp.
-# Reuses the SAME orchestrator + LlamaConfig path the startup thread calls
-# (app.py:6698 server_start_thread) so there's exactly ONE code path for
-# "bring up the local LLM". No parallel starter, no new subprocess launcher.
-# In-memory debounce prevents a second chat request from kicking a second
-# start while the first is still warming up; LlamaConfig also has a file
-# lock for cross-process safety. Fire-and-forget background thread so the
-# chat response returns in < 50 ms and the frontend can retry.
-# ---------------------------------------------------------------------------
-_llm_autostart_lock = threading.Lock()
-_llm_autostart_inflight_until = 0.0  # epoch seconds; skip new starts until this
-
-
-def _trigger_llm_auto_start_once(user_id: str = None) -> bool:
-    """Spawn the llama-server auto-start exactly once per cold window.
-
-    Debounce window is 30 s — enough time for llama.cpp to pull the model
-    into VRAM and start serving. Subsequent chat requests during that window
-    return the 'llm_starting' response without re-kicking.
-
-    Returns True if a new start was scheduled, False if one was already
-    in flight (debounced)."""
-    global _llm_autostart_inflight_until
-    now = time.time()
-    with _llm_autostart_lock:
-        if now < _llm_autostart_inflight_until:
-            return False
-        _llm_autostart_inflight_until = now + 30.0
-
-    def _worker():
-        try:
-            # Warm path: server process may be up but just not yet 200 OK
-            # (loading a model). Calling start_server() in that case lets
-            # LlamaConfig re-sync the model catalog without a fresh spawn.
-            try:
-                from llama.llama_config import LlamaConfig
-                _cfg = LlamaConfig()
-                if _cfg.is_llm_server_running():
-                    _cfg.start_server()
-                    logger.info('LLM auto-start: sync on already-running server')
-                    return
-            except Exception as e:
-                logger.warning(f'LLM auto-start: warm-path check failed: {e}')
-
-            # Cold path: same orchestrator path startup uses
-            try:
-                from models.orchestrator import get_orchestrator
-                entry = get_orchestrator().auto_load('llm')
-                if entry:
-                    logger.info(
-                        f'LLM auto-start: orchestrator loaded {entry.id} on {entry.device}')
-                else:
-                    logger.warning('LLM auto-start: orchestrator found no fit; falling back')
-                    # Final fallback — direct start_server()
-                    from llama.llama_config import LlamaConfig
-                    if LlamaConfig().start_server():
-                        logger.info('LLM auto-start: direct start_server() succeeded')
-                    else:
-                        logger.error('LLM auto-start: direct start_server() failed')
-            except Exception as e:
-                logger.error(f'LLM auto-start: orchestrator path failed: {e}')
-        except Exception as e:
-            logger.error(f'LLM auto-start: worker crashed: {e}')
-
-    threading.Thread(target=_worker, daemon=True,
-                     name='llm_auto_start').start()
-    logger.info(
-        f'LLM auto-start triggered from chat request '
-        f'(user={user_id}); response returned immediately with retry hint'
-    )
-    return True
+# LLM auto-start when chat hits an unreachable llama.cpp is owned by
+# LlamaConfig.ensure_running_async — the chat route just calls it. This
+# file used to carry its own _trigger_llm_auto_start_once with an
+# in-memory debounce, but that was a parallel path because LlamaConfig
+# already owns concurrency via .server_starting.lock. See
+# llama/llama_config.py::LlamaConfig.ensure_running_async.
 
 # Configuration from config.json
 CONTEXT_LEN = 2500
@@ -2440,13 +2374,15 @@ def chat_route():
         except Exception as e:
             logger.warning(f'Local Llama error: {e}')
 
-        # No LLM backend reachable — kick off the SAME auto-start the startup
-        # path uses (app.py:6698 server_start_thread) so subsequent requests
-        # succeed automatically. Runs in the background so this response
-        # returns instantly; file-level lock inside LlamaConfig.start_server()
-        # prevents concurrent starts across threads. User-facing text tells
-        # them the server is coming up and to retry shortly.
-        _trigger_llm_auto_start_once(user_id=user_id)
+        # No LLM backend reachable — one unified "bring up the right
+        # model for this capability" call. The orchestrator owns model
+        # selection + loading for every type (llm, tts, stt, vlm, ...)
+        # and the chat route stays a single line.
+        try:
+            from models.orchestrator import get_orchestrator
+            get_orchestrator().ensure_loaded_async('llm', caller=f'chat:{user_id}')
+        except ImportError:
+            logger.warning('Orchestrator unavailable — cannot auto-start LLM')
         return jsonify({
             'text': (
                 "Starting the local AI engine for you now. "
