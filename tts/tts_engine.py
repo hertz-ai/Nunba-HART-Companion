@@ -39,6 +39,7 @@ BACKEND_CHATTERBOX_TURBO = "chatterbox_turbo"
 BACKEND_CHATTERBOX_ML = "chatterbox_multilingual"
 BACKEND_INDIC_PARLER = "indic_parler"
 BACKEND_COSYVOICE3 = "cosyvoice3"
+BACKEND_KOKORO = "kokoro"
 BACKEND_PIPER = "piper"
 BACKEND_NONE = "none"
 
@@ -115,6 +116,24 @@ _FALLBACK_ENGINE_CAPABILITIES = {
         'sample_rate': 22050,
         'quality': 'high',
     },
+    BACKEND_KOKORO: {
+        # Kokoro 82M — tiny neural English TTS, sits between the big
+        # GPU engines and Piper on the quality ladder. Runs on CPU at
+        # ~1x real-time, or GPU at ~0.1x. No voice cloning, but ~25
+        # English presets shipped with the model. Benchmark vs Piper:
+        # quality 0.88 vs 0.70, CPU latency 400ms vs 200ms per 10
+        # words — Kokoro is ~2x slower but noticeably less robotic,
+        # so it's tried FIRST before we give up and use Piper on CPU.
+        'name': 'Kokoro 82M',
+        'vram_gb': 0.2,
+        'languages': {'en'},
+        'paralinguistic': [],
+        'emotion_tags': [],
+        'voice_cloning': False,
+        'streaming': False,
+        'sample_rate': 24000,
+        'quality': 'high',
+    },
     BACKEND_PIPER: {
         'name': 'Piper TTS (CPU)',
         'vram_gb': 0,
@@ -138,8 +157,13 @@ _INDIC_LANGS = {
 # Fallback-only — canonical preference is read from ModelCatalog via
 # _get_lang_preference().  Direct use of this dict is degraded-mode only.
 _FALLBACK_LANG_ENGINE_PREFERENCE = {
-    # English: Chatterbox Turbo (paralinguistic tags) > F5 (voice cloning) > Indic Parler > Piper CPU fallback
-    'en': [BACKEND_CHATTERBOX_TURBO, BACKEND_F5, BACKEND_INDIC_PARLER, BACKEND_PIPER],
+    # English ladder (quality first, then CPU-friendly):
+    # 1. Chatterbox Turbo — big GPU, paralinguistic tags, voice clone
+    # 2. F5-TTS           — big GPU, voice clone
+    # 3. Indic Parler     — big GPU, also covers English
+    # 4. Kokoro 82M       — small neural, CPU-friendly, beats Piper
+    # 5. Piper            — bundled CPU absolute-last-resort
+    'en': [BACKEND_CHATTERBOX_TURBO, BACKEND_F5, BACKEND_INDIC_PARLER, BACKEND_KOKORO, BACKEND_PIPER],
     # International: CosyVoice3 (zero-shot cloning) > Chatterbox ML (16GB+)
     'es': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
     'fr': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
@@ -181,6 +205,7 @@ _BACKEND_TO_REGISTRY_KEY: dict[str, str] = {
     BACKEND_CHATTERBOX_ML:    'chatterbox_ml',
     BACKEND_INDIC_PARLER:     'indic_parler',
     BACKEND_COSYVOICE3:       'cosyvoice3',
+    BACKEND_KOKORO:           'kokoro',
 }
 
 

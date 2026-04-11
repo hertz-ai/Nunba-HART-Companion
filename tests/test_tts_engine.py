@@ -80,8 +80,10 @@ class TestBackendConstants:
 
 class TestFallbackEngineCapabilities:
     def test_all_backends_present(self):
+        from tts.tts_engine import BACKEND_KOKORO
         expected = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
-                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_PIPER}
+                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
+                    BACKEND_PIPER}
         assert set(_FALLBACK_ENGINE_CAPABILITIES.keys()) == expected
 
     def test_f5_vram(self):
@@ -189,9 +191,60 @@ class TestCatalogMapping:
             assert _CATALOG_TO_BACKEND[cat_id] == be
 
     def test_backend_to_catalog_contains_all_backends(self):
+        from tts.tts_engine import BACKEND_KOKORO
         expected = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
-                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_PIPER}
+                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
+                    BACKEND_PIPER}
         assert set(_BACKEND_TO_CATALOG.keys()) == expected
+
+
+class TestKokoroEnglishLadder:
+    """Kokoro 82M is the second-last rung on the English TTS ladder —
+    tried before Piper so CPU-only users get neural quality when the
+    big GPU engines can't run. These tests lock the placement and
+    registry wiring so Kokoro stays reachable."""
+
+    def test_kokoro_in_english_preference_before_piper(self):
+        from tts.tts_engine import (
+            BACKEND_KOKORO, BACKEND_PIPER,
+            _FALLBACK_LANG_ENGINE_PREFERENCE,
+        )
+        prefs = _FALLBACK_LANG_ENGINE_PREFERENCE['en']
+        assert BACKEND_KOKORO in prefs
+        assert BACKEND_PIPER in prefs
+        # Kokoro must come BEFORE Piper on CPU — that's the whole point.
+        assert prefs.index(BACKEND_KOKORO) < prefs.index(BACKEND_PIPER)
+
+    def test_kokoro_registry_key_wired(self):
+        from tts.tts_engine import BACKEND_KOKORO, _BACKEND_TO_REGISTRY_KEY
+        assert _BACKEND_TO_REGISTRY_KEY[BACKEND_KOKORO] == 'kokoro'
+
+    def test_kokoro_catalog_id_wired(self):
+        from tts.tts_engine import BACKEND_KOKORO, _BACKEND_TO_CATALOG
+        # _registry_key_to_catalog_id('kokoro') == 'kokoro' (no underscores)
+        assert _BACKEND_TO_CATALOG[BACKEND_KOKORO] == 'kokoro'
+
+    def test_kokoro_fallback_caps_english_only(self):
+        from tts.tts_engine import BACKEND_KOKORO
+        caps = _FALLBACK_ENGINE_CAPABILITIES[BACKEND_KOKORO]
+        assert caps['languages'] == {'en'}
+        assert caps['voice_cloning'] is False
+        assert caps['quality'] == 'high'
+
+    def test_kokoro_in_hartos_engine_registry(self):
+        """The HARTOS-side ENGINE_REGISTRY must carry the kokoro spec
+        with a valid subprocess tool path. Without this, Nunba's
+        _SubprocessTTSBackend raises on engine_id='kokoro'."""
+        try:
+            from integrations.channels.media.tts_router import ENGINE_REGISTRY
+        except Exception:
+            pytest.skip("HARTOS tts_router not importable in this env")
+        spec = ENGINE_REGISTRY.get('kokoro')
+        assert spec is not None
+        assert spec.tool_module == 'integrations.service_tools.kokoro_tool'
+        assert spec.tool_function == 'kokoro_synthesize'
+        assert spec.tool_worker_attr == '_tool'
+        assert 'en' in spec.languages
 
 
 # ===========================================================================
