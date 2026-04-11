@@ -112,87 +112,26 @@ _sessions_lock = threading.Lock()
 sessions = {}
 custom_sessions = {}
 
-# Agent creation intent detection — exact phrase match only.
-# Fuzzy/substring matching removed. The LLM's Create_Agent tool handles
-# paraphrases, ambiguous cases, and negation naturally via reasoning.
-# This is just a fast-path for obvious unambiguous phrases.
-_CREATE_AGENT_EXACT = {
-    'create an agent', 'create agent', 'build an agent', 'build agent',
-    'make an agent', 'create a new agent', 'train an agent', 'train agent',
-    'i want a new agent', 'i want an agent', 'i want to create',
-    'i need a new agent', 'i need an agent', 'new agent',
-}
-
-def _detect_create_agent_intent(text):
-    """Exact phrase match only — no fuzzy substring matching.
-
-    The LLM handles everything else via the Create_Agent tool description.
-    This just short-circuits the obvious cases for speed (0ms vs 2s LLM call).
-    """
-    text_lower = text.lower().strip()
-    # Only match if the ENTIRE message is the intent (or starts with it)
-    # "create an agent that does X" → match (starts with exact phrase)
-    # "can you create an agent" → no match (let LLM handle)
-    for phrase in _CREATE_AGENT_EXACT:
-        if text_lower.startswith(phrase):
-            return True
-    return False
-
-
 # ---------------------------------------------------------------------------
-# Channel connect intent: "connect to whatsapp", "add telegram", "link slack"
-# Delegates to the HARTOS Connect_Channel LangChain tool — that's still the
-# single registration code path. This detector just nudges the LLM by
-# injecting a hint so it reliably picks the tool instead of answering in
-# words.
+# USER-INTENT CLASSIFICATION LIVES IN THE HARTOS DRAFT MODEL.
+#
+# Every default chat turn goes through dispatch_draft_first in HARTOS
+# (integrations/agent_engine/speculative_dispatcher.py), which calls the
+# Qwen3.5-0.8B draft with a JSON-schema prompt that emits these flags on
+# the reply:
+#
+#     is_correction   — user is correcting the previous assistant turn
+#     is_casual       — pure chit-chat, doesn't need tools
+#     is_create_agent — user wants a new agent built
+#     channel_connect — lowercased channel name (whatsapp/telegram/...) or ''
+#
+# The flags ride back on the /chat response JSON so the chat handler can
+# route without ever running a phrase-matching classifier on Python
+# strings. The previous hardcoded detectors (_CREATE_AGENT_EXACT,
+# _CONNECT_CHANNEL_VERBS, _CASUAL_EXACT, _TOOL_TRIGGER_TOKENS, etc.) are
+# gone — they were shadow code that couldn't keep up with paraphrases
+# and duplicated the same classification the draft model already does.
 # ---------------------------------------------------------------------------
-_CONNECT_CHANNEL_VERBS = (
-    'connect', 'add', 'link', 'set up', 'setup', 'hook up', 'register',
-    'enable', 'activate', 'integrate',
-)
-# Matches every channel type registered in HARTOS integrations/channels/metadata
-_CHANNEL_NAMES = {
-    'whatsapp', 'telegram', 'discord', 'slack', 'email', 'gmail', 'outlook',
-    'sms', 'teams', 'messenger', 'facebook', 'instagram', 'twitter', 'x',
-    'linkedin', 'matrix', 'signal', 'viber', 'wechat', 'line', 'kik', 'skype',
-    'rocket.chat', 'rocket chat', 'rocketchat', 'mattermost', 'zulip', 'irc',
-    'xmpp', 'reddit', 'youtube', 'twitch', 'webex',
-}
-
-def _detect_channel_connect_intent(text):
-    """Return the channel name if the message looks like 'connect X'
-    where X is a supported channel — else None.
-
-    Runs in 0ms before the LLM sees the prompt. Deterministic: only matches
-    clear cases, falls through for ambiguous ones so the LLM can still decide.
-    """
-    if not text:
-        return None
-    t = text.lower().strip().rstrip('.!?')
-    # Quick reject — if no verb, bail
-    if not any(v in t for v in _CONNECT_CHANNEL_VERBS):
-        return None
-    # Try to find a channel name that appears after a connect verb.
-    # Simple heuristic: look for "<verb> [to|my|up|with] <channel>" pattern.
-    import re as _re
-    verb_alt = '|'.join(_re.escape(v) for v in _CONNECT_CHANNEL_VERBS)
-    chan_alt = '|'.join(
-        _re.escape(c) for c in sorted(_CHANNEL_NAMES, key=len, reverse=True)
-    )
-    pattern = (
-        rf'\b(?:{verb_alt})\b(?:\s+(?:to|with|up|my|a|an|the))*\s+'
-        rf'(?:my\s+)?({chan_alt})\b'
-    )
-    m = _re.search(pattern, t)
-    if m:
-        channel = m.group(1)
-        # Normalize variants
-        if channel in ('x',):
-            channel = 'twitter'
-        if channel in ('rocket chat', 'rocketchat'):
-            channel = 'rocket.chat'
-        return channel
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -232,103 +171,6 @@ def _submit_correction_async(original_response, corrected_text, user_id):
 
     threading.Thread(target=_worker, daemon=True,
                      name='submit_correction').start()
-
-
-# ---------------------------------------------------------------------------
-# Casual-conversation classifier: short chit-chat doesn't need the full
-# LangChain tool pipeline. Routing obvious greetings/acknowledgements
-# through casual_conv=True cuts a ~3s tool-resolution pass off of every
-# "hi" / "thanks" message. Ambiguous messages STAY on the tool path.
-# ---------------------------------------------------------------------------
-_CASUAL_EXACT = {
-    'hi', 'hello', 'hey', 'yo', 'sup', 'howdy', 'heya', 'hiya', 'hii', 'hiii',
-    'ok', 'okay', 'k', 'kk', 'cool', 'nice', 'great', 'awesome', 'sweet',
-    'thanks', 'thank you', 'thx', 'ty', 'tysm', 'thankyou', 'ta', 'cheers',
-    'yes', 'yep', 'yeah', 'yup', 'sure', 'no', 'nope', 'nah',
-    'bye', 'goodbye', 'cya', 'see ya', 'later', 'gn', 'goodnight', 'gm',
-    'good morning', 'good night', 'good evening', 'good afternoon',
-    'lol', 'lmao', 'haha', 'hehe', 'nice one', 'got it',
-    'proceed', 'continue', 'go ahead', 'go on',
-    'stop', 'cancel', 'nvm', 'never mind', 'forget it',
-    'how are you', 'how are you doing', 'hows it going', "how's it going",
-    "what's up", 'whats up',
-    # Self-identity / capability questions — these are pure chat, no
-    # tool use required to answer. Include common typos ('wht') and
-    # short/long forms so the classifier doesn't trip on a missing
-    # apostrophe or dropped vowel.
-    'what do you do', 'wht do you do', 'what do u do', 'wht do u do',
-    'what can you do', 'wht can you do', 'what can u do', 'wht can u do',
-    'what are you', 'what are u', 'who are you', 'who are u',
-    'what is your name', 'whats your name', "what's your name",
-    'tell me about yourself', 'tell me about you', 'introduce yourself',
-    'what do you think', 'how do you work', 'how do u work',
-    'help', 'help me', 'what help', 'need help',
-}
-
-# Verbs / nouns that always require TOOL access. If the message contains any,
-# casual_conv must stay False — the LLM needs tools to answer truthfully.
-_TOOL_TRIGGER_TOKENS = {
-    'open', 'launch', 'start', 'click', 'type', 'screenshot', 'see',
-    'search', 'google', 'find', 'look up', 'browse', 'fetch',
-    'read', 'write', 'create', 'delete', 'rename', 'move', 'copy', 'download',
-    'schedule', 'remind', 'alarm', 'calendar', 'cron', 'repeat',
-    'camera', 'mic', 'record', 'transcribe',
-    'code', 'debug', 'fix', 'run', 'execute', 'compile',
-    'remember', 'recall', 'forget', 'memory',
-    'connect', 'link', 'add', 'register', 'setup', 'set up', 'hook up',
-    'whatsapp', 'telegram', 'discord', 'slack', 'email', 'gmail',
-    'weather', 'news', 'stock', 'price', 'latest',
-    'image', 'picture', 'photo', 'video', 'generate', 'draw', 'paint',
-    'translate', 'summarize', 'summary', 'analyze',
-}
-
-def _is_casual_message(text):
-    """True if the message is simple chit-chat that doesn't need any tools.
-
-    Rules (in order):
-      1. Empty / whitespace → False
-      2. >8 words → False (assume substantive)
-      3. Contains any tool-trigger token → False
-      4. Exact match in _CASUAL_EXACT → True (covers greetings + typos
-         + self-identity questions like 'wht do you do')
-      5. Self-referential pattern (who/what/how + you/u) at ≤6 words →
-         True (catches paraphrases the allowlist missed)
-      6. ≤5 words and no tool trigger → True (short ack / small-talk)
-      7. Otherwise → False (let the full tool pipeline handle it)
-
-    The previous 3-word gate was too tight — 'wht do you do' (4 words,
-    no tool trigger) was getting routed to the full LangChain pipeline
-    and taking 10+ seconds because the agent had to resolve every tool
-    description before realising nothing applied. Loosening to 5 words
-    + self-referential pattern covers the overwhelming majority of
-    'talk to me' prompts without losing any real tool dispatch.
-    """
-    if not text:
-        return False
-    t = text.lower().strip().rstrip('.!?')
-    if not t:
-        return False
-    words = t.split()
-    if len(words) > 8:
-        return False
-    # Tool triggers always force non-casual
-    for tok in _TOOL_TRIGGER_TOKENS:
-        if tok in t:
-            return False
-    # Exact-phrase allowlist (greetings, identity questions, common typos)
-    if t in _CASUAL_EXACT:
-        return True
-    # Self-referential pattern: 'who/what/how ... you/u'
-    # Short questions aimed at the assistant itself have no tools to call.
-    if len(words) <= 6:
-        first = words[0]
-        if first in ('who', 'what', 'wht', 'how', 'why', 'can'):
-            if any(w in ('you', 'u', 'your', 'yours', 'urs') for w in words):
-                return True
-    # Short fallback: ≤5 words with no tool trigger — probably ack/small-talk
-    if len(words) <= 5:
-        return True
-    return False
 
 
 # Agent-driven secret request detection
@@ -2165,59 +2007,17 @@ def chat_route():
                     if os.path.isfile(_prompt_file):
                         langchain_prompt_id = int(_candidate_pid)
 
-                # --- Recursion guard: skip detection if already in creation/review flow ---
-                already_creating = (
-                    create_agent or
-                    (langchain_prompt_id and str(langchain_prompt_id).isdigit())
-                )
-
-                # Conservative deterministic detection — only for unambiguous, non-negated cases
-                # For intelligent detection (paraphrases, etc.), the LangChain Create_Agent
-                # tool handles it via LLM reasoning in hart_intelligence
-                if not already_creating and _detect_create_agent_intent(text):
-                    create_agent = True
-                    logger.info('Deterministic: detected agent creation intent (server will generate prompt_id)')
-                    # Note: autonomous_creation is now detected by the LLM (Create_Agent tool)
-                    # and passed back via the response from hart_intelligence, NOT by pattern matching
-
-                # Deterministic channel-connect nudge: if the user said "connect
-                # whatsapp" / "add telegram" / "link slack", inject a hint in
-                # front of the text so the LangChain LLM reliably picks the
-                # Connect_Channel tool instead of answering in words. Keeps the
-                # tool as the single registration path — zero parallel logic.
-                _channel_intent = _detect_channel_connect_intent(text)
-                if _channel_intent:
-                    logger.info(
-                        'Deterministic: detected channel-connect intent '
-                        f'for {_channel_intent} — nudging LLM to Connect_Channel tool'
-                    )
-                    text = (
-                        f"{text}\n\n[Hint: use the Connect_Channel tool with "
-                        f"input '{_channel_intent}' to start setup.]"
-                    )
-
-                # casual_conv=True hides tool descriptions from the LLM prompt.
-                # In bundled mode (Nunba desktop), the agent needs ALL tools
-                # (Visual_Context_Camera, memory, watchers, etc.) to compose
-                # capabilities agentically — so historically we set casual=False
-                # there. But that was making "hi" and "thanks" take 3+s because
-                # every message went through the full tool-resolution pass.
-                # The fix: even in bundled mode, short chit-chat with no tool
-                # triggers gets the fast path. Substantive messages still hit
-                # the full tool pipeline.
-                _is_bundled = bool(os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False))
-                _is_chitchat = _is_casual_message(text)
-                _is_casual = (
-                    not langchain_prompt_id
-                    and not create_agent
-                    and not agentic_execute
-                    and not agentic_plan
-                    and not _channel_intent
-                    and (not _is_bundled or _is_chitchat)
-                )
-                if _is_casual and _is_bundled:
-                    logger.info(f'Fast path: casual chitchat in bundled mode → casual_conv=True')
-
+                # Intent routing (casual_conv / create_agent / channel
+                # connect nudge) is performed inside HARTOS by the
+                # Qwen3.5-0.8B draft-first classifier — no phrase tables
+                # here. We pass neutral flags to hevolve_chat so HARTOS
+                # can make its own decisions; the draft's reply short-
+                # circuits casual turns at HARTOS level (/chat returns
+                # the draft envelope directly before the LangChain path
+                # even runs), so we don't need a local casual_conv
+                # computation to save latency. Agent-creation and
+                # channel-connect both get handled by the draft flags
+                # the adapter surfaces on the /chat response.
                 result = hevolve_chat(
                     text=text,
                     user_id=str(user_id),
@@ -2225,7 +2025,7 @@ def chat_route():
                     conversation_id=conversation_id,
                     request_id=request_id,
                     create_agent=bool(create_agent),
-                    casual_conv=_is_casual,
+                    casual_conv=False,
                     media_mode=media_mode,
                     autonomous=bool(autonomous_creation),
                     agentic_execute=bool(agentic_execute),

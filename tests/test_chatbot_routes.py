@@ -30,236 +30,50 @@ if PROJECT_ROOT not in sys.path:
 # Unit tests for helper functions (no Flask app needed)
 # ============================================================
 
-class TestDetectCreateAgentIntent:
-    """Test the deterministic agent-creation intent detector."""
-
-    @pytest.fixture(autouse=True)
-    def _import_detector(self):
-        from routes.chatbot_routes import _detect_create_agent_intent
-        self.detect = _detect_create_agent_intent
-
-    def test_positive_create_agent(self):
-        assert self.detect("create an agent that summarizes news") is True
-
-    def test_positive_build_agent(self):
-        assert self.detect("build agent for data analysis") is True
-
-    def test_positive_new_agent(self):
-        assert self.detect("I want a new agent") is True
-
-    def test_positive_train_agent(self):
-        assert self.detect("train an agent to write poetry") is True
-
-    def test_positive_case_insensitive(self):
-        assert self.detect("CREATE AN AGENT for me") is True
-
-    def test_negative_no_pattern(self):
-        assert self.detect("what is the weather today?") is False
-
-    def test_negative_dont_create_agent(self):
-        assert self.detect("don't create an agent please") is False
-
-    def test_negative_do_not_create(self):
-        assert self.detect("do not create agent") is False
-
-    def test_negative_cancel_create(self):
-        assert self.detect("cancel create agent") is False
-
-    def test_negative_empty_string(self):
-        assert self.detect("") is False
-
-    def test_negative_stop_create(self):
-        assert self.detect("stop create an agent") is False
-
-
-class TestDetectChannelConnectIntent:
-    """Tier-1 deterministic detection for 'connect to whatsapp' et al.
-    The chat handler uses this result to nudge the LangChain agent toward
-    the Connect_Channel tool instead of producing a text answer."""
-
-    @pytest.fixture(autouse=True)
-    def _import_detector(self):
-        from routes.chatbot_routes import _detect_channel_connect_intent
-        self.detect = _detect_channel_connect_intent
-
-    def test_connect_whatsapp(self):
-        assert self.detect("connect to whatsapp") == "whatsapp"
-
-    def test_connect_whatsapp_no_preposition(self):
-        assert self.detect("connect whatsapp") == "whatsapp"
-
-    def test_add_telegram(self):
-        assert self.detect("add telegram") == "telegram"
-
-    def test_link_my_slack(self):
-        assert self.detect("link my slack") == "slack"
-
-    def test_set_up_discord(self):
-        assert self.detect("set up discord") == "discord"
-
-    def test_hook_up_gmail(self):
-        assert self.detect("hook up gmail") == "gmail"
-
-    def test_register_matrix(self):
-        assert self.detect("register matrix") == "matrix"
-
-    def test_activate_signal(self):
-        assert self.detect("activate signal") == "signal"
-
-    def test_x_normalizes_to_twitter(self):
-        assert self.detect("connect x") == "twitter"
-
-    def test_rocketchat_normalizes(self):
-        assert self.detect("connect rocketchat") == "rocket.chat"
-
-    def test_case_insensitive(self):
-        assert self.detect("CONNECT TO WHATSAPP") == "whatsapp"
-
-    def test_trailing_punctuation(self):
-        assert self.detect("connect whatsapp!") == "whatsapp"
-
-    def test_no_verb(self):
-        # No connect verb → nothing to match
-        assert self.detect("whatsapp is great") is None
-
-    def test_unknown_channel(self):
-        assert self.detect("connect something unknown") is None
-
-    def test_empty(self):
-        assert self.detect("") is None
-
-    def test_none(self):
-        assert self.detect(None) is None
-
-    def test_connect_in_other_context(self):
-        # "connect" without a known channel name → no match
-        assert self.detect("connect me to the database") is None
-
-
-class TestIsCasualMessage:
-    """Tier-0 chit-chat classifier. Casual messages bypass LangChain tool
-    resolution and go straight to the LLM as pure chat — cuts ~3s off
-    'hi' / 'thanks' in bundled mode."""
-
-    @pytest.fixture(autouse=True)
-    def _import_detector(self):
-        from routes.chatbot_routes import _is_casual_message
-        self.is_casual = _is_casual_message
-
-    def test_hi(self):
-        assert self.is_casual("hi") is True
-
-    def test_hello(self):
-        assert self.is_casual("hello") is True
-
-    def test_thanks(self):
-        assert self.is_casual("thanks") is True
-
-    def test_ok(self):
-        assert self.is_casual("ok") is True
-
-    def test_how_are_you(self):
-        assert self.is_casual("how are you") is True
-
-    def test_good_morning(self):
-        assert self.is_casual("good morning") is True
-
-    def test_uppercase_greeting(self):
-        assert self.is_casual("HEY") is True
-
-    def test_trailing_punctuation(self):
-        assert self.is_casual("thanks!!") is True
-
-    def test_long_message_not_casual(self):
-        # Over 8 words → not casual even if no tool trigger
-        assert self.is_casual(
-            "this is a much longer sentence that absolutely should not count"
-        ) is False
-
-    def test_tool_trigger_open(self):
-        assert self.is_casual("open notepad") is False
-
-    def test_tool_trigger_whatsapp(self):
-        # Tool-trigger overrides short length
-        assert self.is_casual("connect whatsapp") is False
-
-    def test_tool_trigger_search(self):
-        assert self.is_casual("search for X") is False
-
-    def test_tool_trigger_remember(self):
-        assert self.is_casual("remember this") is False
-
-    def test_short_unknown_phrase_is_casual(self):
-        # ≤3 words, no tool trigger → treated as casual ack
-        assert self.is_casual("sounds fine") is True
-
-    def test_empty(self):
-        assert self.is_casual("") is False
-
-    def test_none(self):
-        assert self.is_casual(None) is False
-
-    # Regression: 'wht do you do' was routed to the full LangChain
-    # pipeline because it was 4 words (>3-word gate) and not in the
-    # allowlist, making the bundled UI "think forever".
-    def test_what_do_you_do(self):
-        assert self.is_casual("what do you do") is True
-
-    def test_what_do_you_do_typo(self):
-        assert self.is_casual("wht do you do") is True
-
-    def test_what_can_you_do(self):
-        assert self.is_casual("what can you do") is True
-
-    def test_who_are_you(self):
-        assert self.is_casual("who are you") is True
-
-    def test_how_do_you_work(self):
-        assert self.is_casual("how do you work") is True
-
-    def test_tell_me_about_yourself(self):
-        assert self.is_casual("tell me about yourself") is True
-
-    def test_what_do_u_do_informal(self):
-        # Informal 'u' for 'you' should still classify as casual
-        assert self.is_casual("what do u do") is True
-
-    def test_self_referential_pattern_catches_paraphrase(self):
-        # Not in allowlist but matches self-referential pattern
-        assert self.is_casual("how do you help") is True
-
-    def test_loosened_gate_does_not_break_tool_triggers(self):
-        # 4 words, but 'open' is a tool trigger — must stay False
-        assert self.is_casual("please open notepad now") is False
-
-
-class TestCorrectionIntentFromDraftModel:
-    """Correction intent is classified by the HARTOS draft-first
-    dispatcher's Qwen3.5-0.8B model, NOT a hardcoded phrase list.
-    The chat handler reads ``is_correction`` off the chat result dict
-    and fires ``_submit_correction_async`` only when the draft flagged
-    the current turn as a correction of the previous assistant response.
-
-    These tests lock that contract: the handler must check the draft
-    flag (not regex-match the user text) and must NOT import any
-    removed hardcoded detector."""
-
-    def test_no_hardcoded_detector_remains(self):
-        """Guard against the hardcoded _detect_correction_intent and
-        _CORRECTION_MARKERS ever coming back. The draft model is the
-        single source of truth for correction classification."""
+class TestIntentClassifiersAreDraftOnly:
+    """All user-intent classification for the chat route lives in the
+    HARTOS Qwen3.5-0.8B draft-first classifier. There is NO Python-level
+    phrase list, exact-match set, or regex-based detector for:
+
+        - create-agent intent
+        - channel-connect intent
+        - casual-chit-chat intent
+        - correction intent
+
+    These guard tests lock that contract. Every resurfaced symbol below
+    represents a shadow code path that duplicates the draft model's
+    classification and inevitably drifts from it.
+    """
+
+    @pytest.mark.parametrize('symbol', [
+        # Deleted correction-intent detector
+        '_detect_correction_intent',
+        '_CORRECTION_MARKERS',
+        # Deleted create-agent phrase allowlist + detector
+        '_detect_create_agent_intent',
+        '_CREATE_AGENT_EXACT',
+        # Deleted channel-connect regex detector + tables
+        '_detect_channel_connect_intent',
+        '_CONNECT_CHANNEL_VERBS',
+        '_CHANNEL_NAMES',
+        # Deleted casual-chit-chat classifier + tables
+        '_is_casual_message',
+        '_CASUAL_EXACT',
+        '_TOOL_TRIGGER_TOKENS',
+    ])
+    def test_symbol_is_not_reexported(self, symbol):
         import routes.chatbot_routes as cr
-        assert not hasattr(cr, '_detect_correction_intent'), \
-            ('Hardcoded correction detector resurfaced — correction '
-             'intent must come from the draft model, not a phrase list.')
-        assert not hasattr(cr, '_CORRECTION_MARKERS'), \
-            ('Hardcoded _CORRECTION_MARKERS tuple resurfaced — the draft '
-             'classifier owns this decision now.')
+        assert not hasattr(cr, symbol), (
+            f'{symbol} resurfaced in routes/chatbot_routes.py — the draft '
+            f'classifier owns this decision now. If you need a new intent, '
+            f'add a field to _build_draft_classifier_prompt instead of '
+            f'reviving a phrase list.'
+        )
 
     def test_submit_correction_still_exported(self):
-        """The async submitter must stay — it's the bridge to
-        WorldModelBridge that the chat handler calls after reading
-        is_correction from the draft result."""
+        """The async submitter stays — it's the bridge to
+        WorldModelBridge, triggered by reading is_correction off the
+        /chat response dict."""
         from routes.chatbot_routes import _submit_correction_async
         assert callable(_submit_correction_async)
 

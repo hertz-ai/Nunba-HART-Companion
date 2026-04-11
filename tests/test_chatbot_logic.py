@@ -15,85 +15,21 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from routes.chatbot_routes import (
-    _CREATE_AGENT_EXACT,
     _KEY_NAME_MAP,
     _MISSING_KEY_INDICATORS,
-    _detect_create_agent_intent,
     _detect_missing_key_in_response,
     _extract_resource_request,
     match_options,
 )
 
-
-# ==========================================================================
-# 1. Create Agent Intent Detection
-# ==========================================================================
-class TestCreateAgentIntent:
-    """_detect_create_agent_intent: exact-phrase fast path."""
-
-    # Positive cases
-    def test_exact_phrase_create_agent(self):
-        assert _detect_create_agent_intent('create an agent') is True
-
-    def test_exact_phrase_build_agent(self):
-        assert _detect_create_agent_intent('build an agent') is True
-
-    def test_exact_phrase_new_agent(self):
-        assert _detect_create_agent_intent('new agent') is True
-
-    def test_exact_phrase_train_agent(self):
-        assert _detect_create_agent_intent('train an agent') is True
-
-    def test_starts_with_create_plus_description(self):
-        assert _detect_create_agent_intent('create an agent that helps with math') is True
-
-    def test_case_insensitive(self):
-        assert _detect_create_agent_intent('CREATE AN AGENT') is True
-
-    def test_mixed_case(self):
-        assert _detect_create_agent_intent('Create An Agent') is True
-
-    def test_leading_whitespace(self):
-        assert _detect_create_agent_intent('  create an agent') is True
-
-    def test_i_want_new_agent(self):
-        assert _detect_create_agent_intent('i want a new agent') is True
-
-    def test_i_need_an_agent(self):
-        assert _detect_create_agent_intent('i need an agent') is True
-
-    # Negative cases — these should NOT match (let LLM handle)
-    def test_question_form(self):
-        assert _detect_create_agent_intent('can you create an agent?') is False
-
-    def test_negation(self):
-        assert _detect_create_agent_intent("don't create an agent") is False
-
-    def test_regular_chat(self):
-        assert _detect_create_agent_intent('hello how are you') is False
-
-    def test_agent_word_in_sentence(self):
-        assert _detect_create_agent_intent('the agent is running') is False
-
-    def test_empty_string(self):
-        assert _detect_create_agent_intent('') is False
-
-    def test_just_whitespace(self):
-        assert _detect_create_agent_intent('   ') is False
-
-    def test_partial_phrase(self):
-        assert _detect_create_agent_intent('create a') is False
-
-    def test_about_agents(self):
-        assert _detect_create_agent_intent('tell me about agents') is False
-
-    # All exact phrases
-    def test_all_exact_phrases_detected(self):
-        for phrase in _CREATE_AGENT_EXACT:
-            assert _detect_create_agent_intent(phrase) is True, f"Failed: {phrase}"
-
-    def test_exact_phrases_count(self):
-        assert len(_CREATE_AGENT_EXACT) >= 10
+# Intent classification (create_agent, channel_connect, casual, correction)
+# lives in the HARTOS Qwen3.5-0.8B draft-first classifier — there is no
+# Python-level detector in routes/chatbot_routes.py for any of these. The
+# old TestCreateAgentIntent / TestCreateAgentExactSet classes exercised a
+# deleted helper (_detect_create_agent_intent) and have been removed; the
+# draft-first unit tests in HARTOS test_draft_first_dispatch.py are the
+# new canonical coverage. test_chatbot_routes.py::TestIntentClassifiersAreDraftOnly
+# locks the guard that prevents the hardcoded symbols from coming back.
 
 
 # ==========================================================================
@@ -226,28 +162,7 @@ class TestMatchOptions:
 
 
 # ==========================================================================
-# 5. CREATE_AGENT_EXACT Set Properties
-# ==========================================================================
-class TestCreateAgentExactSet:
-    def test_is_set_type(self):
-        assert isinstance(_CREATE_AGENT_EXACT, set)
-
-    def test_all_lowercase(self):
-        for phrase in _CREATE_AGENT_EXACT:
-            assert phrase == phrase.lower(), f"Not lowercase: {phrase}"
-
-    def test_no_duplicates(self):
-        # By definition a set has no dupes, but verify count
-        as_list = list(_CREATE_AGENT_EXACT)
-        assert len(as_list) == len(set(as_list))
-
-    def test_no_empty_strings(self):
-        for phrase in _CREATE_AGENT_EXACT:
-            assert len(phrase.strip()) > 0
-
-
-# ==========================================================================
-# 6. Template Data Validation
+# 5. Template Data Validation
 # ==========================================================================
 class TestTemplateData:
     """Verify template.json is loaded and has expected structure."""

@@ -107,14 +107,12 @@ class TestExtremeLengths:
                 result = chat(text=long_text, user_id='test')
         assert isinstance(result, dict)
 
-    def test_empty_string_create_intent(self):
-        from routes.chatbot_routes import _detect_create_agent_intent
-        assert _detect_create_agent_intent('') is False
-
-    def test_very_long_create_intent(self):
-        from routes.chatbot_routes import _detect_create_agent_intent
-        result = _detect_create_agent_intent('create an agent ' + 'x' * 10000)
-        assert isinstance(result, bool)
+    # Boundary cases for agent-creation intent now live in the HARTOS
+    # draft-first dispatch tests (test_draft_first_dispatch.py). The
+    # Nunba-side hardcoded detector was removed — the Qwen3.5-0.8B
+    # draft classifier handles empty / huge / weird inputs naturally
+    # because every turn goes through the same JSON-envelope prompt
+    # regardless of length.
 
 
 # ============================================================

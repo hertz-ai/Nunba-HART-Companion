@@ -184,7 +184,7 @@ class TestImportPaths:
     def test_chatbot_routes_import(self):
         """chatbot_routes must be importable — it's the main chat handler."""
         import routes.chatbot_routes as cr
-        assert hasattr(cr, 'chat_route') or hasattr(cr, '_detect_create_agent_intent')
+        assert hasattr(cr, 'chat_route')
 
     def test_adapter_import(self):
         from routes.hartos_backend_adapter import chat, check_backend_health, get_prompts

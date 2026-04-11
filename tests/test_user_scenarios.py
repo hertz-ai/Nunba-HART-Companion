@@ -87,19 +87,22 @@ class TestDefaultAgentChatScenario:
 # ============================================================
 
 class TestAgentCreationScenario:
-    """User says "create an agent" → system detects intent → routes to creation."""
+    """User says "create an agent" → HARTOS draft classifier flags
+    is_create_agent=true on the /chat response → chat handler routes
+    to the autogen CREATE flow.
 
-    def test_create_agent_detected(self):
-        from routes.chatbot_routes import _detect_create_agent_intent
-        assert _detect_create_agent_intent('create an agent for me') is True
+    Agent-creation intent detection no longer lives in Nunba — the
+    Qwen3.5-0.8B draft model in HARTOS owns it. See
+    HARTOS/tests/unit/test_draft_first_dispatch.py::TestCorrectionIntentClassification
+    and dispatch_draft_first result['is_create_agent'] for the full
+    unit coverage. This scenario keeps only the Nunba-side contract
+    check: the local agents sidebar must still populate."""
 
-    def test_train_agent_detected(self):
-        from routes.chatbot_routes import _detect_create_agent_intent
-        assert _detect_create_agent_intent('train an agent') is True
-
-    def test_normal_chat_not_detected(self):
-        from routes.chatbot_routes import _detect_create_agent_intent
-        assert _detect_create_agent_intent('what is the weather today?') is False
+    def test_no_hardcoded_intent_detector(self):
+        """Guard: the old hardcoded phrase detector must stay deleted."""
+        import routes.chatbot_routes as cr
+        assert not hasattr(cr, '_detect_create_agent_intent')
+        assert not hasattr(cr, '_CREATE_AGENT_EXACT')
 
     def test_local_agents_available_for_selection(self):
         """LOCAL_AGENTS must be available for the agent sidebar."""

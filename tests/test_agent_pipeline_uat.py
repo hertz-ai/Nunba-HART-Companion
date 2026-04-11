@@ -960,42 +960,44 @@ class TestNunbaAdapterIntegration(unittest.TestCase):
 
 
 # ===================================================================
-# Chatbot Routes Intent Detection Tests
+# Chatbot Routes Intent Detection — now owned by the HARTOS draft model
 # ===================================================================
+#
+# The Nunba-side hardcoded _detect_create_agent_intent was retired in
+# favour of the Qwen3.5-0.8B draft classifier in HARTOS
+# (speculative_dispatcher._build_draft_classifier_prompt). Unit coverage
+# for the new path lives in
+# HARTOS/tests/unit/test_draft_first_dispatch.py::TestCorrectionIntentClassification.
+# This file only retains a guard that the deprecated detector cannot
+# resurface in routes/chatbot_routes.py.
 
-class TestNunbaChatbotRoutesIntentDetection(unittest.TestCase):
-    """Test chatbot_routes.py agent creation intent detection."""
 
-    @classmethod
-    def setUpClass(cls):
+class TestNunbaChatbotRoutesIntentDetectorDeleted(unittest.TestCase):
+    """Lock the contract: the hardcoded create-agent / channel / casual
+    detectors must stay deleted. Intent classification belongs to the
+    draft model."""
+
+    def test_hardcoded_detectors_removed(self):
         sys.path.insert(0, PROJ_ROOT)
-        from routes.chatbot_routes import _detect_create_agent_intent
-        cls._detect_fn = staticmethod(_detect_create_agent_intent)
-
-    def _detect(self, text):
-        return self._detect_fn(text)
-
-    def test_positive_intent_create_agent(self):
-        """Should detect 'create an agent' phrases."""
-        self.assertTrue(self._detect('create an agent for me'))
-        self.assertTrue(self._detect('I want to create a new agent'))
-        self.assertTrue(self._detect('build an agent that tracks fitness'))
-
-    def test_positive_intent_new_agent(self):
-        """Should detect 'new agent' phrase."""
-        self.assertTrue(self._detect('I need a new agent'))
-
-    def test_negative_no_pattern(self):
-        """Should NOT detect when no pattern matches."""
-        self.assertFalse(self._detect('hello how are you'))
-        self.assertFalse(self._detect('tell me about agents'))
-        self.assertFalse(self._detect('what is an agent'))
-
-    def test_negative_negated(self):
-        """Should NOT detect negated creation intent."""
-        self.assertFalse(self._detect("don't create an agent"))
-        self.assertFalse(self._detect("do not create agent"))
-        self.assertFalse(self._detect("stop create agent"))
+        import routes.chatbot_routes as cr
+        for symbol in (
+            '_detect_create_agent_intent',
+            '_CREATE_AGENT_EXACT',
+            '_detect_channel_connect_intent',
+            '_CONNECT_CHANNEL_VERBS',
+            '_CHANNEL_NAMES',
+            '_is_casual_message',
+            '_CASUAL_EXACT',
+            '_TOOL_TRIGGER_TOKENS',
+            '_detect_correction_intent',
+            '_CORRECTION_MARKERS',
+        ):
+            self.assertFalse(
+                hasattr(cr, symbol),
+                f'{symbol} resurfaced — intent classification belongs '
+                f'in the Qwen3.5-0.8B draft classifier, not a Python '
+                f'phrase list.',
+            )
 
 
 if __name__ == '__main__':
