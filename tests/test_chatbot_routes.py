@@ -233,6 +233,135 @@ class TestIsCasualMessage:
         assert self.is_casual("please open notepad now") is False
 
 
+class TestLlmAutoStart:
+    """Auto-start llama-server when chat hits 'LLM not running' path.
+
+    Must reuse the SAME startup path (LlamaConfig.start_server / orchestrator
+    auto_load) — no parallel launcher. Debounce window prevents a second
+    chat request from kicking a second start during the warm-up window."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_debounce(self):
+        # Fresh module state per test — clear the module-level debounce timer
+        from routes import chatbot_routes as cr
+        cr._llm_autostart_inflight_until = 0.0
+        yield
+
+    def test_first_call_spawns_worker_thread(self):
+        from routes.chatbot_routes import _trigger_llm_auto_start_once
+        with patch('threading.Thread') as mock_thread:
+            mock_instance = MagicMock()
+            mock_thread.return_value = mock_instance
+            scheduled = _trigger_llm_auto_start_once(user_id='u1')
+            assert scheduled is True
+            mock_thread.assert_called_once()
+            # The worker was started
+            mock_instance.start.assert_called_once()
+            # Name hint for debugging
+            assert mock_thread.call_args.kwargs.get('name') == 'llm_auto_start'
+            assert mock_thread.call_args.kwargs.get('daemon') is True
+
+    def test_second_call_within_window_is_debounced(self):
+        from routes.chatbot_routes import _trigger_llm_auto_start_once
+        with patch('threading.Thread') as mock_thread:
+            mock_thread.return_value = MagicMock()
+            first = _trigger_llm_auto_start_once(user_id='u1')
+            second = _trigger_llm_auto_start_once(user_id='u2')
+            assert first is True
+            assert second is False  # Debounced
+            # Only one thread spawned
+            mock_thread.assert_called_once()
+
+    def test_debounce_window_expires(self):
+        """After the 30s window, a new start can be scheduled."""
+        from routes import chatbot_routes as cr
+        with patch('threading.Thread') as mock_thread:
+            mock_thread.return_value = MagicMock()
+            cr._trigger_llm_auto_start_once()
+            # Simulate 31 seconds passing
+            cr._llm_autostart_inflight_until = 0.0
+            scheduled = cr._trigger_llm_auto_start_once()
+            assert scheduled is True
+            assert mock_thread.call_count == 2
+
+    def test_worker_uses_orchestrator_path_on_cold_start(self):
+        """When the llama server is NOT running, the worker must call
+        get_orchestrator().auto_load('llm') — the same path startup uses.
+        This is the DRY contract with app.py:6698 server_start_thread."""
+        from routes.chatbot_routes import _trigger_llm_auto_start_once
+        captured_worker = {}
+        real_thread = MagicMock()
+
+        def capture_thread(target=None, **kwargs):
+            captured_worker['fn'] = target
+            return real_thread
+
+        with patch('threading.Thread', side_effect=capture_thread):
+            _trigger_llm_auto_start_once()
+
+        # Mock orchestrator path so the worker doesn't actually spawn llama
+        mock_orch = MagicMock()
+        mock_entry = MagicMock(id='qwen3.5-4b', device='gpu')
+        mock_orch.auto_load.return_value = mock_entry
+
+        with patch('llama.llama_config.LlamaConfig') as mock_llama_cfg_cls, \
+             patch('models.orchestrator.get_orchestrator',
+                   return_value=mock_orch):
+            mock_cfg = MagicMock()
+            mock_cfg.is_llm_server_running.return_value = False  # cold
+            mock_llama_cfg_cls.return_value = mock_cfg
+            # Execute the worker directly (we captured it)
+            captured_worker['fn']()
+
+        # orchestrator auto_load('llm') was the path taken
+        mock_orch.auto_load.assert_called_once_with('llm')
+
+    def test_worker_uses_start_server_on_warm_path(self):
+        """When is_llm_server_running() == True, start_server is called
+        (not orchestrator) to re-sync the catalog without a fresh spawn."""
+        from routes.chatbot_routes import _trigger_llm_auto_start_once
+        captured_worker = {}
+
+        def capture_thread(target=None, **kwargs):
+            captured_worker['fn'] = target
+            return MagicMock()
+
+        with patch('threading.Thread', side_effect=capture_thread):
+            _trigger_llm_auto_start_once()
+
+        mock_cfg = MagicMock()
+        mock_cfg.is_llm_server_running.return_value = True
+        mock_cfg.start_server.return_value = True
+        with patch('llama.llama_config.LlamaConfig', return_value=mock_cfg), \
+             patch('models.orchestrator.get_orchestrator') as mock_orch:
+            captured_worker['fn']()
+
+        mock_cfg.start_server.assert_called_once()
+        # orchestrator path NOT taken on warm
+        mock_orch.assert_not_called()
+
+    def test_worker_swallows_all_exceptions(self):
+        """A broken orchestrator or LlamaConfig must NOT crash the worker
+        thread. The chat response already returned; this runs in the
+        background and can only log."""
+        from routes.chatbot_routes import _trigger_llm_auto_start_once
+        captured_worker = {}
+
+        def capture_thread(target=None, **kwargs):
+            captured_worker['fn'] = target
+            return MagicMock()
+
+        with patch('threading.Thread', side_effect=capture_thread):
+            _trigger_llm_auto_start_once()
+
+        with patch('llama.llama_config.LlamaConfig',
+                   side_effect=RuntimeError('vault locked')), \
+             patch('models.orchestrator.get_orchestrator',
+                   side_effect=RuntimeError('orch down')):
+            # Must NOT raise
+            captured_worker['fn']()
+
+
 class TestExtractResourceRequest:
     """Test the RESOURCE_REQUEST marker extraction."""
 
