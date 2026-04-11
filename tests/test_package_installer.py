@@ -652,6 +652,32 @@ class TestGetBackendStatus:
         finally:
             pi._installing.clear()
 
+    def test_pinned_version_spec_does_not_crash(self):
+        """Regression: BACKEND_PACKAGES entries like 'parler_tts==0.6.0'
+        used to be passed straight into importlib.util.find_spec, which
+        RAISES ModuleNotFoundError on '==' in the name (not returns
+        None). That crashed the whole /tts/engines endpoint. Fix strips
+        the pip version spec before resolving the import name."""
+        fake_pkgs = {
+            'fakebackend': ['parler_tts==0.6.0', 'chatterbox-tts>=1.0'],
+        }
+        with patch.dict(pi.BACKEND_PACKAGES, fake_pkgs, clear=True), \
+             patch.object(pi, 'is_package_installed', return_value=True) as mock_isinst:
+            status = pi.get_backend_status()
+            assert 'fakebackend' in status
+            assert status['fakebackend']['installed'] is True
+            # is_package_installed must have been called with the base
+            # module name (no '==', no '>='), not the raw pip spec.
+            called_names = [c.args[0] for c in mock_isinst.call_args_list]
+            # 'parler_tts==0.6.0' → base 'parler_tts', no mapping → 'parler_tts'
+            assert 'parler_tts' in called_names
+            # Raw pip specs must NEVER reach find_spec — that's the
+            # regression we're locking in (importlib raises on '==').
+            assert not any(
+                any(op in n for op in ('==', '>=', '<=', '!=', '>', '<', '~'))
+                for n in called_names
+            ), f'pip operators leaked through: {called_names}'
+
 
 # ========================== get_recommended_backends ======================
 

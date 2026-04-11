@@ -17,6 +17,7 @@ import importlib
 import importlib.util
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -683,7 +684,13 @@ def get_backend_status() -> dict[str, dict]:
     for backend, packages in BACKEND_PACKAGES.items():
         missing = []
         for pkg in packages:
-            import_name = _PIP_TO_IMPORT.get(pkg, pkg.replace('-', '_'))
+            # Strip pip version spec ('parler_tts==0.6.0' → 'parler_tts')
+            # before resolving the import name. importlib.util.find_spec
+            # RAISES ModuleNotFoundError (not returns None) when the
+            # argument contains '==', so unstripped specs crash the
+            # whole /tts/engines endpoint.
+            base_pkg = re.split(r'[=<>!~\s]', pkg, 1)[0]
+            import_name = _PIP_TO_IMPORT.get(base_pkg, base_pkg.replace('-', '_'))
             if not is_package_installed(import_name):
                 missing.append(pkg)
 
