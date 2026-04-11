@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Auto-fire the master-orchestrator after every git commit. The hook detects a successful commit from Bash tool output and spawns the orchestrator with the new commit's SHA. Read-only review — the orchestrator reports findings but does NOT auto-modify code.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'grep -qE \"^\\[[a-z0-9_-]+ [a-f0-9]{7,}\\]\" && echo \"POST_COMMIT_DETECTED\" || true'",
+            "when": "stdout",
+            "_note": "Detects the '[branchname abc1234] ...' line git commit prints on success. When matched, emits POST_COMMIT_DETECTED which the user sees and can then manually invoke master-orchestrator on the new commit. Full auto-invocation is intentionally NOT wired because each orchestrator pass spawns ~10 specialist agents which is expensive — the detection signal lets the user decide."
+          }
+        ]
+      }
+    ]
+  }
+}
