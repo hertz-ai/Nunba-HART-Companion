@@ -1368,8 +1368,10 @@ class TTSEngine:
 
     def _ensure_initialized(self):
         if not self._initialized and self.auto_init:
-            # Non-blocking: if another thread is loading, don't wait
-            self.initialize(blocking=False)
+            # Block on first init so backend is ready before synthesis.
+            # Non-blocking caused "backend not initialized" on every first
+            # TTS call because synthesize() ran before the bg thread finished.
+            self.initialize(blocking=True)
 
     @property
     def backend(self) -> str:
