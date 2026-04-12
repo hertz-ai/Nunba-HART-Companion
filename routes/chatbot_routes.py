@@ -11,7 +11,6 @@ The module supports:
 """
 
 import datetime
-import hmac
 import inspect
 import json
 import logging
@@ -31,34 +30,8 @@ from models.catalog import ModelType
 logger = logging.getLogger(__name__)
 
 
-def _require_local_or_token(f):
-    """
-    Decorator to protect sensitive endpoints (D4 fix).
-    Allows access if:
-    1. Request comes from localhost (127.0.0.1 or ::1)
-    2. Valid API token is provided in Authorization header
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        remote_addr = request.remote_addr
-        is_local = remote_addr in ('127.0.0.1', '::1', 'localhost')
-        if is_local:
-            return f(*args, **kwargs)
-
-        # Check for API token from environment
-        api_token = os.environ.get('NUNBA_API_TOKEN', '')
-        if api_token:
-            auth_header = request.headers.get('Authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header[7:]
-                if hmac.compare_digest(token, api_token):
-                    return f(*args, **kwargs)
-
-        return jsonify({
-            'error': 'Unauthorized',
-            'message': 'This endpoint requires local access or valid API token'
-        }), 401
-    return decorated_function
+# Auth decorator — single source of truth in routes/auth.py
+from routes.auth import require_local_or_token as _require_local_or_token
 
 
 # ============== Try to import hart-backend ==============

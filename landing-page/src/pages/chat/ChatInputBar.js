@@ -217,7 +217,7 @@ const ChatInputBar = ({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyPress={handleKeyPress}
-          className="w-full text-black border bg-[#fff8ea] text-base border-gray-200 rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] break-words overflow-wrap-anywhere whitespace-pre-wrap transition-all duration-200"
+          className="w-full text-gray-100 border bg-[#1a1a2e] text-base border-[#2a2a4a] rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#6C63FF] focus:shadow-[0_0_0_3px_rgba(108,99,255,0.15)] break-words overflow-wrap-anywhere whitespace-pre-wrap transition-all duration-200 placeholder-gray-500"
           style={{
             minHeight: '44px',
             maxHeight: '200px',

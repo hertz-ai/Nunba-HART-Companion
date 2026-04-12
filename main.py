@@ -5,7 +5,6 @@ A Friend, A Well Wisher, Your LocalMind
 Connect to Hivemind to collaborate with your friends' agents.
 """
 import argparse
-import hmac
 import logging
 import os
 import shlex
@@ -496,55 +495,8 @@ threading.Thread(target=_deferred_platform_init, daemon=True,
 # =============================================================================
 # Security: API Token Authentication for sensitive endpoints
 # =============================================================================
-from functools import wraps
-
-# Get API token from environment (for sensitive endpoints)
-API_TOKEN = os.environ.get('NUNBA_API_TOKEN', '')
-
-def _is_local_request():
-    """Check if request is truly local, accounting for proxies.
-
-    When running behind a reverse proxy, *all* requests appear as 127.0.0.1
-    because the proxy connects locally.  If the ``TRUSTED_PROXY`` env-var is
-    set to the proxy's address we inspect ``X-Forwarded-For`` to determine the
-    *real* client IP.  Without the env-var, only ``remote_addr`` is checked
-    (safe default for direct connections).
-    """
-    trusted_proxy = os.environ.get('TRUSTED_PROXY', '')
-    if trusted_proxy and request.remote_addr == trusted_proxy:
-        forwarded_for = request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
-        return forwarded_for in ('127.0.0.1', '::1', 'localhost', '')
-    # Direct connection - check remote_addr
-    return request.remote_addr in ('127.0.0.1', '::1')
-
-
-def require_local_or_token(f):
-    """
-    Decorator to protect sensitive endpoints.
-    Allows access if:
-    1. Request comes from localhost (127.0.0.1 or ::1), accounting for proxies
-    2. Valid API token is provided in Authorization header
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if _is_local_request():
-            return f(*args, **kwargs)
-
-        # Check for API token if not local
-        if API_TOKEN:
-            auth_header = request.headers.get('Authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header[7:]
-                if hmac.compare_digest(token, API_TOKEN):
-                    return f(*args, **kwargs)
-
-        # Unauthorized
-        return jsonify({
-            'error': 'Unauthorized',
-            'message': 'This endpoint requires local access or valid API token'
-        }), 401
-
-    return decorated_function
+# Auth decorators — single source of truth in routes/auth.py
+from routes.auth import _is_local_request, require_local_or_token  # noqa: E402
 
 # Register Nunba AI health endpoints
 try:
@@ -623,6 +575,11 @@ def after_request(response):
     # may block requests to localhost in future versions.
     if request.headers.get('Access-Control-Request-Private-Network') == 'true':
         response.headers['Access-Control-Allow-Private-Network'] = 'true'
+
+    # Security headers — desktop app, never iframed, no external scripts
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
 
     return response
 
@@ -2062,6 +2019,22 @@ def wamp_router_status():
         return jsonify(get_stats())
     except ImportError:
         return jsonify({'running': False, 'error': 'module not available'}), 503
+
+
+@app.route('/api/wamp/ticket')
+@require_local_or_token
+def wamp_ticket():
+    """Return WAMP ticket for authenticated clients (LAN mode).
+
+    Protected by require_local_or_token — only local requests or
+    requests with a valid API token can get the WAMP ticket.
+    Returns empty ticket when auth is not required (localhost mode).
+    """
+    try:
+        from wamp_router import get_wamp_ticket
+        return jsonify({'ticket': get_wamp_ticket()})
+    except ImportError:
+        return jsonify({'ticket': ''})
 
 
 @app.route('/api/jslog', methods=['POST'])

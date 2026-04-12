@@ -32,9 +32,10 @@ jobs:
 
       - name: Ruff lint (includes bandit security scan)
         run: ruff check .
+        # HARD GATE — lint + security must pass
 
       - name: Ruff format check
-        run: ruff format --check . || true  # Advisory initially
+        run: ruff format --check . || true  # Advisory — auto-format differences are not blocking
 
       # pytest: Backend unit tests (mocked — no running servers required)
       - name: Install test dependencies
@@ -42,7 +43,7 @@ jobs:
 
       - name: Run backend tests
         run: python -m pytest tests/ -v --tb=short --html=test-report.html --self-contained-html
-        continue-on-error: true  # Advisory — stabilize then enforce
+        # HARD GATE — test failures block merge
 
       - name: Upload pytest report
         if: always()
@@ -56,7 +57,7 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r requirements.txt --desc 2>&1 || true
-        continue-on-error: true  # Advisory — harden after initial triage
+        continue-on-error: true  # Advisory — high/critical CVEs tracked manually
 
   # ── Frontend: Linting + Jest Unit Tests + Dependency Audit ──
   frontend-quality:
@@ -77,13 +78,14 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: ESLint
-        run: npx eslint src/ --max-warnings 50 --ext .js,.jsx 2>&1 || true
-        continue-on-error: true  # Advisory — reduce max-warnings over time
+        run: npx eslint src/ --max-warnings 50 --ext .js,.jsx
+        # HARD GATE — max 50 warnings, zero errors
 
       - name: Jest unit tests
         run: npx react-scripts test --watchAll=false --ci --forceExit --coverage
         env:
           CI: true
+        # HARD GATE — test failures block merge
 
       - name: Upload Jest coverage
         if: always()
@@ -95,7 +97,7 @@ jobs:
       # npm audit: dependency vulnerability scanner
       - name: Dependency vulnerability scan
         run: npm audit --audit-level=high 2>&1 || true
-        continue-on-error: true
+        continue-on-error: true  # Advisory — tracked manually for high/critical
 
   # ── Cypress E2E Tests ──
   # Full-stack: Flask backend (port 5000) + React dev server (port 3000).

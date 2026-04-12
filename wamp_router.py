@@ -34,6 +34,8 @@ logger = logging.getLogger('nunba.wamp_router')
 HELLO = 1
 WELCOME = 2
 ABORT = 3
+CHALLENGE = 4
+AUTHENTICATE = 5
 GOODBYE = 6
 ERROR = 8
 PUBLISH = 16
@@ -51,6 +53,30 @@ UNREGISTER = 66
 UNREGISTERED = 67
 INVOCATION = 68
 YIELD_MSG = 70
+
+# ── Auth Token ──────────────────────────────────────────────────────────
+# When NUNBA_WAMP_TICKET is set (or auto-generated for LAN mode),
+# the router requires ticket auth.  When empty, anonymous is allowed.
+import secrets
+_wamp_ticket: Optional[str] = os.environ.get('NUNBA_WAMP_TICKET', '')
+
+
+def _require_auth() -> bool:
+    """True when the router requires ticket authentication."""
+    return bool(_wamp_ticket)
+
+
+def get_wamp_ticket() -> str:
+    """Return the current WAMP ticket (for Flask API to serve to clients)."""
+    return _wamp_ticket
+
+
+def _enable_auth_for_lan():
+    """Auto-generate a ticket when binding to non-localhost (LAN mode)."""
+    global _wamp_ticket
+    if not _wamp_ticket:
+        _wamp_ticket = secrets.token_urlsafe(32)
+        logger.info("WAMP auth enabled (auto-generated ticket for LAN mode)")
 
 # ── Router State ─────────────────────────────────────────────────────────
 
@@ -90,6 +116,7 @@ class WampSession:
         self.session_id = session_id
         self.protocol = protocol  # WebSocket protocol instance
         self.realm: Optional[str] = None
+        self.authenticated: bool = False  # True after successful auth or when auth not required
 
     def send(self, msg: list):
         """Send a WAMP message (JSON-encoded list) to this client."""
@@ -119,12 +146,10 @@ def _get_realm(name: str = 'realm1') -> WampRealm:
 
 # ── WAMP Message Handlers ────────────────────────────────────────────────
 
-def _handle_hello(session: WampSession, msg: list):
-    """HELLO [realm, details] -> WELCOME"""
-    realm_name = msg[1] if len(msg) > 1 else 'realm1'
-    session.realm = realm_name
-    _get_realm(realm_name)
-
+def _send_welcome(session: WampSession, authid: str = 'anonymous',
+                   authrole: str = 'anonymous', authmethod: str = 'anonymous'):
+    """Send WELCOME message after successful auth (or when auth not required)."""
+    session.authenticated = True
     welcome = [WELCOME, session.session_id, {
         'roles': {
             'broker': {
@@ -139,12 +164,52 @@ def _handle_hello(session: WampSession, msg: list):
                 }
             },
         },
-        'authid': 'anonymous',
-        'authrole': 'anonymous',
-        'authmethod': 'anonymous',
+        'authid': authid,
+        'authrole': authrole,
+        'authmethod': authmethod,
     }]
     session.send(welcome)
+
+
+def _handle_hello(session: WampSession, msg: list):
+    """HELLO [realm, details] -> WELCOME or CHALLENGE"""
+    realm_name = msg[1] if len(msg) > 1 else 'realm1'
+    details = msg[2] if len(msg) > 2 else {}
+    session.realm = realm_name
+    _get_realm(realm_name)
+
+    if _require_auth():
+        # Check if client supports ticket auth
+        client_methods = details.get('authmethods', [])
+        if 'ticket' in client_methods:
+            # Send CHALLENGE for ticket auth
+            session.send([CHALLENGE, 'ticket', {}])
+            logger.debug("Session %d: sent ticket CHALLENGE", session.session_id)
+            return
+        else:
+            # Client doesn't support ticket auth — reject
+            session.send([ABORT, {}, 'wamp.error.no_auth_method'])
+            logger.warning("Session %d: rejected (no ticket auth support)",
+                           session.session_id)
+            return
+
+    # No auth required — welcome immediately
+    _send_welcome(session)
     logger.debug("Session %d joined realm '%s'", session.session_id, realm_name)
+
+
+def _handle_authenticate(session: WampSession, msg: list):
+    """AUTHENTICATE [signature, extra] -> WELCOME or ABORT"""
+    import hmac as _hmac
+    signature = msg[1] if len(msg) > 1 else ''
+
+    if _require_auth() and _hmac.compare_digest(str(signature), _wamp_ticket):
+        _send_welcome(session, authid='client', authrole='trusted',
+                      authmethod='ticket')
+        logger.debug("Session %d authenticated via ticket", session.session_id)
+    else:
+        session.send([ABORT, {}, 'wamp.error.not_authorized'])
+        logger.warning("Session %d: ticket auth FAILED", session.session_id)
 
 
 def _handle_goodbye(session: WampSession, msg: list):
@@ -349,9 +414,15 @@ def _handle_yield(session: WampSession, msg: list):
 
 # ── Message Dispatch ─────────────────────────────────────────────────────
 
-_HANDLERS = {
+# Handlers that don't require authentication (pre-auth phase)
+_PRE_AUTH_HANDLERS = {
     HELLO: _handle_hello,
+    AUTHENTICATE: _handle_authenticate,
     GOODBYE: _handle_goodbye,
+}
+
+# Handlers that require authentication
+_AUTH_HANDLERS = {
     SUBSCRIBE: _handle_subscribe,
     UNSUBSCRIBE: _handle_unsubscribe,
     PUBLISH: _handle_publish,
@@ -374,8 +445,23 @@ def _dispatch_message(session: WampSession, raw: str):
         return
 
     msg_type = msg[0]
-    handler = _HANDLERS.get(msg_type)
+
+    # Pre-auth handlers (HELLO, AUTHENTICATE, GOODBYE) always allowed
+    handler = _PRE_AUTH_HANDLERS.get(msg_type)
     if handler:
+        try:
+            handler(session, msg)
+        except Exception as e:
+            logger.warning("Handler error for msg_type %d: %s", msg_type, e)
+        return
+
+    # Auth-required handlers — reject if session not authenticated
+    handler = _AUTH_HANDLERS.get(msg_type)
+    if handler:
+        if not session.authenticated:
+            logger.warning("Session %d: msg_type %d rejected (not authenticated)",
+                           session.session_id, msg_type)
+            return
         try:
             handler(session, msg)
         except Exception as e:
@@ -582,8 +668,7 @@ def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
 
     Security: defaults to 127.0.0.1 (localhost only). Set host='0.0.0.0'
     explicitly for regional/LAN deployments where React Native clients
-    connect from other devices. WAMP auth should be added before exposing
-    to LAN (tracked: ethical-hacker finding #1).
+    connect from other devices. Ticket auth is auto-enabled for LAN mode.
 
     Args:
         port: WebSocket port (default 8088, matching crossbarWorker.js expectation)
@@ -597,12 +682,64 @@ def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
     # Allow port override via environment variable
     port = int(os.environ.get('NUNBA_WAMP_PORT', port))
 
+    # Auto-enable ticket auth when binding to LAN (non-localhost)
+    if host != '127.0.0.1':
+        _enable_auth_for_lan()
+
     _router_thread = threading.Thread(
         target=_run_router, args=(port, host),
         daemon=True, name='WampRouter',
     )
     _router_thread.start()
+
+    # Register with watchdog so silent crashes are detected and auto-restarted
+    _register_with_watchdog(port, host)
+
     return True
+
+
+def _register_with_watchdog(port: int, host: str):
+    """Register WAMP router with the node watchdog for crash detection."""
+    try:
+        from security.node_watchdog import get_watchdog
+        wd = get_watchdog()
+        if wd and not wd.is_registered('wamp_router'):
+            wd.register(
+                name='wamp_router',
+                expected_interval=60,
+                restart_fn=lambda: start_wamp_router(port, host),
+                stop_fn=stop_wamp_router,
+            )
+            # Start a heartbeat thread that pulses while the router is alive
+            _start_heartbeat_thread()
+    except ImportError:
+        pass  # watchdog not available (standalone mode)
+
+
+_heartbeat_thread: Optional[threading.Thread] = None
+
+
+def _start_heartbeat_thread():
+    """Pulse a watchdog heartbeat every 30s while the router is alive."""
+    global _heartbeat_thread
+    if _heartbeat_thread and _heartbeat_thread.is_alive():
+        return
+
+    def _pulse():
+        try:
+            from security.node_watchdog import get_watchdog
+        except ImportError:
+            return
+        while _started:
+            wd = get_watchdog()
+            if wd:
+                wd.heartbeat('wamp_router')
+            import time
+            time.sleep(30)
+
+    _heartbeat_thread = threading.Thread(target=_pulse, daemon=True,
+                                         name='WampRouterHeartbeat')
+    _heartbeat_thread.start()
 
 
 def stop_wamp_router():
@@ -611,3 +748,12 @@ def stop_wamp_router():
     _started = False
     if _event_loop and _event_loop.is_running():
         _event_loop.call_soon_threadsafe(_event_loop.stop)
+
+    # Unregister from watchdog
+    try:
+        from security.node_watchdog import get_watchdog
+        wd = get_watchdog()
+        if wd:
+            wd.unregister('wamp_router')
+    except ImportError:
+        pass

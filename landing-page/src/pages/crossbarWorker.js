@@ -688,6 +688,19 @@ const registerProcedures = async (session, userId) => {
   }
 };
 
+let _wampTicket = '';
+
+async function fetchWampTicket() {
+  try {
+    const res = await axios.get('http://localhost:5000/api/wamp/ticket');
+    _wampTicket = res.data?.ticket || '';
+    logResponse('WAMP_TICKET_FETCHED', {hasTicket: !!_wampTicket});
+  } catch (err) {
+    _wampTicket = '';
+    logResponse('WAMP_TICKET_FETCH_FAILED', {error: err.message});
+  }
+}
+
 function initCrossbar({
   wsUri,
   userId,
@@ -732,14 +745,28 @@ function initCrossbar({
 
     cleanupProcessedMessages();
 
-    connectionInstance = new autobahn.Connection({
+    // Build connection options — use ticket auth when ticket is available
+    const connOpts = {
       url: wsUri,
       realm: 'realm1',
       retry_if_unreachable: false,
       max_retries: 0,
       debug: true,
       protocols: ['wamp.2.json'],
-    });
+    };
+
+    if (_wampTicket) {
+      connOpts.authmethods = ['ticket'];
+      connOpts.authid = userId || 'client';
+      connOpts.onchallenge = (session, method) => {
+        if (method === 'ticket') {
+          return _wampTicket;
+        }
+        throw new Error('Unsupported auth method: ' + method);
+      };
+    }
+
+    connectionInstance = new autobahn.Connection(connOpts);
 
     connectionInstance.onopen = async (session) => {
       isConnecting = false;
@@ -896,13 +923,16 @@ onmessage = function (e) {
   switch (type) {
     case 'INIT':
       logResponse('INIT_PAYLOAD', payload);
-      initCrossbar({
-        wsUri: payload.wsUri,
-        userId: payload.userId,
-        promptId: payload.promptId,
-        prompt_id: payload.prompt_id,
-        maxRetries: payload.maxRetries,
-        retryDelay: payload.retryDelay,
+      // Fetch WAMP ticket before connecting (for LAN auth)
+      fetchWampTicket().finally(() => {
+        initCrossbar({
+          wsUri: payload.wsUri,
+          userId: payload.userId,
+          promptId: payload.promptId,
+          prompt_id: payload.prompt_id,
+          maxRetries: payload.maxRetries,
+          retryDelay: payload.retryDelay,
+        });
       });
       break;
 

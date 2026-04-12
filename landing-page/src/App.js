@@ -85,14 +85,29 @@ function App() {
       <RealtimeProvider>
         <ToastProvider>
           <SocialProvider>
+            {/* Skip-link: keyboard users can jump straight to content (WCAG 2.4.1) */}
+            <a
+              href="#main-content"
+              style={{
+                position: 'absolute', left: '-9999px', top: 'auto',
+                width: '1px', height: '1px', overflow: 'hidden',
+                zIndex: 9999,
+              }}
+              onFocus={(e) => { e.target.style.cssText = 'position:fixed;top:8px;left:8px;z-index:9999;padding:8px 16px;background:#6C63FF;color:#fff;border-radius:4px;font-size:14px;text-decoration:none;width:auto;height:auto;overflow:visible;'; }}
+              onBlur={(e) => { e.target.style.cssText = 'position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;'; }}
+            >
+              Skip to main content
+            </a>
             <AgentContactRequest
               request={contactRequest}
               onAccept={handleAcceptContact}
               onDeny={handleDenyContact}
             />
-            <Suspense fallback={<PageSkeleton />}>
-              <MainRoutes />
-            </Suspense>
+            <main id="main-content">
+              <Suspense fallback={<PageSkeleton />}>
+                <MainRoutes />
+              </Suspense>
+            </main>
           </SocialProvider>
         </ToastProvider>
       </RealtimeProvider>
