@@ -6,7 +6,7 @@ This is the **enumerated test backlog**. The master-orchestrator picks the next 
 
 | # | Capability | Status | Last tested | Notes |
 |---|---|---|---|---|
-| 1.1 | Plain chat: "hi" → draft classifier fires → response + TTS audio | ⏸ | — | Scenario from 2026-04-11 incident |
+| 1.1 | Plain chat: "hi" → draft classifier fires → response + TTS audio | ⚠️ | 2026-04-12 19:42 | PARTIAL: Response works ("Hello! How can I help you today?") via Tier-2 llama_local. get_tools SKIPPED confirmed. 5.6s 2nd request. TTS not verified. Draft-first envelope not active (source=llama_local not langchain_local). Hot-patched build. |
 | 1.2 | Plain chat: substantive question → full LangChain path → response + TTS | ⏸ | — | Tool-using path |
 | 1.3 | Plain chat: non-English input → draft classifies language → reply in same language | ⏸ | — | Hindi, Japanese, Arabic |
 | 1.4 | Plain chat: greeting variants ("hello", "hey there", "good morning") → each produces a reply + TTS | ⏸ | — | |

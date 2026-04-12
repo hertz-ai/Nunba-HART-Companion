@@ -9,35 +9,73 @@
     "draft_llama_port": 8081,
     "crossbar_port": 8088
   },
-  "iteration_count": 3,
+  "iteration_count": 5,
   "max_iterations": 288,
   "max_wall_clock_hours": 24,
   "interval_minutes": 5,
   "cron_job_id": "bd555892",
   "last_iteration": {
-    "iso": "2026-04-12T08:10:00Z",
-    "phase": "C+A_hybrid",
-    "outcome": "T20 fixed + committed (8e712d1). speculative_dispatch + local_llm moved from FULL to STANDARD tier. RAM threshold 16.0→15.0. Draft-first classifier now ENABLED on desktop. Also verified T9 mmproj fix is NOT regressed (confirmed preset.mmproj_file vs mmproj_source_file distinction is correct). Added house rule #11 (question original intent).",
-    "duration_seconds": 200,
-    "findings_count": 2,
+    "iso": "2026-04-12T12:15:00Z",
+    "phase": "FULL_AGENT_PIPELINE",
+    "outcome": "20-agent review pipeline completed. 4 code changes from SRE/CISO/vuln-scanner findings: empty GPT_API guard, log injection sanitization, lang validation, boot-time tier warning. All committed and pushed. casual_conv=True default shipped. llm-routing.md rewritten. Build in progress.",
+    "duration_seconds": 3600,
+    "findings_count": 8,
     "failures_count": 0,
-    "tasks_filed": 0,
-    "tasks_completed": 1
+    "tasks_filed": 8,
+    "tasks_completed": 8
   },
   "cumulative": {
-    "findings_total": 7,
-    "failures_total": 2,
-    "tasks_filed_total": 1,
-    "fixes_committed": 3,
+    "findings_total": 19,
+    "failures_total": 4,
+    "tasks_filed_total": 9,
+    "fixes_committed": 7,
     "drift_entries_filed": 0,
     "runtime_log_critical_total": 1,
-    "runtime_log_error_total": 1,
-    "runtime_log_warning_total": 3
+    "runtime_log_error_total": 2,
+    "runtime_log_warning_total": 5
+  },
+  "agent_pipeline_results": {
+    "performance_engineer": "SHIP (all PASS)",
+    "devops": "SHIP (all CLEAR)",
+    "sre": "REWORK → FIXED (FM3 guard + FM1 boot warning)",
+    "ciso": "REQUEST_CHANGES → FIXED (boot-time tier check)",
+    "vulnerability_scanner": "1 MED + 1 LOW → FIXED",
+    "ethical_hacker": "HARDENED (user_id spoofing closed)",
+    "product_owner": "SHIP",
+    "tpo": "SHIP with conditions (regional migration docs)",
+    "ux_designer": "SHIP with follow-up (draft-replacement UX)",
+    "business_analyst": "SHIP (positive across all dimensions)",
+    "ceo": "SHIP (APPROVE_WITH_CAVEATS — 4GB VRAM test)",
+    "technical_writer": "REWORK → FIXED (llm-routing.md rewritten)",
+    "release_manager": "HOLD (version tag + changelog deferred to release)",
+    "accessibility_reviewer": "PASS",
+    "data_scientist": "SHIP with instrumentation gap (confidence calibration)",
+    "seo": "N/A (backend only)",
+    "sales": "SHIP (demo-ready, closes enterprise objections)",
+    "marketer": "SHIP WITH LAUNCH (lead with 300ms latency story)",
+    "reviewer": "DRY findings all fixed",
+    "architect": "Reviewed, no blockers"
+  },
+  "capability_matrix_tested": {
+    "1.1": "BLOCKED — awaiting new build with casual_conv=True default"
   },
   "learned_patterns_applied": [
-    "architect: mmproj_source_file for HF URLs, not mmproj_file",
+    "architect: mmproj_source_file for HF URLs",
     "architect: check_server_running must verify /v1/models identity",
-    "sre: speculative_dispatch requires NodeTierLevel.FULL but desktop reports STANDARD",
-    "house_rule_11: question original intent before changing code — read BOTH parallel paths"
+    "sre: speculative_dispatch tier gate blocked draft-first on desktop",
+    "house_rule_11: question original intent before changing code",
+    "testing: Nunba chatbot_routes uses field 'text' not 'prompt' for the message body",
+    "testing: ensure_loaded_async logs 'loaded' but the llama-server process may not actually exist",
+    "sre: empty GPT_API causes MissingSchema crash — guard with early return",
+    "ciso: default tier must not silently downgrade to flat on non-bundled",
+    "vuln_scanner: sanitize all user-controlled strings before logging (log injection)",
+    "data_scientist: confidence threshold 0.85 is defensible but uncalibrated"
+  ],
+  "deferred_items": [
+    "Release manager: HARTOS version tag v0.1.0 + CHANGELOG.md (both repos)",
+    "UX designer: draft-replacement bubble pattern in Demopage.js",
+    "CEO: 4GB VRAM test with pinned 0.8B + pressure-evict 4B",
+    "Data scientist: confidence calibration curve from 500+ production turns",
+    "TPO: Regional deployment migration docs for JWT requirement"
   ]
 }
