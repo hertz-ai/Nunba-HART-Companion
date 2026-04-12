@@ -423,7 +423,7 @@ def gpt_lang(message, user_id, prompt=None, prompt_id=None, timeout=120, probe=F
         "file_id": sessions.get(user_id, {}).get('file_id', 0),
         "tools": None,
         "prompt_id": prompt_id,
-        "casual_conv": False,
+        "casual_conv": not bool(prompt_id or create_agent),
         "probe": probe,
         "intermediate": False,
         "create_agent": create_agent
@@ -2018,6 +2018,10 @@ def chat_route():
                 # computation to save latency. Agent-creation and
                 # channel-connect both get handled by the draft flags
                 # the adapter surfaces on the /chat response.
+                # Default to casual (0.8B draft) unless an agentic flow needs tools.
+                _needs_tools = bool(langchain_prompt_id or create_agent
+                                    or agentic_execute or agentic_plan
+                                    or autonomous_creation)
                 result = hevolve_chat(
                     text=text,
                     user_id=str(user_id),
@@ -2025,7 +2029,7 @@ def chat_route():
                     conversation_id=conversation_id,
                     request_id=request_id,
                     create_agent=bool(create_agent),
-                    casual_conv=False,
+                    casual_conv=not _needs_tools,
                     media_mode=media_mode,
                     autonomous=bool(autonomous_creation),
                     agentic_execute=bool(agentic_execute),
