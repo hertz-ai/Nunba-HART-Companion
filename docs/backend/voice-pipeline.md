@@ -5,29 +5,38 @@ Nunba has a full voice pipeline: speech-to-text (STT), text-to-speech (TTS), and
 ## Overview
 
 ```
-Microphone → Web Speech API (streaming) → Flask /voice/transcribe (Whisper) → Chat
-                                                                                ↓
-Speaker ← Browser PocketTTS (English) ← Chat Response ← LLM
-           or Piper/VibeVoice (server)
+Microphone → Whisper STT (server, GPU) → Chat
+                                           ↓
+Speaker ← TTS Engine (quality-ordered ladder) ← Chat Response ← LLM
+           → WAMP/SSE push → frontend auto-play
 ```
 
-## Text-to-Speech (TTS)
+## Text-to-Speech (TTS) — 11-Engine Quality Ladder
 
-### Browser TTS (Default for English)
+The TTS engine walks a quality-ordered preference list per language. First runnable engine wins. If an engine fails, it automatically falls to the next.
 
-Nunba uses **PocketTTS** — an ONNX-based TTS engine that runs entirely in the browser. Zero server load, zero latency.
+### English Ladder
+1. **Chatterbox Turbo** (0.95 quality, GPU, voice clone) — needs 3.8GB VRAM
+2. **F5-TTS** (0.91, GPU, EN/ZH voice clone) — auto-installed via `~/.nunba/site-packages/`
+3. **LuxTTS** (0.93, CPU, English voice clone) — in-process via HARTOS tool
+4. **Indic Parler** (0.90, GPU, 22 Indic + English) — auto-installed
+5. **Kokoro** (0.88, GPU preferred, English) — auto-installed with espeak-ng
+6. **Pocket-TTS** (0.85, CPU, English voice clone) — in-process
+7. **Piper** (0.70, CPU, multilingual) — bundled, always available
+8. **espeak** (0.40, CPU, 100+ languages) — ultimate fallback
 
-- Enabled by default for English
-- No configuration needed
-- Works offline
+### Indic Languages (Hindi, Tamil, Telugu, Bengali, etc.)
+indic_parler → chatterbox_ml → espeak
 
-### Server TTS (Non-English or higher quality)
+### CJK (Chinese, Japanese, Korean)
+cosyvoice3 → f5_tts → chatterbox_ml → espeak
 
-For non-English voices, the server-side Piper TTS is used:
-
-```bash
-pip install piper-tts
-```
+### Auto-Install
+When a higher-quality engine is selected but not installed, the auto-installer (`tts/package_installer.py`) runs in the background:
+- Installs pip packages to `~/.nunba/site-packages/`
+- Downloads model weights from HuggingFace
+- Current request falls to next available engine
+- Next request uses the newly installed engine
 
 Configure in `.env`:
 ```bash

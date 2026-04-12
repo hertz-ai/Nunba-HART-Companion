@@ -59,11 +59,14 @@ Nunba is a multi-process application with a Flask backend, React frontend, and o
 1. User types message in React
 2. React → POST /chat (Flask :5000)
 3. chatbot_routes.py:
-   a. Intent detection (Tier 1: deterministic rules)
-   b. Route to LangChain agent (Tier 2: :6778)
-   c. LangChain → llama.cpp (Tier 3: :8080) with tools
-   d. Fallback: direct llama.cpp if LangChain unavailable
+   a. Draft-first: 0.8B Qwen3.5 classifier on :8081 (~300ms)
+      - casual_conv=True → draft responds directly
+      - delegate=local → escalates to 4B with full tool chain
+   b. LangChain agent (in-process via test_client) with tools
+   c. LangChain → llama.cpp 4B on :8080 with tools
+   d. Fallback: direct llama.cpp 0.8B on :8081 if 4B busy
 4. Response → React → displayed in chat
+5. TTS: async synthesis → audio URL → WAMP/SSE push → frontend plays
 ```
 
 ## Data Flow: Social Post
