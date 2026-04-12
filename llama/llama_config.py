@@ -740,19 +740,26 @@ class LlamaConfig:
             return False
 
     def is_llm_available(self) -> bool:
-        """Check if any LLM endpoint is ready for completions (local server healthy or cloud configured)."""
+        """Check if any LLM endpoint is ready for completions.
+
+        Uses /v1/models (not just /health) to verify the model is actually
+        loaded — a healthy server with no model returns 200 on /health but
+        can't serve completions. Discovery: 2026-04-12 boot false-positive.
+        """
         if self.is_cloud_configured():
             return True
-        # Check if local server is running AND healthy (model loaded)
         try:
-            import urllib.request
+            import urllib.request, json as _json
             port = self.config.get('server_port', 8080)
             req = urllib.request.Request(
-                f'http://127.0.0.1:{port}/health',
+                f'http://127.0.0.1:{port}/v1/models',
                 method='GET'
             )
             with urllib.request.urlopen(req, timeout=2) as resp:
-                return resp.status == 200
+                if resp.status != 200:
+                    return False
+                data = _json.loads(resp.read())
+                return bool(data.get('data'))
         except Exception:
             return False
 
