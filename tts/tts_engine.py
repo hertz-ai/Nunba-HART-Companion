@@ -840,15 +840,28 @@ class TTSEngine:
             if '_torch_cuda' not in TTSEngine._import_check_cache:
                 try:
                     import torch
-                    TTSEngine._import_check_cache['_torch_cuda'] = torch.cuda.is_available()
-                    if not TTSEngine._import_check_cache['_torch_cuda']:
+                    _cuda_ok = torch.cuda.is_available()
+                    if not _cuda_ok:
+                        # In-process torch may be CPU-only (python-embed ships CPU stub).
+                        # The real CUDA torch lives in ~/.nunba/site-packages/ and is used
+                        # by subprocess workers. Check via subprocess probe before giving up.
                         self._ensure_hw_detected()
-                        logger.info(f"torch.cuda.is_available() = False "
-                                    f"(torch {torch.__version__}) — "
-                                    f"GPU TTS needs CUDA torch upgrade"
-                                    f"{' (GPU present via nvidia-smi)' if self.has_gpu else ''}")
+                        if self.has_gpu:
+                            try:
+                                from tts._torch_probe import check_cuda_available
+                                _cuda_ok = check_cuda_available()
+                                if _cuda_ok:
+                                    logger.info("TTS: CUDA torch verified via subprocess — GPU TTS enabled")
+                            except Exception:
+                                pass
+                        if not _cuda_ok:
+                            logger.info(f"torch.cuda.is_available() = False "
+                                        f"(torch {torch.__version__}) — "
+                                        f"GPU TTS needs CUDA torch upgrade"
+                                        f"{' (GPU present via nvidia-smi)' if self.has_gpu else ''}")
                     else:
                         logger.info(f"torch {torch.__version__} CUDA available — GPU TTS enabled")
+                    TTSEngine._import_check_cache['_torch_cuda'] = _cuda_ok
                 except (ImportError, OSError) as _torch_err:
                     # Stub torch poisons sys.modules — use shared subprocess probe
                     try:
