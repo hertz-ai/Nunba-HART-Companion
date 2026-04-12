@@ -122,3 +122,15 @@ Single canonical resolver for `(user_details, actions)` tuple. Three call sites 
 8. **Multi-OS parity** — every change must work on Windows, macOS, Linux (and Android for things that touch the mobile app).
 9. **Test both FT and NFT** — happy path + error paths + edge cases + thread safety + degraded-mode + performance bounds.
 10. **Never skip hooks, never force-push, never amend a published commit.** Small, focused, well-messaged commits.
+
+## CRITICAL: Nunba runs in BUNDLED mode
+
+The installed Nunba desktop app runs `NUNBA_BUNDLED=1` / `sys.frozen=True`. This means:
+
+- The running Flask server uses `C:\Program Files (x86)\HevolveAI\Nunba\python-embed\` — NOT the dev `.venv/`
+- HARTOS is pip-installed inside `python-embed\Lib\site-packages\hartos\` — NOT the live source tree at `C:\Users\sathi\PycharmProjects\HARTOS`
+- **Code changes to the HARTOS source tree have ZERO effect on the running Nunba build** until either:
+  (a) `pip install -e .` into python-embed (hot-patch, requires admin elevation on Windows)
+  (b) Full `cx_Freeze` rebuild + reinstall via Inno Setup
+- The `NUNBA_BUNDLED` flag triggers special paths: auth middleware early-returns (trusted in-process), local URLs via `config_cache.is_bundled()`, `_local_base()` for DB/action/student APIs
+- The testing agent must account for this: source-tree fixes are NOT testable against the installed build without a rebuild or hot-patch step

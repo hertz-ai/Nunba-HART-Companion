@@ -349,3 +349,19 @@ GREEN (all scenarios pass, no failures) / YELLOW (some FLAKY) / RED (failures)
 ```
 
 Under 600 words per report. Full evidence goes into `.claude/shared/test-failures.md`, not into the report summary.
+
+## Discovered patterns
+
+### [2026-04-12] Nunba chatbot_routes uses field "text" not "prompt"
+**Observed in:** Orchestrator iteration 3 live test — curl POST with "prompt" → 400 "Text is required"
+**Pattern:** Nunba's chatbot_routes.py (the Nunba desktop route) uses `data.get("text")` at line 909/1095/1354/1853. HARTOS's hart_intelligence_entry.py /chat uses `data.get('prompt')`. When live-testing against the installed Nunba build, always use `"text"` field.
+**Applicability:** Every live test against http://localhost:5000/chat
+**Confidence:** high
+**Source:** curl -v POST /chat → 400 "Text is required" with field "prompt"; 200 with field "text"
+
+### [2026-04-12] ensure_loaded_async can log "loaded" without the server process existing
+**Observed in:** langchain.log 2026-04-12 08:11:32 "ensure_loaded_async: loaded llm-qwen3.5-4b-vl-recommended on gpu" but tasklist shows only 0.8B on :8081, nothing on :8080
+**Pattern:** The ModelOrchestrator marks a model as "loaded" in the catalog based on the LlamaConfig call returning, but start_server may fail silently (30s health check times out, process crashes during load, etc.). The catalog state can drift from actual process state.
+**Applicability:** Any code that checks "is the model loaded?" via catalog — must also verify the process is alive via /v1/models or health probe
+**Confidence:** high
+**Source:** tasklist | grep llama-server → only PID 30844 on :8081; curl :8080/health → refused

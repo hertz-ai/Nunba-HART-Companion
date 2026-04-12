@@ -58,3 +58,19 @@ Produce a structured review with:
 9. **Verdict** — APPROVE / REQUEST_CHANGES / REJECT, with the top 3 blocking issues if not APPROVE
 
 Keep it under 500 words. You're the first gate, not the last — don't write essays.
+
+## Discovered patterns
+
+### [2026-04-12] mmproj download has TWO parallel paths — _download_mmproj_only vs llama_installer.download_model
+**Observed in:** T9 fix c520a5d (llama_config.py:706 vs llama_installer.py:991)
+**Pattern:** _download_mmproj_only reconstructed the HF URL using preset.mmproj_file (local name) instead of preset.mmproj_source_file (HF name). The installer's download_model does it correctly. Any future mmproj download must use mmproj_source_file for the HF URL.
+**Applicability:** Any code that downloads model files from HuggingFace
+**Confidence:** high
+**Source:** langchain.log 2026-04-12 01:26:10 "HTTP Error 404: Not Found" on mmproj-Qwen3.5-0.8B-F16.gguf
+
+### [2026-04-12] check_server_running accepts ANY HTTP 200 — must verify /v1/models for identity
+**Observed in:** T9 fix c520a5d (main.py:437, llama_config.py:1406)
+**Pattern:** check_server_running only checks /health returns 200. A stale process, a different model, or a non-llama service can pass. Always follow up with /v1/models to verify the correct model is loaded before claiming a server is "ready".
+**Applicability:** Any code path that checks llama-server health before deciding to start/skip
+**Confidence:** high
+**Source:** frozen_debug.log 2026-04-12 01:26:08 "Main LLM server already running on port 8080 — skipping eager boot" but :8080 was dead by 01:26:31

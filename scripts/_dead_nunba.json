@@ -1,0 +1,1187 @@
+{
+  "root": "C:/Users/sathi/PycharmProjects/Nunba-HART-Companion",
+  "file_count": 158,
+  "defs_count": 4842,
+  "refs_count": 5864,
+  "dead_count": 103,
+  "parse_failures": [],
+  "dead_by_file": {
+    "routes/hartos_backend_adapter.py": [
+      {
+        "name": "set_token",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 519,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_user",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 558,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_user",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 561,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "follow_user",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 564,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unfollow_user",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 567,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_followers",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 570,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_following",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 573,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_post",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 580,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_post",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 583,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_post",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 586,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_post",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 589,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "upvote_post",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 592,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "downvote_post",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 595,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_comments",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 598,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_comment",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 601,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_trending",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 608,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_community_posts",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 625,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_community_members",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 634,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_notifications",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 645,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "mark_notifications_read",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 648,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_recipes",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 652,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "share_recipe",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 655,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "fork_recipe",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 658,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_wallet",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 662,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_achievements",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 665,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "daily_checkin",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 669,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_dashboard_agents",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 673,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_dashboard_health",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 676,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_referral_code",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 680,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "use_referral_code",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 683,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_referral_stats",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 686,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_onboarding_progress",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 690,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "complete_onboarding_step",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 693,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_campaigns",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 697,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_campaign",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 700,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_usage",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 759,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_key",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 763,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_keys",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 766,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "revoke_key",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 769,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_download_url",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 802,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_licenses",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 805,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "verify_license",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 808,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_publications",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 838,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_publication",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 841,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_provenance",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 844,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_milestone",
+        "file": "routes/hartos_backend_adapter.py",
+        "line": 847,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "app.py": [
+      {
+        "name": "_run_frozen_import_fixes",
+        "file": "app.py",
+        "line": 658,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_load_indicator",
+        "file": "app.py",
+        "line": 897,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "check_existing_user_data",
+        "file": "app.py",
+        "line": 2982,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_custom_titlebar_injection",
+        "file": "app.py",
+        "line": 3384,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_server_info",
+        "file": "app.py",
+        "line": 4776,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "toggle_fullscreen",
+        "file": "app.py",
+        "line": 4792,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_window_events",
+        "file": "app.py",
+        "line": 5152,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "stop_database_service",
+        "file": "app.py",
+        "line": 5232,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_update_companion_mode",
+        "file": "app.py",
+        "line": 5561,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/test_upload_routes.py": [
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 62,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 100,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 128,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 162,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 179,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 243,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 298,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "setup_method",
+        "file": "tests/test_upload_routes.py",
+        "line": 328,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "desktop/splash_effects.py": [
+      {
+        "name": "_get_dot",
+        "file": "desktop/splash_effects.py",
+        "line": 231,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_render_tron_border",
+        "file": "desktop/splash_effects.py",
+        "line": 708,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_tron_glow_dot",
+        "file": "desktop/splash_effects.py",
+        "line": 750,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_greeting_pulse",
+        "file": "desktop/splash_effects.py",
+        "line": 1908,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_greeting_stack",
+        "file": "desktop/splash_effects.py",
+        "line": 1972,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_greeting_hourglass",
+        "file": "desktop/splash_effects.py",
+        "line": 2159,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "run_splash_effect",
+        "file": "desktop/splash_effects.py",
+        "line": 3046,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "scripts/verify_hart_voices.py": [
+      {
+        "name": "do_OPTIONS",
+        "file": "scripts/verify_hart_voices.py",
+        "line": 259,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_GET",
+        "file": "scripts/verify_hart_voices.py",
+        "line": 272,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_POST",
+        "file": "scripts/verify_hart_voices.py",
+        "line": 355,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "log_message",
+        "file": "scripts/verify_hart_voices.py",
+        "line": 545,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/test_catalog_populators.py": [
+      {
+        "name": "tearDown",
+        "file": "tests/test_catalog_populators.py",
+        "line": 72,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "tearDown",
+        "file": "tests/test_catalog_populators.py",
+        "line": 281,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "tearDown",
+        "file": "tests/test_catalog_populators.py",
+        "line": 373,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "tearDown",
+        "file": "tests/test_catalog_populators.py",
+        "line": 471,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "desktop/indicator_window.py": [
+      {
+        "name": "show_indicator",
+        "file": "desktop/indicator_window.py",
+        "line": 754,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "force_refresh_timer",
+        "file": "desktop/indicator_window.py",
+        "line": 768,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_activity_timeout",
+        "file": "desktop/indicator_window.py",
+        "line": 772,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/conftest.py": [
+      {
+        "name": "do_GET",
+        "file": "tests/conftest.py",
+        "line": 65,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_POST",
+        "file": "tests/conftest.py",
+        "line": 76,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "log_message",
+        "file": "tests/conftest.py",
+        "line": 94,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tts/tts_engine.py": [
+      {
+        "name": "_run_with_timeout",
+        "file": "tts/tts_engine.py",
+        "line": 382,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_oom_guard",
+        "file": "tts/tts_engine.py",
+        "line": 415,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_suggest_device",
+        "file": "tts/tts_engine.py",
+        "line": 462,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "llama/llama_config.py": [
+      {
+        "name": "get_current_model_name",
+        "file": "llama/llama_config.py",
+        "line": 1595,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_active_llm_endpoint",
+        "file": "llama/llama_config.py",
+        "line": 1759,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "llama/zinc_installer.py": [
+      {
+        "name": "build_server_command",
+        "file": "llama/zinc_installer.py",
+        "line": 214,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_server_env",
+        "file": "llama/zinc_installer.py",
+        "line": 227,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/test_model_resilience.py": [
+      {
+        "name": "tearDown",
+        "file": "tests/test_model_resilience.py",
+        "line": 44,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "tearDown",
+        "file": "tests/test_model_resilience.py",
+        "line": 255,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "main.py": [
+      {
+        "name": "serve_static_file",
+        "file": "main.py",
+        "line": 2048,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "desktop/ai_installer.py": [
+      {
+        "name": "install_ai_components",
+        "file": "desktop/ai_installer.py",
+        "line": 525,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "routes/chatbot_routes.py": [
+      {
+        "name": "exception_publish",
+        "file": "routes/chatbot_routes.py",
+        "line": 635,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "routes/kids_game_recommendation.py": [
+      {
+        "name": "get_recommendations",
+        "file": "routes/kids_game_recommendation.py",
+        "line": 244,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "scripts/build.py": [
+      {
+        "name": "generate_build_hashes",
+        "file": "scripts/build.py",
+        "line": 344,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "scripts/generate_hart_voices.py": [
+      {
+        "name": "transliterate_code_mix",
+        "file": "scripts/generate_hart_voices.py",
+        "line": 362,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/test_agent_pipeline_uat.py": [
+      {
+        "name": "tearDown",
+        "file": "tests/test_agent_pipeline_uat.py",
+        "line": 202,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/test_orchestrator_loaders.py": [
+      {
+        "name": "tearDown",
+        "file": "tests/test_orchestrator_loaders.py",
+        "line": 449,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/test_package_installer.py": [
+      {
+        "name": "setup_method",
+        "file": "tests/test_package_installer.py",
+        "line": 428,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tts/piper_tts.py": [
+      {
+        "name": "synthesize_text_async",
+        "file": "tts/piper_tts.py",
+        "line": 470,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ]
+  }
+}

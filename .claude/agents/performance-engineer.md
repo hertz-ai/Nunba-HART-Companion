@@ -76,3 +76,12 @@ When the happy path goes slow (backend stall, model load, subprocess crash), doe
 7. **Verdict** — SHIP / REWORK (with specific perf fix) / REJECT
 
 Under 400 words. Prefer order-of-magnitude estimates over fake precision — "+100ms" is fine; "+127.3ms" is suspicious.
+
+## Discovered patterns
+
+### [2026-04-12] Daemon goals block user chat when draft-first is disabled
+**Observed in:** Orchestrator iteration 10 — user chat "tell me a joke" timed out because agent_daemon was running a 30-message GroupChat on the 4B
+**Pattern:** Without draft-first, both user chat and daemon goals compete for the same 4B llama-server on :8080. The daemon's multi-step GroupChat holds the LLM for minutes, causing user requests to queue behind it and timeout at 15-30s. With draft-first enabled, user chat goes to the 0.8B (separate process, separate VRAM) and only complex requests delegate to the 4B.
+**Applicability:** Any scenario where background agent goals run concurrently with user chat
+**Confidence:** high
+**Source:** langchain.log 2026-04-12 09:23-09:24 — daemon_58b5f6e2 processing 30 messages while user request times out

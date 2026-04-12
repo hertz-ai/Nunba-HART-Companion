@@ -1,0 +1,6412 @@
+{
+  "root": "C:/Users/sathi/PycharmProjects/HARTOS",
+  "file_count": 955,
+  "defs_count": 21347,
+  "refs_count": 23073,
+  "dead_count": 552,
+  "parse_failures": [],
+  "dead_by_file": {
+    "agent-ledger-opensource/agent_ledger/core.py": [
+      {
+        "name": "record_retry",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 844,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_failure_reason",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 871,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_pending_reason",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 876,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "is_deferred",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 901,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "is_delegated",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 905,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "is_rolled_back",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 909,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "enable_pubsub",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1374,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "enable_heartbeat",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1380,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_tasks_by_type",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1475,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_parallel_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1505,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_context_for_task",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1510,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_task_hierarchy",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1545,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "clear_completed_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1592,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "undefer_task",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1803,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_delegated_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1879,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_tasks_delegated_to",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1883,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_rolled_back_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1890,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_scheduled_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1894,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_task_progress",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1901,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "defer_all_pending_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1911,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "undefer_all_tasks",
+        "file": "agent-ledger-opensource/agent_ledger/core.py",
+        "line": 1922,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/response/templates.py": [
+      {
+        "name": "set_context",
+        "file": "integrations/channels/response/templates.py",
+        "line": 114,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_context",
+        "file": "integrations/channels/response/templates.py",
+        "line": 118,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_model",
+        "file": "integrations/channels/response/templates.py",
+        "line": 126,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_provider",
+        "file": "integrations/channels/response/templates.py",
+        "line": 130,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_user",
+        "file": "integrations/channels/response/templates.py",
+        "line": 138,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_channel",
+        "file": "integrations/channels/response/templates.py",
+        "line": 142,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_prefix",
+        "file": "integrations/channels/response/templates.py",
+        "line": 146,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_suffix",
+        "file": "integrations/channels/response/templates.py",
+        "line": 150,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_variable",
+        "file": "integrations/channels/response/templates.py",
+        "line": 154,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_variable",
+        "file": "integrations/channels/response/templates.py",
+        "line": 158,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_template",
+        "file": "integrations/channels/response/templates.py",
+        "line": 167,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_templates",
+        "file": "integrations/channels/response/templates.py",
+        "line": 171,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "render_named",
+        "file": "integrations/channels/response/templates.py",
+        "line": 229,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "format_response",
+        "file": "integrations/channels/response/templates.py",
+        "line": 250,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_available_variables",
+        "file": "integrations/channels/response/templates.py",
+        "line": 296,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "validate_template",
+        "file": "integrations/channels/response/templates.py",
+        "line": 300,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_context",
+        "file": "integrations/channels/response/templates.py",
+        "line": 319,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_default_filters",
+        "file": "integrations/channels/response/templates.py",
+        "line": 404,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/identity/agent_identity.py": [
+      {
+        "name": "has_capability",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 65,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_capability",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 69,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_capability",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 75,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_personality_trait",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 83,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_personality_trait",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 87,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_active_identity",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 149,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_identity_for_channel",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 166,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_identity_for_channel",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 180,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_channel_identity",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 194,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_identities",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 210,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_channel_identities",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 214,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_identity",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 218,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_identity",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 232,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "clone_identity",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 267,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "export_identities",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 292,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "import_identities",
+        "file": "integrations/channels/identity/agent_identity.py",
+        "line": 305,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/identity/sender_mapping.py": [
+      {
+        "name": "update_last_seen",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 62,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "has_role",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 66,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_role",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 70,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_role",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 75,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "has_permission",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 121,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_channel_identity",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 223,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_cross_channel_by_channel",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 276,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_user",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 315,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unlink_channel",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 342,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "merge_users",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 376,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_channel_identities",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 414,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "find_users_by_email",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 432,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "find_users_by_username",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 436,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_user_channel_count",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 444,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "export_mappings",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 448,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "import_mappings",
+        "file": "integrations/channels/identity/sender_mapping.py",
+        "line": 456,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/nextcloud_adapter.py": [
+      {
+        "name": "create_conversation",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 688,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_participant",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 714,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_participant",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 731,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_participants",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 739,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_conversation_name",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 763,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_conversation_description",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 776,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "leave_conversation",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 785,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_conversation",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 793,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_reactions",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 833,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_poll",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 848,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "vote_poll",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 882,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "close_poll",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 899,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "share_rich_object",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 903,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_read_marker",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 935,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "download_file",
+        "file": "integrations/channels/extensions/nextcloud_adapter.py",
+        "line": 947,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/identity/avatars.py": [
+      {
+        "name": "get_avatar",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 152,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_avatar_url",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 176,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "generate_avatar",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 230,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_avatar_for_identity",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 266,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_avatar_for_channel",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 285,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_channel_avatar",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 304,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_identity_avatar",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 311,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_avatar",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 318,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_avatars",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 349,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_generators",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 353,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_generator",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 357,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_avatar_from_url",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 368,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_avatar_from_emoji",
+        "file": "integrations/channels/identity/avatars.py",
+        "line": 387,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/messenger_adapter.py": [
+      {
+        "name": "add_element",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 170,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_call_button",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 216,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "verify_webhook",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 319,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_postback_handler",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 682,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_referral_handler",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 690,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_quick_replies",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 724,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_generic_template",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 741,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_button_template",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 752,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_with_tag",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 763,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_persistent_menu",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 782,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_persistent_menu",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 833,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "request_one_time_notification",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 852,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_one_time_notification",
+        "file": "integrations/channels/extensions/messenger_adapter.py",
+        "line": 876,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/plugins/http_server.py": [
+      {
+        "name": "register_route",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 117,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unregister_route",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 149,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unregister_routes",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 169,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_middleware",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 188,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "log_message",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 209,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_GET",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 266,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_POST",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 269,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_PUT",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 272,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_DELETE",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 275,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_PATCH",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 278,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_OPTIONS",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 281,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "do_HEAD",
+        "file": "integrations/channels/plugins/http_server.py",
+        "line": 284,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/automation/workflows.py": [
+      {
+        "name": "add_step",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 71,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_step",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 78,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_workflow",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 184,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_workflows",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 196,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "pause_execution",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 479,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "cancel_execution",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 496,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_execution",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 514,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_executions",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 526,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_global_action",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 551,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_global_action",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 565,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_step",
+        "file": "integrations/channels/automation/workflows.py",
+        "line": 569,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/line_adapter.py": [
+      {
+        "name": "set_header",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 106,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_hero_image",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 120,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_body",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 131,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_footer",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 152,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_postback_handler",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 603,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_flex_message",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 611,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_quick_reply",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 639,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_sticker",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 684,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_location",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 712,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_rich_menu",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 794,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_liff_url",
+        "file": "integrations/channels/extensions/line_adapter.py",
+        "line": 818,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/voice_adapter.py": [
+      {
+        "name": "validate_twilio_signature",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 297,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "hangup_call",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 753,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_dtmf_handler",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 813,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_ivr_menu",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 833,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_twiml_say",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 837,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_twiml_gather",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 848,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_twiml_record",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 868,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_twiml_dial",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 878,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_ncco_talk",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 888,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_ncco_input",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 902,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_ncco_record",
+        "file": "integrations/channels/extensions/voice_adapter.py",
+        "line": 932,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/response/reactions.py": [
+      {
+        "name": "set_emojis",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 117,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ack_queued",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 294,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ack_thinking",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 318,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_active_messages",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 396,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "clear_all",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 401,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ack_received_async",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 416,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ack_processing_async",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 421,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ack_complete_async",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 426,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ack_error_async",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 432,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_acks_async",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 437,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "transition_state",
+        "file": "integrations/channels/response/reactions.py",
+        "line": 442,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/instagram_adapter.py": [
+      {
+        "name": "verify_webhook",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 216,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_postback_handler",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 565,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_quick_replies",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 609,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_generic_template",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 623,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_heart_reaction",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 641,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_ice_breakers",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 666,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_ice_breakers",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 691,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "reply_to_story",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 710,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "reply_to_comment",
+        "file": "integrations/channels/extensions/instagram_adapter.py",
+        "line": 726,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/commands/registry.py": [
+      {
+        "name": "get_by_native_name",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 217,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "resolve_alias",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 233,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_alias",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 257,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_alias",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 283,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_aliases",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 357,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_native_names",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 361,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "has_alias",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 369,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "enable_command",
+        "file": "integrations/channels/commands/registry.py",
+        "line": 374,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "hevolvearmor/hevolvearmor/_transforms.py": [
+      {
+        "name": "visit_Name",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 248,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_AsyncFunctionDef",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 266,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_ClassDef",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 269,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_Attribute",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 274,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_keyword",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 279,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_Global",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 284,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_Nonlocal",
+        "file": "hevolvearmor/hevolvearmor/_transforms.py",
+        "line": 289,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/mattermost_adapter.py": [
+      {
+        "name": "register_interactive_handler",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 884,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_interactive_message",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 912,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_thread_reply",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 972,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_thread_posts",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 987,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_direct_channel",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 1004,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_channel_members",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 1015,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "download_file",
+        "file": "integrations/channels/extensions/mattermost_adapter.py",
+        "line": 1031,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/automation/webhooks.py": [
+      {
+        "name": "list_webhooks",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 153,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_webhook",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 178,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_webhook",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 190,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_delivery_history",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 361,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_handler",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 425,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unregister_handler",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 439,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "reset_failure_count",
+        "file": "integrations/channels/automation/webhooks.py",
+        "line": 444,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/automation/cron.py": [
+      {
+        "name": "schedule_at",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 187,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "schedule_every",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 242,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "schedule_cron",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 303,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_jobs",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 434,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "run_due_jobs",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 472,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "run_job",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 494,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_execution_history",
+        "file": "integrations/channels/automation/cron.py",
+        "line": 580,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/wechat_adapter.py": [
+      {
+        "name": "verify_webhook",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 317,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_event_handler",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 695,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_template_message",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 743,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_menu",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 772,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_qr_code",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 788,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_media_content",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 834,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_mini_program_qr_code",
+        "file": "integrations/channels/extensions/wechat_adapter.py",
+        "line": 857,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/twitch_adapter.py": [
+      {
+        "name": "leave_channel",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 286,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_command",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 826,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "timeout_user",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 842,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ban_user",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 868,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unban_user",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 893,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "clear_chat",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 909,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_slow_mode",
+        "file": "integrations/channels/extensions/twitch_adapter.py",
+        "line": 925,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/queue/batching.py": [
+      {
+        "name": "flush_all_sync",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 410,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_batch_size",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 443,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_batch_count",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 463,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_batch_keys",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 468,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_batch_count",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 695,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_batch_keys",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 700,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_batch",
+        "file": "integrations/channels/queue/batching.py",
+        "line": 752,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/coding_agent/aider_core/utils.py": [
+      {
+        "name": "is_image_file",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 88,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "show_messages",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 143,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "split_chat_history_markdown",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 151,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "find_common_root",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 266,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "format_tokens",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 282,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "touch_file",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 291,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "check_pip_install_extra",
+        "file": "integrations/coding_agent/aider_core/utils.py",
+        "line": 301,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "helper.py": [
+      {
+        "name": "crawl4ai_fetch",
+        "file": "helper.py",
+        "line": 162,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "gpt_call",
+        "file": "helper.py",
+        "line": 458,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "gpt_mini",
+        "file": "helper.py",
+        "line": 481,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_logs",
+        "file": "helper.py",
+        "line": 1399,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "cleanup_old_backups",
+        "file": "helper.py",
+        "line": 2256,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_agent_data_info",
+        "file": "helper.py",
+        "line": 2297,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/matrix_adapter.py": [
+      {
+        "name": "create_room",
+        "file": "integrations/channels/extensions/matrix_adapter.py",
+        "line": 602,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "join_room",
+        "file": "integrations/channels/extensions/matrix_adapter.py",
+        "line": 638,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "leave_room",
+        "file": "integrations/channels/extensions/matrix_adapter.py",
+        "line": 650,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "invite_user",
+        "file": "integrations/channels/extensions/matrix_adapter.py",
+        "line": 662,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_thread_reply",
+        "file": "integrations/channels/extensions/matrix_adapter.py",
+        "line": 703,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_read_receipt",
+        "file": "integrations/channels/extensions/matrix_adapter.py",
+        "line": 742,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/automation/scheduled_messages.py": [
+      {
+        "name": "schedule_relative",
+        "file": "integrations/channels/automation/scheduled_messages.py",
+        "line": 276,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_content",
+        "file": "integrations/channels/automation/scheduled_messages.py",
+        "line": 357,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_message",
+        "file": "integrations/channels/automation/scheduled_messages.py",
+        "line": 381,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "deliver_due_messages",
+        "file": "integrations/channels/automation/scheduled_messages.py",
+        "line": 481,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "clear_sent",
+        "file": "integrations/channels/automation/scheduled_messages.py",
+        "line": 630,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_delivery_history",
+        "file": "integrations/channels/automation/scheduled_messages.py",
+        "line": 646,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/viber_adapter.py": [
+      {
+        "name": "add_location_button",
+        "file": "integrations/channels/extensions/viber_adapter.py",
+        "line": 149,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_phone_button",
+        "file": "integrations/channels/extensions/viber_adapter.py",
+        "line": 153,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_event_handler",
+        "file": "integrations/channels/extensions/viber_adapter.py",
+        "line": 732,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "check_online_status",
+        "file": "integrations/channels/extensions/viber_adapter.py",
+        "line": 767,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_carousel",
+        "file": "integrations/channels/extensions/viber_adapter.py",
+        "line": 910,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_location",
+        "file": "integrations/channels/extensions/viber_adapter.py",
+        "line": 964,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/media/audio.py": [
+      {
+        "name": "to_srt",
+        "file": "integrations/channels/media/audio.py",
+        "line": 84,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "to_vtt",
+        "file": "integrations/channels/media/audio.py",
+        "line": 96,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "transcribe_streaming",
+        "file": "integrations/channels/media/audio.py",
+        "line": 389,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_max_audio_duration",
+        "file": "integrations/channels/media/audio.py",
+        "line": 453,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_max_file_size",
+        "file": "integrations/channels/media/audio.py",
+        "line": 462,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_supported_languages",
+        "file": "integrations/channels/media/audio.py",
+        "line": 471,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/plugins/registry.py": [
+      {
+        "name": "register_plugin",
+        "file": "integrations/channels/plugins/registry.py",
+        "line": 126,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unregister_plugin",
+        "file": "integrations/channels/plugins/registry.py",
+        "line": 150,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "check_updates",
+        "file": "integrations/channels/plugins/registry.py",
+        "line": 342,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_load_cache",
+        "file": "integrations/channels/plugins/registry.py",
+        "line": 438,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_plugin_info",
+        "file": "integrations/channels/plugins/registry.py",
+        "line": 461,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_installed_version",
+        "file": "integrations/channels/plugins/registry.py",
+        "line": 469,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/marketing/marketing_nunban.py": [
+      {
+        "name": "get_marketing_system_prompt",
+        "file": "integrations/marketing/marketing_nunban.py",
+        "line": 238,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_kural_for_context",
+        "file": "integrations/marketing/marketing_nunban.py",
+        "line": 283,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_proverb_for_context",
+        "file": "integrations/marketing/marketing_nunban.py",
+        "line": 297,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "detect_geography",
+        "file": "integrations/marketing/marketing_nunban.py",
+        "line": 305,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_all_regions",
+        "file": "integrations/marketing/marketing_nunban.py",
+        "line": 372,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_style_for_region",
+        "file": "integrations/marketing/marketing_nunban.py",
+        "line": 377,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/openclaw/hart_skill_server.py": [
+      {
+        "name": "_handle_hart_chat",
+        "file": "integrations/openclaw/hart_skill_server.py",
+        "line": 89,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_handle_hart_recipe_run",
+        "file": "integrations/openclaw/hart_skill_server.py",
+        "line": 110,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_handle_hart_model_bus",
+        "file": "integrations/openclaw/hart_skill_server.py",
+        "line": 121,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_handle_hart_tts",
+        "file": "integrations/openclaw/hart_skill_server.py",
+        "line": 130,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_handle_hart_vision",
+        "file": "integrations/openclaw/hart_skill_server.py",
+        "line": 139,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_handle_hart_expert",
+        "file": "integrations/openclaw/hart_skill_server.py",
+        "line": 148,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "hart_intelligence_entry.py": [
+      {
+        "name": "get_frame_store",
+        "file": "hart_intelligence_entry.py",
+        "line": 1328,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_diarization_service",
+        "file": "hart_intelligence_entry.py",
+        "line": 1427,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "prep_outputs",
+        "file": "hart_intelligence_entry.py",
+        "line": 3492,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "prep_inputs",
+        "file": "hart_intelligence_entry.py",
+        "line": 3541,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_format_instructions",
+        "file": "hart_intelligence_entry.py",
+        "line": 4593,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/plugins/plugin_system.py": [
+      {
+        "name": "get_metadata",
+        "file": "integrations/channels/plugins/plugin_system.py",
+        "line": 92,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "load_from_module",
+        "file": "integrations/channels/plugins/plugin_system.py",
+        "line": 230,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_plugins",
+        "file": "integrations/channels/plugins/plugin_system.py",
+        "line": 364,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_plugin",
+        "file": "integrations/channels/plugins/plugin_system.py",
+        "line": 384,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "unload_all",
+        "file": "integrations/channels/plugins/plugin_system.py",
+        "line": 475,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/bridge/wamp_bridge.py": [
+      {
+        "name": "get_rule",
+        "file": "integrations/channels/bridge/wamp_bridge.py",
+        "line": 457,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "enable_rule",
+        "file": "integrations/channels/bridge/wamp_bridge.py",
+        "line": 465,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "disable_rule",
+        "file": "integrations/channels/bridge/wamp_bridge.py",
+        "line": 473,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "forward_to_all",
+        "file": "integrations/channels/bridge/wamp_bridge.py",
+        "line": 544,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "publish_to_wamp",
+        "file": "integrations/channels/bridge/wamp_bridge.py",
+        "line": 572,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/commands/detection.py": [
+      {
+        "name": "extract_command_name",
+        "file": "integrations/channels/commands/detection.py",
+        "line": 209,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "normalize_command_text",
+        "file": "integrations/channels/commands/detection.py",
+        "line": 242,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_prefixes",
+        "file": "integrations/channels/commands/detection.py",
+        "line": 278,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_prefix",
+        "file": "integrations/channels/commands/detection.py",
+        "line": 282,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_prefix",
+        "file": "integrations/channels/commands/detection.py",
+        "line": 288,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/bluebubbles_adapter.py": [
+      {
+        "name": "send_with_effect",
+        "file": "integrations/channels/extensions/bluebubbles_adapter.py",
+        "line": 781,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_attachment",
+        "file": "integrations/channels/extensions/bluebubbles_adapter.py",
+        "line": 843,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "rename_group",
+        "file": "integrations/channels/extensions/bluebubbles_adapter.py",
+        "line": 892,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "add_participant",
+        "file": "integrations/channels/extensions/bluebubbles_adapter.py",
+        "line": 917,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_participant",
+        "file": "integrations/channels/extensions/bluebubbles_adapter.py",
+        "line": 937,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/twitter_adapter.py": [
+      {
+        "name": "verify_webhook",
+        "file": "integrations/channels/extensions/twitter_adapter.py",
+        "line": 329,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_quick_reply_handler",
+        "file": "integrations/channels/extensions/twitter_adapter.py",
+        "line": 868,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_user_by_username",
+        "file": "integrations/channels/extensions/twitter_adapter.py",
+        "line": 908,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_dm_with_quick_replies",
+        "file": "integrations/channels/extensions/twitter_adapter.py",
+        "line": 960,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_dm_with_cta",
+        "file": "integrations/channels/extensions/twitter_adapter.py",
+        "line": 973,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/media/limits.py": [
+      {
+        "name": "check_batch",
+        "file": "integrations/channels/media/limits.py",
+        "line": 331,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_limits",
+        "file": "integrations/channels/media/limits.py",
+        "line": 370,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_limits",
+        "file": "integrations/channels/media/limits.py",
+        "line": 374,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_limits",
+        "file": "integrations/channels/media/limits.py",
+        "line": 378,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_limits_summary",
+        "file": "integrations/channels/media/limits.py",
+        "line": 441,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "agent_identity.py": [
+      {
+        "name": "validate_personality",
+        "file": "agent_identity.py",
+        "line": 203,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "generate_agent_handle",
+        "file": "agent_identity.py",
+        "line": 208,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "is_handle_locked",
+        "file": "agent_identity.py",
+        "line": 243,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "build_proactive_contact_prompt",
+        "file": "agent_identity.py",
+        "line": 328,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "core/platform/extension_sandbox.py": [
+      {
+        "name": "visit_Call",
+        "file": "core/platform/extension_sandbox.py",
+        "line": 60,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_Import",
+        "file": "core/platform/extension_sandbox.py",
+        "line": 73,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_ImportFrom",
+        "file": "core/platform/extension_sandbox.py",
+        "line": 82,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "visit_Attribute",
+        "file": "core/platform/extension_sandbox.py",
+        "line": 98,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "hevolvearmor/hevolvearmor/_loader.py": [
+      {
+        "name": "find_module",
+        "file": "hevolvearmor/hevolvearmor/_loader.py",
+        "line": 69,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_module",
+        "file": "hevolvearmor/hevolvearmor/_loader.py",
+        "line": 131,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "install_loader",
+        "file": "hevolvearmor/hevolvearmor/_loader.py",
+        "line": 146,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "uninstall_loader",
+        "file": "hevolvearmor/hevolvearmor/_loader.py",
+        "line": 165,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_lightning/rewards.py": [
+      {
+        "name": "calculate_task_completion_reward",
+        "file": "integrations/agent_lightning/rewards.py",
+        "line": 184,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "calculate_tool_reward",
+        "file": "integrations/agent_lightning/rewards.py",
+        "line": 215,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_recent_rewards",
+        "file": "integrations/agent_lightning/rewards.py",
+        "line": 271,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "reset_statistics",
+        "file": "integrations/agent_lightning/rewards.py",
+        "line": 283,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/whatsapp_adapter.py": [
+      {
+        "name": "set_qr_callback",
+        "file": "integrations/channels/whatsapp_adapter.py",
+        "line": 81,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_read_receipt",
+        "file": "integrations/channels/whatsapp_adapter.py",
+        "line": 409,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_qr_code",
+        "file": "integrations/channels/whatsapp_adapter.py",
+        "line": 424,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "download_media",
+        "file": "integrations/channels/whatsapp_adapter.py",
+        "line": 441,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/commands/builtin.py": [
+      {
+        "name": "add_admin",
+        "file": "integrations/channels/commands/builtin.py",
+        "line": 1214,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "remove_admin",
+        "file": "integrations/channels/commands/builtin.py",
+        "line": 1218,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_user_language",
+        "file": "integrations/channels/commands/builtin.py",
+        "line": 1226,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_user_timezone",
+        "file": "integrations/channels/commands/builtin.py",
+        "line": 1230,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/commands/mention_gating.py": [
+      {
+        "name": "set_always",
+        "file": "integrations/channels/commands/mention_gating.py",
+        "line": 282,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_mention_only",
+        "file": "integrations/channels/commands/mention_gating.py",
+        "line": 286,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_commands_only",
+        "file": "integrations/channels/commands/mention_gating.py",
+        "line": 290,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_overrides",
+        "file": "integrations/channels/commands/mention_gating.py",
+        "line": 294,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/teams_adapter.py": [
+      {
+        "name": "add_image",
+        "file": "integrations/channels/extensions/teams_adapter.py",
+        "line": 113,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_card_action",
+        "file": "integrations/channels/extensions/teams_adapter.py",
+        "line": 665,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_adaptive_card",
+        "file": "integrations/channels/extensions/teams_adapter.py",
+        "line": 673,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "mention_user",
+        "file": "integrations/channels/extensions/teams_adapter.py",
+        "line": 717,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/zalo_adapter.py": [
+      {
+        "name": "register_button_handler",
+        "file": "integrations/channels/extensions/zalo_adapter.py",
+        "line": 773,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "send_list_template",
+        "file": "integrations/channels/extensions/zalo_adapter.py",
+        "line": 835,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "tag_user",
+        "file": "integrations/channels/extensions/zalo_adapter.py",
+        "line": 940,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "untag_user",
+        "file": "integrations/channels/extensions/zalo_adapter.py",
+        "line": 968,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/media/vision.py": [
+      {
+        "name": "analyze_image",
+        "file": "integrations/channels/media/vision.py",
+        "line": 191,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "compare_images",
+        "file": "integrations/channels/media/vision.py",
+        "line": 341,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "check_safety",
+        "file": "integrations/channels/media/vision.py",
+        "line": 368,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_max_image_size",
+        "file": "integrations/channels/media/vision.py",
+        "line": 397,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/memory/memory_store.py": [
+      {
+        "name": "add_batch",
+        "file": "integrations/channels/memory/memory_store.py",
+        "line": 284,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "delete_by_source",
+        "file": "integrations/channels/memory/memory_store.py",
+        "line": 578,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_sources",
+        "file": "integrations/channels/memory/memory_store.py",
+        "line": 629,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "update_embedding",
+        "file": "integrations/channels/memory/memory_store.py",
+        "line": 643,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/queue/pipeline.py": [
+      {
+        "name": "set_handler",
+        "file": "integrations/channels/queue/pipeline.py",
+        "line": 241,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_component_stats",
+        "file": "integrations/channels/queue/pipeline.py",
+        "line": 545,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_queue_size",
+        "file": "integrations/channels/queue/pipeline.py",
+        "line": 577,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "set_handler",
+        "file": "integrations/channels/queue/pipeline.py",
+        "line": 703,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/response/typing.py": [
+      {
+        "name": "is_typing",
+        "file": "integrations/channels/response/typing.py",
+        "line": 196,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_active_channels",
+        "file": "integrations/channels/response/typing.py",
+        "line": 206,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "typing_async",
+        "file": "integrations/channels/response/typing.py",
+        "line": 298,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_typing_duration",
+        "file": "integrations/channels/response/typing.py",
+        "line": 342,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/coding_agent/aider_core/coders/search_replace.py": [
+      {
+        "name": "line_pad",
+        "file": "integrations/coding_agent/aider_core/coders/search_replace.py",
+        "line": 249,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "line_unpad",
+        "file": "integrations/coding_agent/aider_core/coders/search_replace.py",
+        "line": 254,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "dmp_apply",
+        "file": "integrations/coding_agent/aider_core/coders/search_replace.py",
+        "line": 260,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "git_cherry_pick_sr_onto_so",
+        "file": "integrations/coding_agent/aider_core/coders/search_replace.py",
+        "line": 485,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/chatterbox_tool.py": [
+      {
+        "name": "_load_turbo",
+        "file": "integrations/service_tools/chatterbox_tool.py",
+        "line": 67,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_synthesize_turbo",
+        "file": "integrations/service_tools/chatterbox_tool.py",
+        "line": 97,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_load_ml",
+        "file": "integrations/service_tools/chatterbox_tool.py",
+        "line": 121,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_synthesize_ml",
+        "file": "integrations/service_tools/chatterbox_tool.py",
+        "line": 131,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "security/native_hive_loader.py": [
+      {
+        "name": "is_native_available",
+        "file": "security/native_hive_loader.py",
+        "line": 434,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_native_lib",
+        "file": "security/native_hive_loader.py",
+        "line": 444,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "native_hebbian_update",
+        "file": "security/native_hive_loader.py",
+        "line": 493,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "shutdown_native",
+        "file": "security/native_hive_loader.py",
+        "line": 537,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "security/tls_config.py": [
+      {
+        "name": "secure_get",
+        "file": "security/tls_config.py",
+        "line": 83,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "secure_post",
+        "file": "security/tls_config.py",
+        "line": 88,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "secure_put",
+        "file": "security/tls_config.py",
+        "line": 93,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "secure_delete",
+        "file": "security/tls_config.py",
+        "line": 98,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "helper_ledger.py": [
+      {
+        "name": "get_task_execution_summary",
+        "file": "helper_ledger.py",
+        "line": 305,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_agent_awareness",
+        "file": "helper_ledger.py",
+        "line": 325,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_agent_awareness_text",
+        "file": "helper_ledger.py",
+        "line": 358,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "agent-ledger-opensource/agent_ledger/heartbeat.py": [
+      {
+        "name": "get_alive_agents",
+        "file": "agent-ledger-opensource/agent_ledger/heartbeat.py",
+        "line": 92,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_stale_agents",
+        "file": "agent-ledger-opensource/agent_ledger/heartbeat.py",
+        "line": 105,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_agent_host_info",
+        "file": "agent-ledger-opensource/agent_ledger/heartbeat.py",
+        "line": 121,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "agent-ledger-opensource/agent_ledger/verification.py": [
+      {
+        "name": "record_verification",
+        "file": "agent-ledger-opensource/agent_ledger/verification.py",
+        "line": 51,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "requires_verification",
+        "file": "agent-ledger-opensource/agent_ledger/verification.py",
+        "line": 103,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_snapshots",
+        "file": "agent-ledger-opensource/agent_ledger/verification.py",
+        "line": 209,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "deploy/linux/dbus/hart_dbus_service.py": [
+      {
+        "name": "GoalCreate",
+        "file": "deploy/linux/dbus/hart_dbus_service.py",
+        "line": 130,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "ListPeers",
+        "file": "deploy/linux/dbus/hart_dbus_service.py",
+        "line": 140,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "NodeId",
+        "file": "deploy/linux/dbus/hart_dbus_service.py",
+        "line": 146,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/app_marketplace.py": [
+      {
+        "name": "auto_onboard_users",
+        "file": "integrations/agent_engine/app_marketplace.py",
+        "line": 1106,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "auto_compete",
+        "file": "integrations/agent_engine/app_marketplace.py",
+        "line": 1143,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "run_benchmark_comparison",
+        "file": "integrations/agent_engine/app_marketplace.py",
+        "line": 1166,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/journey_engine.py": [
+      {
+        "name": "register_stage",
+        "file": "integrations/agent_engine/journey_engine.py",
+        "line": 146,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_action",
+        "file": "integrations/agent_engine/journey_engine.py",
+        "line": 151,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_hook",
+        "file": "integrations/agent_engine/journey_engine.py",
+        "line": 159,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/flask_integration.py": [
+      {
+        "name": "register_telegram",
+        "file": "integrations/channels/flask_integration.py",
+        "line": 213,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_discord",
+        "file": "integrations/channels/flask_integration.py",
+        "line": 226,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_whatsapp",
+        "file": "integrations/channels/flask_integration.py",
+        "line": 242,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/automation/triggers.py": [
+      {
+        "name": "get_trigger",
+        "file": "integrations/channels/automation/triggers.py",
+        "line": 267,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "evaluate_message",
+        "file": "integrations/channels/automation/triggers.py",
+        "line": 431,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "reset_trigger",
+        "file": "integrations/channels/automation/triggers.py",
+        "line": 471,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/rocketchat_adapter.py": [
+      {
+        "name": "upload_file",
+        "file": "integrations/channels/extensions/rocketchat_adapter.py",
+        "line": 610,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_direct_message",
+        "file": "integrations/channels/extensions/rocketchat_adapter.py",
+        "line": 648,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_thread_messages",
+        "file": "integrations/channels/extensions/rocketchat_adapter.py",
+        "line": 670,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/sunshine_bridge.py": [
+      {
+        "name": "get_apps",
+        "file": "integrations/remote_desktop/sunshine_bridge.py",
+        "line": 140,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "pair_with_pin",
+        "file": "integrations/remote_desktop/sunshine_bridge.py",
+        "line": 154,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_hosts",
+        "file": "integrations/remote_desktop/sunshine_bridge.py",
+        "line": 304,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/model_catalog.py": [
+      {
+        "name": "register_populator",
+        "file": "integrations/service_tools/model_catalog.py",
+        "line": 213,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_by_tag",
+        "file": "integrations/service_tools/model_catalog.py",
+        "line": 261,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "select_all_fitting",
+        "file": "integrations/service_tools/model_catalog.py",
+        "line": 346,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "security/ai_governance.py": [
+      {
+        "name": "register_gate",
+        "file": "security/ai_governance.py",
+        "line": 295,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_evaluator",
+        "file": "security/ai_governance.py",
+        "line": 317,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "register_validator",
+        "file": "security/ai_governance.py",
+        "line": 328,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_recipe_experience_healing.py": [
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_recipe_experience_healing.py",
+        "line": 38,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_recipe_experience_healing.py",
+        "line": 336,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_recipe_experience_healing.py",
+        "line": 429,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "lifecycle_hooks.py": [
+      {
+        "name": "sync_all_actions_to_ledger",
+        "file": "lifecycle_hooks.py",
+        "line": 1222,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_ledger_status_for_action",
+        "file": "lifecycle_hooks.py",
+        "line": 1247,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "agent-ledger-opensource/agent_ledger/pubsub.py": [
+      {
+        "name": "publish_agent_announce",
+        "file": "agent-ledger-opensource/agent_ledger/pubsub.py",
+        "line": 118,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "publish_verification_request",
+        "file": "agent-ledger-opensource/agent_ledger/pubsub.py",
+        "line": 125,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "core/peer_link/nat.py": [
+      {
+        "name": "get_external_ip",
+        "file": "core/peer_link/nat.py",
+        "line": 166,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_nat_traversal",
+        "file": "core/peer_link/nat.py",
+        "line": 244,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/trading_tools.py": [
+      {
+        "name": "get_portfolio_status",
+        "file": "integrations/agent_engine/trading_tools.py",
+        "line": 214,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_trade_history",
+        "file": "integrations/agent_engine/trading_tools.py",
+        "line": 237,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_lightning/store.py": [
+      {
+        "name": "get_training_data",
+        "file": "integrations/agent_lightning/store.py",
+        "line": 252,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "cleanup_old_spans",
+        "file": "integrations/agent_lightning/store.py",
+        "line": 353,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/google_chat_adapter.py": [
+      {
+        "name": "list_spaces",
+        "file": "integrations/channels/google_chat_adapter.py",
+        "line": 627,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_space",
+        "file": "integrations/channels/google_chat_adapter.py",
+        "line": 644,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/slack_adapter.py": [
+      {
+        "name": "open_dm",
+        "file": "integrations/channels/slack_adapter.py",
+        "line": 456,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_slack_adapter",
+        "file": "integrations/channels/slack_adapter.py",
+        "line": 469,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/email_adapter.py": [
+      {
+        "name": "get_thread",
+        "file": "integrations/channels/extensions/email_adapter.py",
+        "line": 983,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "list_threads",
+        "file": "integrations/channels/extensions/email_adapter.py",
+        "line": 987,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/nostr_adapter.py": [
+      {
+        "name": "repost",
+        "file": "integrations/channels/extensions/nostr_adapter.py",
+        "line": 1044,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_npub",
+        "file": "integrations/channels/extensions/nostr_adapter.py",
+        "line": 1062,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/media/links.py": [
+      {
+        "name": "is_same_domain",
+        "file": "integrations/channels/media/links.py",
+        "line": 434,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_domain",
+        "file": "integrations/channels/media/links.py",
+        "line": 440,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/dlna_bridge.py": [
+      {
+        "name": "do_GET",
+        "file": "integrations/remote_desktop/dlna_bridge.py",
+        "line": 106,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "log_message",
+        "file": "integrations/remote_desktop/dlna_bridge.py",
+        "line": 140,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/coding_agent/aider_core/repomap.py": [
+      {
+        "name": "get_random_color",
+        "file": "integrations/coding_agent/aider_core/repomap.py",
+        "line": 798,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_supported_languages_md",
+        "file": "integrations/coding_agent/aider_core/repomap.py",
+        "line": 832,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/device_id.py": [
+      {
+        "name": "register_device",
+        "file": "integrations/remote_desktop/device_id.py",
+        "line": 122,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "discover_user_devices",
+        "file": "integrations/remote_desktop/device_id.py",
+        "line": 157,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/security.py": [
+      {
+        "name": "notify_connection_request",
+        "file": "integrations/remote_desktop/security.py",
+        "line": 84,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "decrypt_frame",
+        "file": "integrations/remote_desktop/security.py",
+        "line": 252,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/whisper_tool.py": [
+      {
+        "name": "start_stt_stream_server",
+        "file": "integrations/service_tools/whisper_tool.py",
+        "line": 943,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "get_stt_stream_port",
+        "file": "integrations/service_tools/whisper_tool.py",
+        "line": 1010,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/social/task_delegation.py": [
+      {
+        "name": "delegate_to_best_agent",
+        "file": "integrations/social/task_delegation.py",
+        "line": 11,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "create_ledger_task",
+        "file": "integrations/social/task_delegation.py",
+        "line": 30,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "security/hsm_trust.py": [
+      {
+        "name": "verify_connection",
+        "file": "security/hsm_trust.py",
+        "line": 149,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "start_hsm_monitor",
+        "file": "security/hsm_trust.py",
+        "line": 336,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/integration/test_channels_e2e_regression.py": [
+      {
+        "name": "module_available",
+        "file": "tests/integration/test_channels_e2e_regression.py",
+        "line": 29,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "class_in_module",
+        "file": "tests/integration/test_channels_e2e_regression.py",
+        "line": 38,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_cache_restoration.py": [
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_cache_restoration.py",
+        "line": 174,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_cache_restoration.py",
+        "line": 227,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_gossip_security.py": [
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_gossip_security.py",
+        "line": 163,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_gossip_security.py",
+        "line": 273,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_integrity_system.py": [
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_integrity_system.py",
+        "line": 128,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_integrity_system.py",
+        "line": 732,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_vlm_qwen3vl.py": [
+      {
+        "name": "_make_api_success",
+        "file": "tests/unit/test_vlm_qwen3vl.py",
+        "line": 139,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_make_health_fail",
+        "file": "tests/unit/test_vlm_qwen3vl.py",
+        "line": 161,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_world_model_routing.py": [
+      {
+        "name": "_has_peers",
+        "file": "tests/unit/test_world_model_routing.py",
+        "line": 73,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      },
+      {
+        "name": "_no_peers",
+        "file": "tests/unit/test_world_model_routing.py",
+        "line": 78,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "create_recipe.py": [
+      {
+        "name": "_record_exception",
+        "file": "create_recipe.py",
+        "line": 279,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "agent-ledger-opensource/agent_ledger/graph.py": [
+      {
+        "name": "visualize_ascii",
+        "file": "agent-ledger-opensource/agent_ledger/graph.py",
+        "line": 189,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/command_graph.py": [
+      {
+        "name": "flattened",
+        "file": "claw_native/src/command_graph.py",
+        "line": 15,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/costHook.py": [
+      {
+        "name": "apply_cost_hook",
+        "file": "claw_native/src/costHook.py",
+        "line": 6,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/ink.py": [
+      {
+        "name": "render_markdown_panel",
+        "file": "claw_native/src/ink.py",
+        "line": 4,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/interactiveHelpers.py": [
+      {
+        "name": "bulletize",
+        "file": "claw_native/src/interactiveHelpers.py",
+        "line": 4,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/query_engine.py": [
+      {
+        "name": "replay_user_messages",
+        "file": "claw_native/src/query_engine.py",
+        "line": 134,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/replLauncher.py": [
+      {
+        "name": "build_repl_banner",
+        "file": "claw_native/src/replLauncher.py",
+        "line": 4,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "claw_native/src/tasks.py": [
+      {
+        "name": "default_tasks",
+        "file": "claw_native/src/tasks.py",
+        "line": 6,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "core/platform_paths.py": [
+      {
+        "name": "ensure_data_dirs",
+        "file": "core/platform_paths.py",
+        "line": 175,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "core/resource_governor.py": [
+      {
+        "name": "get_throttle",
+        "file": "core/resource_governor.py",
+        "line": 573,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "core/peer_link/channels.py": [
+      {
+        "name": "get_channel_dispatcher",
+        "file": "core/peer_link/channels.py",
+        "line": 175,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "core/peer_link/local_subscribers.py": [
+      {
+        "name": "get_task_status",
+        "file": "core/peer_link/local_subscribers.py",
+        "line": 207,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "desktop/ai_key_vault.py": [
+      {
+        "name": "clear_pending",
+        "file": "desktop/ai_key_vault.py",
+        "line": 246,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/blueprint_registry.py": [
+      {
+        "name": "register_all_blueprints",
+        "file": "integrations/blueprint_registry.py",
+        "line": 15,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/agent_baseline_service.py": [
+      {
+        "name": "get_baseline_service",
+        "file": "integrations/agent_engine/agent_baseline_service.py",
+        "line": 644,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/erxes_client.py": [
+      {
+        "name": "list_deals_by_stage",
+        "file": "integrations/agent_engine/erxes_client.py",
+        "line": 341,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/federated_aggregator.py": [
+      {
+        "name": "receive_resonance_delta",
+        "file": "integrations/agent_engine/federated_aggregator.py",
+        "line": 785,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/hive_benchmark_prover.py": [
+      {
+        "name": "publish_results",
+        "file": "integrations/agent_engine/hive_benchmark_prover.py",
+        "line": 1082,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/model_bus_service.py": [
+      {
+        "name": "start_dbus_bridge",
+        "file": "integrations/agent_engine/model_bus_service.py",
+        "line": 967,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_engine/revenue_tools.py": [
+      {
+        "name": "register_revenue_tools",
+        "file": "integrations/agent_engine/revenue_tools.py",
+        "line": 13,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/agent_lightning/wrapper.py": [
+      {
+        "name": "emit_custom_reward",
+        "file": "integrations/agent_lightning/wrapper.py",
+        "line": 227,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/hive_signal_bridge.py": [
+      {
+        "name": "attach_to_all",
+        "file": "integrations/channels/hive_signal_bridge.py",
+        "line": 219,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/imessage_adapter.py": [
+      {
+        "name": "download_attachment",
+        "file": "integrations/channels/imessage_adapter.py",
+        "line": 636,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/signal_adapter.py": [
+      {
+        "name": "download_attachment",
+        "file": "integrations/channels/signal_adapter.py",
+        "line": 546,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/registry.py": [
+      {
+        "name": "set_registry",
+        "file": "integrations/channels/registry.py",
+        "line": 245,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/telegram_adapter.py": [
+      {
+        "name": "download_file",
+        "file": "integrations/channels/telegram_adapter.py",
+        "line": 499,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/openprose_adapter.py": [
+      {
+        "name": "add_suggestion",
+        "file": "integrations/channels/extensions/openprose_adapter.py",
+        "line": 337,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/telegram_user_adapter.py": [
+      {
+        "name": "get_session_string",
+        "file": "integrations/channels/extensions/telegram_user_adapter.py",
+        "line": 317,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/extensions/zalo_user_adapter.py": [
+      {
+        "name": "get_session_token",
+        "file": "integrations/channels/extensions/zalo_user_adapter.py",
+        "line": 352,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/media/tts_router.py": [
+      {
+        "name": "_catalog_entry_to_spec",
+        "file": "integrations/channels/media/tts_router.py",
+        "line": 1293,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/memory/simplemem_langchain.py": [
+      {
+        "name": "add_ai_message",
+        "file": "integrations/channels/memory/simplemem_langchain.py",
+        "line": 157,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/channels/queue/concurrency.py": [
+      {
+        "name": "release_all_for_chat",
+        "file": "integrations/channels/queue/concurrency.py",
+        "line": 335,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/coding_agent/claude_hive_session.py": [
+      {
+        "name": "execute_task",
+        "file": "integrations/coding_agent/claude_hive_session.py",
+        "line": 459,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/coding_agent/aider_core/io_adapter.py": [
+      {
+        "name": "get_input",
+        "file": "integrations/coding_agent/aider_core/io_adapter.py",
+        "line": 44,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/coding_agent/aider_core/linter.py": [
+      {
+        "name": "set_linter",
+        "file": "integrations/coding_agent/aider_core/linter.py",
+        "line": 34,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/mcp/mcp_http_bridge.py": [
+      {
+        "name": "_tool_create_goal",
+        "file": "integrations/mcp/mcp_http_bridge.py",
+        "line": 165,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/mcp/mcp_integration.py": [
+      {
+        "name": "get_mcp_tool_descriptions",
+        "file": "integrations/mcp/mcp_integration.py",
+        "line": 382,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/mcp/mcp_server.py": [
+      {
+        "name": "start_sse_server_background",
+        "file": "integrations/mcp/mcp_server.py",
+        "line": 541,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/openclaw/gateway_bridge.py": [
+      {
+        "name": "start_openclaw_gateway",
+        "file": "integrations/openclaw/gateway_bridge.py",
+        "line": 237,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/providers/gateway.py": [
+      {
+        "name": "generate_stream",
+        "file": "integrations/providers/gateway.py",
+        "line": 142,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/providers/registry.py": [
+      {
+        "name": "update_health",
+        "file": "integrations/providers/registry.py",
+        "line": 745,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/clipboard_sync.py": [
+      {
+        "name": "get_current",
+        "file": "integrations/remote_desktop/clipboard_sync.py",
+        "line": 116,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/drag_drop.py": [
+      {
+        "name": "set_receive_directory",
+        "file": "integrations/remote_desktop/drag_drop.py",
+        "line": 95,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/orchestrator.py": [
+      {
+        "name": "detach_tab",
+        "file": "integrations/remote_desktop/orchestrator.py",
+        "line": 589,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/service_manager.py": [
+      {
+        "name": "stop_engine",
+        "file": "integrations/remote_desktop/service_manager.py",
+        "line": 279,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/session_manager.py": [
+      {
+        "name": "get_sessions_for_device",
+        "file": "integrations/remote_desktop/session_manager.py",
+        "line": 284,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/signaling.py": [
+      {
+        "name": "poll_signals_http",
+        "file": "integrations/remote_desktop/signaling.py",
+        "line": 210,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/viewer_client.py": [
+      {
+        "name": "drop_files",
+        "file": "integrations/remote_desktop/viewer_client.py",
+        "line": 323,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/remote_desktop/peripheral_backends/usbip_backend.py": [
+      {
+        "name": "attach_remote",
+        "file": "integrations/remote_desktop/peripheral_backends/usbip_backend.py",
+        "line": 76,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/robotics/intelligence_api.py": [
+      {
+        "name": "register_mcp_tools",
+        "file": "integrations/robotics/intelligence_api.py",
+        "line": 1063,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/kokoro_tool.py": [
+      {
+        "name": "unload_kokoro",
+        "file": "integrations/service_tools/kokoro_tool.py",
+        "line": 168,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/media_agent.py": [
+      {
+        "name": "_select_audio_tool",
+        "file": "integrations/service_tools/media_agent.py",
+        "line": 178,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/model_lifecycle.py": [
+      {
+        "name": "ensure_inference_headroom",
+        "file": "integrations/service_tools/model_lifecycle.py",
+        "line": 1159,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/model_orchestrator.py": [
+      {
+        "name": "notify_downloaded",
+        "file": "integrations/service_tools/model_orchestrator.py",
+        "line": 754,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/runtime_manager.py": [
+      {
+        "name": "setup_available_tools",
+        "file": "integrations/service_tools/runtime_manager.py",
+        "line": 192,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/service_tools/vram_manager.py": [
+      {
+        "name": "get_total_vram",
+        "file": "integrations/service_tools/vram_manager.py",
+        "line": 221,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/social/cross_channel.py": [
+      {
+        "name": "ingest_channel_message",
+        "file": "integrations/social/cross_channel.py",
+        "line": 13,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/social/external_bot_bridge.py": [
+      {
+        "name": "send_to_santaclaw",
+        "file": "integrations/social/external_bot_bridge.py",
+        "line": 245,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/social/federation.py": [
+      {
+        "name": "push_to_followers",
+        "file": "integrations/social/federation.py",
+        "line": 95,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/social/feed_import.py": [
+      {
+        "name": "import_new_items",
+        "file": "integrations/social/feed_import.py",
+        "line": 493,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "integrations/vlm/qwen3vl_backend.py": [
+      {
+        "name": "verify_goal",
+        "file": "integrations/vlm/qwen3vl_backend.py",
+        "line": 674,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "scripts/armor_hevolveai.py": [
+      {
+        "name": "decrypt_bytes",
+        "file": "scripts/armor_hevolveai.py",
+        "line": 67,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "security/master_key.py": [
+      {
+        "name": "verify_revocation_message",
+        "file": "security/master_key.py",
+        "line": 64,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/conftest.py": [
+      {
+        "name": "pytest_configure",
+        "file": "tests/conftest.py",
+        "line": 54,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/testpublish.py": [
+      {
+        "name": "onJoin",
+        "file": "tests/testpublish.py",
+        "line": 15,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/e2e/runtime_tests/mock_services/mock_api_server.py": [
+      {
+        "name": "run_on_port",
+        "file": "tests/e2e/runtime_tests/mock_services/mock_api_server.py",
+        "line": 218,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/standalone/test_complex_agent_comprehensive.py": [
+      {
+        "name": "record_fix",
+        "file": "tests/standalone/test_complex_agent_comprehensive.py",
+        "line": 117,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_source_protection.py": [
+      {
+        "name": "teardown_method",
+        "file": "tests/unit/test_source_protection.py",
+        "line": 361,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_channel_adapters.py": [
+      {
+        "name": "_webhook_config",
+        "file": "tests/unit/test_channel_adapters.py",
+        "line": 57,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_dispatch.py": [
+      {
+        "name": "_make_guardrail_patches",
+        "file": "tests/unit/test_dispatch.py",
+        "line": 133,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_hive_benchmark_prover.py": [
+      {
+        "name": "tearDownModule",
+        "file": "tests/unit/test_hive_benchmark_prover.py",
+        "line": 858,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_parallel_dispatch.py": [
+      {
+        "name": "_failing_dispatch",
+        "file": "tests/unit/test_parallel_dispatch.py",
+        "line": 92,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_theme_service.py": [
+      {
+        "name": "teardown_module",
+        "file": "tests/unit/test_theme_service.py",
+        "line": 889,
+        "is_method": false,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ],
+    "tests/unit/test_voting_rules.py": [
+      {
+        "name": "_make_vote",
+        "file": "tests/unit/test_voting_rules.py",
+        "line": 107,
+        "is_method": true,
+        "is_dunder": false,
+        "is_test": false,
+        "is_event": false,
+        "is_framework": false,
+        "in_all": false
+      }
+    ]
+  }
+}
