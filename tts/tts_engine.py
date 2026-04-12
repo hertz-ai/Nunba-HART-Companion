@@ -1946,7 +1946,14 @@ class _InProcessTTSBackend:
 
     def synthesize(self, text, output_path=None, **kwargs):
         try:
-            result = self._fn(text=text, output_path=output_path, **kwargs)
+            # Only pass params the HARTOS tool function accepts.
+            # Tool functions have varied signatures — don't forward
+            # unknown kwargs (voice, language, speed) that cause TypeError.
+            import inspect
+            sig = inspect.signature(self._fn)
+            accepted = set(sig.parameters.keys())
+            safe_kw = {k: v for k, v in kwargs.items() if k in accepted}
+            result = self._fn(text=text, output_path=output_path, **safe_kw)
             return result
         except Exception as e:
             logger.warning(f"In-process TTS {self._engine_id} failed: {e}")
