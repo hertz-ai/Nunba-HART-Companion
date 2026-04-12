@@ -1131,16 +1131,28 @@ class TTSEngine:
         if backend == BACKEND_PIPER:
             return _LazyPiper()
 
-        # Every other backend is a GPU engine that runs in a HARTOS
-        # subprocess worker. Use the generic adapter driven by
-        # ENGINE_REGISTRY so adding a new GPU engine requires zero
-        # changes here — just register it in tts_router.
-        # Reads from the module-level _BACKEND_TO_REGISTRY_KEY (single
-        # source of truth for the Nunba-constant ↔ HARTOS-registry
-        # bridge — see the top of this file).
+        # Look up the HARTOS ENGINE_REGISTRY spec for this backend.
         registry_key = _BACKEND_TO_REGISTRY_KEY.get(backend)
         if registry_key is None:
             return None
+
+        # Check if the engine is subprocess-capable (has tool_worker_attr).
+        # CPU-only engines (luxtts, pocket_tts, espeak) have tool_module +
+        # tool_function but no worker — they run in-process via direct import.
+        reg = _get_engine_registry()
+        spec = reg.get(registry_key)
+        if spec and not spec.tool_worker_attr:
+            # In-process CPU engine — import and call directly
+            try:
+                import importlib
+                mod = importlib.import_module(spec.tool_module)
+                fn = getattr(mod, spec.tool_function)
+                return _InProcessTTSBackend(fn, registry_key)
+            except Exception as e:
+                logger.warning(f"In-process backend {backend} failed: {e}")
+                return None
+
+        # GPU/subprocess engine — runs via HARTOS RuntimeToolManager
         try:
             return _SubprocessTTSBackend(registry_key)
         except Exception as e:
@@ -1919,6 +1931,29 @@ class _SubprocessTTSBackend:
                 self._worker.stop()
             except Exception as e:
                 logger.warning(f"{self._engine_id} stop failed: {e}")
+
+
+class _InProcessTTSBackend:
+    """Generic in-process TTS backend for CPU engines (luxtts, pocket_tts, espeak).
+
+    These engines have a tool_module + tool_function but no subprocess worker.
+    We import the function and call it directly in-process.
+    """
+
+    def __init__(self, synth_fn, engine_id: str):
+        self._fn = synth_fn
+        self._engine_id = engine_id
+
+    def synthesize(self, text, output_path=None, **kwargs):
+        try:
+            result = self._fn(text=text, output_path=output_path, **kwargs)
+            return result
+        except Exception as e:
+            logger.warning(f"In-process TTS {self._engine_id} failed: {e}")
+            return None
+
+    def stop(self):
+        pass  # No subprocess to stop
 
 
 class _LazyPiper:
