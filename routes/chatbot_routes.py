@@ -2203,23 +2203,39 @@ def chat_route():
             except Exception as e:
                 logger.warning(f'LangChain pipeline unavailable, falling back to raw llama: {e}')
 
-        # --- Tier 2: Fallback to raw Llama.cpp (port 8080) ---
+        # --- Tier 2: Fallback to raw llama-server ---
+        # Try 0.8B draft first (fast, always available), then 4B.
+        # The 4B may be stuck serving daemon autogen goals.
         try:
             from llama.llama_config import check_llama_health, get_llama_endpoint
-            if check_llama_health():
-                endpoint = get_llama_endpoint()
-                messages = [{"role": "user", "content": text}]
-                if system_prompt:
-                    messages.insert(0, {"role": "system", "content": system_prompt})
+            messages = [{"role": "user", "content": text}]
+            if system_prompt:
+                messages.insert(0, {"role": "system", "content": system_prompt})
+            _payload = {"model": "local", "messages": messages, "stream": False}
 
+            # Try 0.8B draft first (port 8081) — 5s timeout, fast fallback
+            response_text = ''
+            try:
+                _draft_resp = requests.post(
+                    "http://127.0.0.1:8081/v1/chat/completions",
+                    json={**_payload, "max_tokens": 200},
+                    timeout=5,
+                )
+                if _draft_resp.status_code == 200:
+                    _dr = _draft_resp.json()
+                    if 'choices' in _dr:
+                        response_text = _dr["choices"][0]["message"]["content"]
+                        logger.info(f"Tier-2 draft 0.8B responded: {response_text[:60]}...")
+            except Exception:
+                pass
+
+            # If draft didn't respond, try 4B (may be slow/stuck)
+            if not response_text and check_llama_health():
+                endpoint = get_llama_endpoint()
                 response = requests.post(
                     f"{endpoint}/v1/chat/completions",
-                    json={
-                        "model": "local",
-                        "messages": messages,
-                        "stream": False
-                    },
-                    timeout=120
+                    json=_payload,
+                    timeout=30,
                 )
                 result = response.json()
                 response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
