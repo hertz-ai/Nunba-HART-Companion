@@ -522,31 +522,72 @@ class LlamaConfig:
         else:
             model_idx = diag['best_model_index']
 
-        # VRAM coexistence: if other GPU models need VRAM (F5-TTS, whisper, VLM),
-        # reduce the LLM budget to leave room. Transparent to user — just picks
-        # the best model that fits alongside everything else.
+        # VRAM-tiered model selection:
+        #   ≥8GB → 4B (recommended), draft 0.8B runs separately
+        #   6GB  → 2B pinned, NO draft. Reserve for TTS (CPU engines).
+        #          0.8B VLM loaded on-demand for vision, evicted after.
+        #   4GB  → 2B auto-download, NO draft (no headroom)
+        #   ≤2GB → 0.8B only, serves both draft + agentic
+        #
+        # TTS reserve is dynamic: F5-TTS needs 2.5GB VRAM but on ≤6GB cards
+        # the TTS ladder falls through to CPU engines (kokoro/piper/espeak),
+        # so we don't reserve VRAM for TTS on small GPUs.
         preset = MODEL_PRESETS[model_idx]
         try:
             vram_mgr = self._get_vram_manager()
-            if vram_mgr and diag.get('gpu_type') == 'nvidia':
+            if vram_mgr and diag.get('gpu_type') in ('nvidia', 'cuda'):
                 total_gb = vram_mgr.get_total_vram()
-                # Estimate VRAM needed by non-LLM models that will likely load:
-                # F5-TTS (2.5GB if audio mode) is the main consumer.
-                tts_reserve_gb = 2.5  # F5 model + inference buffers
-                kv_reserve_gb = 1.5   # KV cache for 10K context
                 os_reserve_gb = 0.5   # display + OS
-                available_for_llm_mb = int((total_gb - tts_reserve_gb
-                                            - kv_reserve_gb - os_reserve_gb) * 1024)
-                if preset.size_mb > available_for_llm_mb:
-                    better_idx = self._find_best_fitting_model(available_for_llm_mb)
-                    if better_idx != model_idx:
+
+                if total_gb <= 2.0:
+                    # ≤2GB: force 0.8B — it's the only model that fits
+                    target_idx = self._find_preset_by_size('0.8B')
+                    if target_idx is not None and target_idx != model_idx:
                         logger.info(
-                            f"VRAM coexistence: {preset.display_name} ({preset.size_mb}MB) "
-                            f"too large for {available_for_llm_mb}MB budget "
-                            f"(total={total_gb}GB - TTS={tts_reserve_gb}GB - KV={kv_reserve_gb}GB). "
-                            f"Selecting {MODEL_PRESETS[better_idx].display_name}")
-                        model_idx = better_idx
+                            f"VRAM tier ≤2GB: forcing {MODEL_PRESETS[target_idx].display_name} "
+                            f"(only model that fits {total_gb:.1f}GB)")
+                        model_idx = target_idx
                         preset = MODEL_PRESETS[model_idx]
+                elif total_gb <= 6.0:
+                    # 4-6GB: force 2B (no TTS VRAM reserve — ladder uses CPU engines)
+                    kv_reserve_gb = 0.8  # smaller KV for 2B model
+                    available_mb = int((total_gb - kv_reserve_gb - os_reserve_gb) * 1024)
+                    target_idx = self._find_preset_by_size('2B')
+                    if target_idx is not None:
+                        p = MODEL_PRESETS[target_idx]
+                        if p.size_mb <= available_mb:
+                            if target_idx != model_idx:
+                                logger.info(
+                                    f"VRAM tier {total_gb:.0f}GB: selecting "
+                                    f"{p.display_name} ({p.size_mb}MB) — "
+                                    f"no draft, CPU TTS, headroom for on-demand VLM")
+                            model_idx = target_idx
+                            preset = MODEL_PRESETS[model_idx]
+                        else:
+                            # 2B doesn't fit (unlikely on 4GB) — fall to best fitting
+                            better_idx = self._find_best_fitting_model(available_mb)
+                            if better_idx != model_idx:
+                                logger.info(
+                                    f"VRAM tier {total_gb:.0f}GB: 2B too large, "
+                                    f"selecting {MODEL_PRESETS[better_idx].display_name}")
+                                model_idx = better_idx
+                                preset = MODEL_PRESETS[model_idx]
+                else:
+                    # ≥8GB: full coexistence — reserve for F5-TTS + KV
+                    tts_reserve_gb = 2.5  # F5 model + inference buffers
+                    kv_reserve_gb = 1.5   # KV cache for 10K context
+                    available_for_llm_mb = int((total_gb - tts_reserve_gb
+                                                - kv_reserve_gb - os_reserve_gb) * 1024)
+                    if preset.size_mb > available_for_llm_mb:
+                        better_idx = self._find_best_fitting_model(available_for_llm_mb)
+                        if better_idx != model_idx:
+                            logger.info(
+                                f"VRAM coexistence: {preset.display_name} ({preset.size_mb}MB) "
+                                f"too large for {available_for_llm_mb}MB budget "
+                                f"(total={total_gb}GB - TTS={tts_reserve_gb}GB). "
+                                f"Selecting {MODEL_PRESETS[better_idx].display_name}")
+                            model_idx = better_idx
+                            preset = MODEL_PRESETS[model_idx]
         except Exception as _e:
             logger.debug(f"VRAM coexistence check skipped: {_e}")
 
@@ -691,6 +732,21 @@ class LlamaConfig:
                 best_idx = i
                 best_size = preset.size_mb
         return best_idx
+
+    def _find_preset_by_size(self, size_label: str) -> int | None:
+        """Find a Qwen3.5 VL model preset by size label (e.g. '0.8B', '2B', '4B').
+
+        Prefers Qwen3.5 VL models over older Qwen3-VL or text-only variants.
+        Returns the MODEL_PRESETS index, or None if not found.
+        """
+        for i, p in enumerate(MODEL_PRESETS):
+            if size_label in p.display_name and 'Qwen3.5' in p.display_name:
+                return i
+        # Fallback: any model with that size label
+        for i, p in enumerate(MODEL_PRESETS):
+            if size_label in p.display_name:
+                return i
+        return None
 
     def _find_best_downloaded_model(self, budget_mb: int) -> int | None:
         """Find the largest already-downloaded model that fits the budget."""

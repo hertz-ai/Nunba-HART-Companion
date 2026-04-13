@@ -878,12 +878,23 @@ class TTSEngine:
             if not TTSEngine._import_check_cache['_torch_cuda']:
                 return False
 
-        # ── VRAM check: enough room? ──
-        # GPU backends can still run in cpu_offload mode if VRAM is tight.
-        # Don't block the backend — let the model loader decide the fit mode.
+        # ── VRAM check: enough room alongside the LLM? ──
+        # GPU-heavy TTS engines (F5=2.5GB, chatterbox=1.5GB) need VRAM that
+        # may already be consumed by the LLM. On ≤6GB cards the LLM is pinned
+        # and leaves no headroom — skip to CPU engines (kokoro/piper/espeak)
+        # instead of installing a GPU engine that will OOM at inference time.
         if required_vram == 0:
             return True
-        # As long as GPU + CUDA exist, the backend is runnable (cpu_offload as fallback)
+        try:
+            from integrations.service_tools.vram_manager import vram_manager
+            free_gb = vram_manager.get_free_vram()
+            if free_gb < required_vram:
+                logger.info(
+                    f"Backend {backend} skipped: needs {required_vram}GB VRAM "
+                    f"but only {free_gb:.1f}GB free (LLM pinned)")
+                return False
+        except Exception:
+            pass  # VRAMManager unavailable — let it try
         return True
 
     # Track which backends have a background auto-install in progress

@@ -416,8 +416,50 @@ def _deferred_platform_init():
     # Disable the draft eager-boot with HEVOLVE_DRAFT_FIRST=0.
     # Disable the main eager-boot with HEVOLVE_EAGER_LLM=0 (e.g. when
     # running against a remote llama.cpp server already serving :8080).
-    _boot_draft = os.environ.get('HEVOLVE_DRAFT_FIRST', '').strip() != '0'
-    _boot_main = os.environ.get('HEVOLVE_EAGER_LLM', '').strip() != '0'
+    #
+    # VRAM-tiered boot strategy (auto-detected unless env overrides):
+    #   ≥8GB VRAM → boot both 0.8B draft + 4B main (headroom for TTS/VLM)
+    #   6GB  VRAM → boot 2B only, NO draft (TTS needs headroom; 0.8B VLM on-demand)
+    #   4GB  VRAM → boot 2B only, NO draft (no headroom for both)
+    #   ≤2GB VRAM → boot 0.8B only, serves BOTH draft + agentic (single model)
+    #   CPU-only  → boot whatever fits in RAM, no draft (RAM is slower, avoid 2x)
+    _vram_gb = 0.0
+    try:
+        from integrations.service_tools.vram_manager import vram_manager
+        gpu_info = vram_manager.detect_gpu()
+        if gpu_info.get('cuda_available') or gpu_info.get('metal_available'):
+            _vram_gb = vram_manager.get_total_vram()
+            logging.info(f"VRAM-tiered boot: detected {_vram_gb:.1f}GB GPU VRAM")
+    except Exception:
+        pass
+
+    # Env var overrides take priority; otherwise auto-detect from VRAM tier
+    _draft_env = os.environ.get('HEVOLVE_DRAFT_FIRST', '').strip()
+    _main_env = os.environ.get('HEVOLVE_EAGER_LLM', '').strip()
+
+    if _draft_env:
+        _boot_draft = _draft_env != '0'
+    else:
+        # Draft needs ~1GB VRAM for 0.8B + KV. Only worth running when
+        # there's enough VRAM for BOTH a main model AND the draft.
+        _boot_draft = _vram_gb >= 8.0
+
+    if _main_env:
+        _boot_main = _main_env != '0'
+    else:
+        _boot_main = True  # Always boot a main model (size selected by VRAM budget)
+
+    if _vram_gb > 0 and not _boot_draft:
+        if _vram_gb <= 2.0:
+            logging.info(
+                "VRAM tier ≤2GB: 0.8B serves both draft + agentic (single model)")
+        elif _vram_gb <= 6.0:
+            logging.info(
+                f"VRAM tier {_vram_gb:.0f}GB: 2B main only, no draft "
+                f"(reserve headroom for TTS/VLM)")
+    elif _vram_gb >= 8.0 and _boot_draft:
+        logging.info(
+            f"VRAM tier {_vram_gb:.0f}GB: dual mode — 0.8B draft + main model")
 
     if _boot_draft:
         def _boot_draft_server():
