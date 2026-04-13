@@ -3285,27 +3285,32 @@ def register_routes(app):
     app.route("/agents/<prompt_id>/post", methods=["POST"])(agent_post)
 
     # TTS audio serving — for async push playback (pupit topic)
+    # Cache the search_dirs list (perf-engineer: glob on every request is ~2ms)
+    _tts_search_dirs = None
+    _tts_search_dirs_ts = 0
+
     def tts_serve_audio(filename):
         """Serve a TTS audio file by filename. Used by frontend after WAMP/SSE push."""
-        import tempfile
+        nonlocal _tts_search_dirs, _tts_search_dirs_ts
         from pathlib import Path
         from flask import send_file, abort
-        # Security: only serve from temp dir, no path traversal
+        # Security: only serve from known dirs, no path traversal
         if '..' in filename or '/' in filename or '\\' in filename:
             abort(400)
-        # Search all TTS output directories.
-        # HARTOS engines write to ~/.hevolve/models/<engine>/output/
-        # Nunba engines write to ~/.nunba/<engine>/cache/
-        # Glob ~/.hevolve/models/*/output/ so new engines are found automatically.
-        _home = Path.home()
-        search_dirs = list((_home / '.hevolve' / 'models').glob('*/output'))
-        search_dirs += [
-            _home / '.nunba' / 'piper' / 'cache',
-            _home / '.nunba' / 'vibevoice' / 'cache',
-            _home / '.nunba' / 'tts_cache' / 'presynth',
-            _home / '.nunba' / 'tts_cache',
-            # tempdir removed — serves arbitrary files (ethical-hacker finding)
-        ]
+        # Cache search dirs for 30s — engine dirs don't change often
+        import time as _t
+        now = _t.time()
+        if _tts_search_dirs is None or now - _tts_search_dirs_ts > 30:
+            _home = Path.home()
+            _tts_search_dirs = list((_home / '.hevolve' / 'models').glob('*/output'))
+            _tts_search_dirs += [
+                _home / '.nunba' / 'piper' / 'cache',
+                _home / '.nunba' / 'vibevoice' / 'cache',
+                _home / '.nunba' / 'tts_cache' / 'presynth',
+                _home / '.nunba' / 'tts_cache',
+            ]
+            _tts_search_dirs_ts = now
+        search_dirs = _tts_search_dirs
         for d in search_dirs:
             path = d / filename
             if path.is_file():

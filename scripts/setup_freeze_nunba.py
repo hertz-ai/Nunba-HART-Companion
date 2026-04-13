@@ -399,7 +399,9 @@ build_exe_options = {
         + [(f, f) for f in glob.glob("*.json")]
         # 3. Auto-include ALL .png/.ico asset files from project root
         + [(f, f) for f in glob.glob("*.png") + glob.glob("*.ico")]
-        # 4. Key directories
+        # 4. License (origin attestation requires it)
+        + ([("LICENSE", "LICENSE")] if os.path.isfile("LICENSE") else [])
+        # 5. Key directories
         + [
             ("templates", "templates"),
             ("landing-page/build", "landing-page/build"),
