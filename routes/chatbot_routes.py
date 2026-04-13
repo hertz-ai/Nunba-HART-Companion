@@ -62,19 +62,38 @@ def _fire_nunba_tts(text, user_id, request_id, language='en'):
             if audio_path and os.path.isfile(audio_path):
                 audio_filename = os.path.basename(audio_path)
                 audio_url = f'/tts/audio/{audio_filename}'
-                # Push via SSE
+                import json as _json
+                _payload = {
+                    'text': [text[:200]],
+                    'generated_audio_url': audio_url,
+                    'request_id': str(request_id),
+                    'action': 'TTS',
+                }
+                # Push via ALL transports so every consumer gets audio:
+                # 1. SSE (local Nunba desktop)
+                # 2. Local embedded WAMP (LAN clients)
+                # 3. Cloud Crossbar WAMP (Hevolve web + Android)
                 import sys as _sys
                 main_mod = _sys.modules.get('__main__')
                 if main_mod and hasattr(main_mod, 'broadcast_sse_event'):
-                    import json as _json
-                    _payload = {
-                        'text': [text[:200]],
-                        'generated_audio_url': audio_url,
-                        'request_id': str(request_id),
-                        'action': 'TTS',
-                    }
                     main_mod.broadcast_sse_event('message', _payload, user_id=user_id)
-                    logger.info(f"Nunba TTS: published {audio_url} for {user_id}")
+                # WAMP publish_async → reaches cloud Crossbar + PeerLink + MessageBus
+                try:
+                    from routes.hartos_backend_adapter import _hartos_backend_available
+                    if _hartos_backend_available:
+                        import hart_intelligence as _hi
+                        _hi.publish_async(
+                            f'com.hertzai.pupit.{user_id}',
+                            _json.dumps(_payload))
+                    else:
+                        # Tier-1 down — publish via embedded WAMP directly
+                        from wamp_router import publish_local
+                        publish_local(
+                            f'com.hertzai.pupit.{user_id}',
+                            [_payload])
+                except Exception:
+                    pass
+                logger.info(f"Nunba TTS: published {audio_url} for {user_id}")
         except Exception as e:
             logger.debug(f"Nunba TTS failed: {e}")
 
