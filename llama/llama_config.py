@@ -1488,7 +1488,7 @@ class LlamaConfig:
             return False
 
         cmd = [str(binary_path), "--model", str(model_path),
-               "--port", str(port), "--ctx-size", "1536",
+               "--port", str(port), "--ctx-size", "2048",
                "--threads", "4"]
         if mmproj_path:
             cmd.extend(["--mmproj", str(mmproj_path), "--kv-unified"])
