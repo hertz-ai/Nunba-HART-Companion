@@ -34,6 +34,53 @@ logger = logging.getLogger(__name__)
 from routes.auth import require_local_or_token as _require_local_or_token
 
 
+# ============== Nunba-layer TTS (works on ALL tiers) ==============
+
+def _fire_nunba_tts(text, user_id, request_id, language='en'):
+    """Synthesize TTS and push audio via SSE — works regardless of HARTOS tier.
+
+    Called from chat_route when HARTOS Tier-1 didn't handle TTS.
+    Uses Nunba's own tts_engine (kokoro/piper/indic_parler) and pushes
+    the audio URL to the frontend via SSE broadcast.
+    """
+    import threading
+
+    def _bg():
+        try:
+            from tts.tts_engine import synthesize_text
+            import re
+            # Clean text for TTS
+            _clean = re.sub(r'```[\s\S]*?```', '', text)
+            _clean = re.sub(r'`[^`]+`', '', _clean)
+            _clean = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', _clean)
+            _clean = re.sub(r'https?://\S+', '', _clean)
+            _clean = re.sub(r'[*_~]{1,3}', '', _clean)
+            _clean = re.sub(r'\s+', ' ', _clean).strip()
+            if not _clean:
+                return
+            audio_path = synthesize_text(_clean, language=language)
+            if audio_path and os.path.isfile(audio_path):
+                audio_filename = os.path.basename(audio_path)
+                audio_url = f'/tts/audio/{audio_filename}'
+                # Push via SSE
+                import sys as _sys
+                main_mod = _sys.modules.get('__main__')
+                if main_mod and hasattr(main_mod, 'broadcast_sse_event'):
+                    import json as _json
+                    _payload = {
+                        'text': [text[:200]],
+                        'generated_audio_url': audio_url,
+                        'request_id': str(request_id),
+                        'action': 'TTS',
+                    }
+                    main_mod.broadcast_sse_event('message', _payload, user_id=user_id)
+                    logger.info(f"Nunba TTS: published {audio_url} for {user_id}")
+        except Exception as e:
+            logger.debug(f"Nunba TTS failed: {e}")
+
+    threading.Thread(target=_bg, daemon=True, name='nunba-tts').start()
+
+
 # ============== Try to import hart-backend ==============
 HEVOLVE_CHAT_AVAILABLE = False
 HEVOLVE_PROMPTS_AVAILABLE = False
@@ -1896,10 +1943,10 @@ def chat_route():
         else:
             media_mode = 'text'   # Cloud/web default
     audio_mode = media_mode in ('audio', 'video')
-    # TTS is handled INSIDE HARTOS /chat handler (line 5449 in hart_intelligence_entry.py).
-    # Do NOT call _tts_synthesize_and_publish here — it creates a duplicate call that
-    # races with the HARTOS one and kills the executor via after_this_request timing
-    # (Flask test_client context closes → "cannot schedule new futures after shutdown").
+    # TTS: fire at THIS layer (Nunba) so it works on ALL tiers — not just Tier-1.
+    # When HARTOS Tier-1 is active, it ALSO fires TTS internally via _chat_reply.
+    # To avoid duplicate audio, we check if HARTOS handled the request (Tier-1).
+    # If Tier-2/3 produced the text, we synthesize here.
 
     # Find the agent configuration
     agent_config = None
@@ -2212,6 +2259,9 @@ def chat_route():
                             args=(langchain_prompt_id, user_id, agent_name_for_post),
                             daemon=True
                         ).start()
+                    # TTS at Nunba layer — works on ALL tiers
+                    if audio_mode and response_text and not _hartos_backend_available:
+                        _fire_nunba_tts(response_text, user_id, request_id, preferred_lang)
                     return jsonify(response_json)
                 else:
                     logger.warning(f'LangChain returned error or empty: {result}')
@@ -2255,13 +2305,16 @@ def chat_route():
                 result = response.json()
                 response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-                return jsonify({
+                _resp = {
                     'text': response_text,
                     'agent_id': agent_id,
                     'agent_type': 'local',
                     'source': 'llama_local',
                     'success': True
-                })
+                }
+                if audio_mode and response_text:
+                    _fire_nunba_tts(response_text, user_id, request_id, preferred_lang)
+                return jsonify(_resp)
         except ImportError:
             logger.warning('Llama config not available')
         except Exception as e:
