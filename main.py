@@ -2875,6 +2875,62 @@ def view_log():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/diag/thread-dump', methods=['POST'])
+@require_local_or_token
+def admin_diag_thread_dump():
+    """On-demand thread-stack dump for diagnosing a live hang.
+
+    Calls `_dump_all_thread_stacks()` (app.py) which writes to BOTH
+    the logger AND ~/Documents/Nunba/logs/startup_trace.log (the
+    trace channel flushes immediately and survives GIL-held hangs).
+    Returns the number of threads dumped + path to the trace file.
+
+    Guards: local-or-token gate (no remote callers); on
+    regional/central topologies a future `@require_central` wrap
+    SHOULD reject since thread stacks leak cross-tenant memory.
+    For flat (desktop) topology the local gate is sufficient.
+    """
+    try:
+        # _dump_all_thread_stacks is defined at module level in app.py.
+        # In frozen bundled mode, it was published on __builtins__ via
+        # `_builtins._nunba_trace = ...` pattern; falling through to
+        # direct lookup for dev mode where app.py is the entry script.
+        _dumper = None
+        try:
+            import __main__ as _m
+            _dumper = getattr(_m, '_dump_all_thread_stacks', None)
+        except Exception:
+            pass
+        if _dumper is None:
+            try:
+                import app as _app_mod
+                _dumper = getattr(_app_mod, '_dump_all_thread_stacks', None)
+            except Exception:
+                pass
+        if _dumper is None:
+            return jsonify({
+                'error': 'thread_dump_unavailable',
+                'message': 'app._dump_all_thread_stacks not found',
+            }), 503
+        reason = (request.get_json(silent=True) or {}).get(
+            'reason', 'admin-requested'
+        )
+        _dumper(f"admin diag: {reason}")
+        import threading as _t
+        return jsonify({
+            'success': True,
+            'threads_dumped': _t.active_count(),
+            'trace_file': os.path.join(
+                os.path.expanduser('~'), 'Documents', 'Nunba',
+                'logs', 'startup_trace.log',
+            ),
+            'reason': reason,
+        })
+    except Exception as e:
+        logging.error(f"thread-dump admin endpoint failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/logs/download', methods=['GET'])
 @require_local_or_token
 def download_log():
