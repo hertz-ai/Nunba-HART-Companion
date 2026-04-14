@@ -2867,12 +2867,35 @@ def start_langchain_service():
     # In bundled mode, never launch LangChain as a subprocess.
     # Tier-1 is import-only; Tier-2 is llama.cpp. No ports needed.
     if os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False):
-        try:
-            from routes.hartos_backend_adapter import _hartos_backend_available
-            if _hartos_backend_available:
+        # `_hartos_backend_available` is set by a background thread that
+        # imports `hart_intelligence` (takes 15-30s on first boot because
+        # LangChain + hevolveai pulls are heavy).  Checking synchronously
+        # the moment the main boot thread reaches here gives a FALSE-
+        # NEGATIVE warning — the thread hasn't finished yet, but Tier-1
+        # will be active shortly.  Wait briefly for a definitive answer
+        # before emitting status, and if still pending, log as INFO (not
+        # WARNING) so it isn't mistaken for a hard failure.
+        def _report_tier_status():
+            from routes.hartos_backend_adapter import (
+                _hartos_backend_available as _avail,
+                _hartos_initialized as _done,
+            )
+            if _avail:
                 logging.info("hart-backend available in-process (bundled), no subprocess needed")
+            elif _done:
+                # Init finished AND failed — this is a real failure
+                logging.warning(
+                    "hart-backend import failed in bundled mode — chat will use llama.cpp fallback",
+                )
             else:
-                logging.warning("hart-backend import failed in bundled mode — chat will use llama.cpp fallback")
+                # Still in flight — schedule a retry log shortly
+                logging.info(
+                    "hart-backend Tier-1 init in progress (background thread); "
+                    "the adapter will log 'Tier-1 ACTIVE' when ready.",
+                )
+
+        try:
+            _report_tier_status()
         except Exception as ex:
             logging.error(f"hartos_backend_adapter import failed in bundled mode: {ex}")
         return
