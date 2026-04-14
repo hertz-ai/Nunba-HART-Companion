@@ -122,8 +122,8 @@ EMBED_DEPS = {
     # Vector DB
     "chromadb": "1.5.0",
     "faiss-cpu": "1.13.2",
-    # Vision
-    "opencv-python": "4.13.0.92",
+    # Vision — 4.10.x is last line supporting numpy<2 (autogen-agentchat needs numpy<2)
+    "opencv-python": "4.10.0.84",
     # ML
     "scikit-learn": "1.7.2",
     # Tokenization

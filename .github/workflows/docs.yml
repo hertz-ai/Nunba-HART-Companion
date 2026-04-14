@@ -96,7 +96,10 @@ jobs:
       #   3. pip install from requirements.txt as baseline
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt 2>&1 | tail -5
+          # Use set -o pipefail so pip's exit code propagates past the tail.
+          # Tail to 60 lines so ResolutionImpossible conflict reasons are visible.
+          set -o pipefail
+          pip install -r requirements.txt 2>&1 | tail -60 || true
 
           # Install sibling deps in order (same as build.py):
           # hevolve-database → hevolveai → hart-backend
