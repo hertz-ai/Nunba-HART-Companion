@@ -114,15 +114,21 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: ESLint
-        run: npx eslint src/ --max-warnings 50 --ext .js,.jsx
-        continue-on-error: true
-        # ADVISORY (transitional) — frontend has 1,700+ pre-existing
-        # ESLint violations (prettier/prettier, import/order, case-
-        # sensitivity of imports on Linux runners).  Gating Jest behind
-        # ESLint blocked ALL frontend test coverage for months.  Flip
-        # this back to HARD GATE after a focused `npx prettier --write`
-        # + `eslint --fix` + case-fix PR (tracked separately) — Jest
-        # itself stays hard-gated below.
+        run: npx eslint src/ --max-warnings 1500 --ext .js,.jsx
+        # HARD GATE (task #280) — 0 errors required.  Pre-existing style
+        # debt demoted to warnings in .eslintrc.js (prettier/prettier,
+        # camelcase, import/order, react/no-unescaped-entities, react-
+        # hooks/exhaustive-deps, spaced-comment, new-cap, no-var,
+        # prefer-const).  security/detect-object-injection disabled
+        # (1,100+ false positives on legit bracket access; run targeted
+        # security audits separately).
+        #
+        # Warning budget ladder (lower as debt shrinks):
+        #   current baseline ≈1,215 warnings → cap 1,500 (~25% headroom)
+        #   next reduction PR: target 750 → cap 800
+        #   final state:      target <200  → cap 200
+        # DO NOT raise the cap without a tracking issue — regressions
+        # should be fixed, not accommodated.
 
       - name: Jest unit tests
         run: npx react-scripts test --watchAll=false --ci --forceExit --coverage
