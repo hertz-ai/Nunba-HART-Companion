@@ -1354,8 +1354,10 @@ def admin_models_download(model_id):
     if not _is_local_request():
         return jsonify({"error": "local only"}), 403
     try:
+        import threading
+        import time
+
         from models.orchestrator import get_orchestrator
-        import threading, time
         orch = get_orchestrator()
 
         _download_progress[model_id] = {
@@ -1427,6 +1429,7 @@ def admin_models_health():
     """
     try:
         from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+
         from models.orchestrator import get_orchestrator
         mlm = get_model_lifecycle_manager()
 
@@ -1486,6 +1489,7 @@ def admin_models_swap():
         return jsonify({"error": "local only"}), 403
     try:
         from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+
         from models.orchestrator import get_orchestrator
         data = request.get_json(silent=True) or {}
         needed = data.get('needed_model')
@@ -1956,7 +1960,7 @@ def broadcast_sse_event(event_type, data, user_id=None):
     """
     # Mirror to embedded WAMP router for crossbarWorker.js subscribers
     try:
-        from wamp_router import publish_local, is_running
+        from wamp_router import is_running, publish_local
         if is_running() and user_id:
             # Map event types to the WAMP topics crossbarWorker.js subscribes to
             wamp_data = dict(data) if isinstance(data, dict) else {'raw': data}
@@ -2033,7 +2037,7 @@ def wamp_http_bridge():
     This replaces the Crossbar.io HTTP Bridge Service for local/bundled mode.
     """
     try:
-        from wamp_router import publish_local, is_running
+        from wamp_router import is_running, publish_local
         if not is_running():
             return jsonify({'error': 'WAMP router not running'}), 503
         data = request.get_json(silent=True) or {}

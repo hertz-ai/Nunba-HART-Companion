@@ -786,7 +786,7 @@ class TTSEngine:
             self._detect_hardware()
 
     @classmethod
-    def _get_vram_tool_name(cls, backend: str) -> Optional[str]:
+    def _get_vram_tool_name(cls, backend: str) -> str | None:
         """Nunba backend constant → VRAMManager tool name.
 
         Derives from HARTOS ENGINE_REGISTRY[key].vram_key — no local
@@ -801,7 +801,7 @@ class TTSEngine:
         return spec.vram_key if spec else None
 
     @classmethod
-    def _get_required_package(cls, backend: str) -> Optional[str]:
+    def _get_required_package(cls, backend: str) -> str | None:
         """Nunba backend constant → pip package required for in-process run.
 
         Derives from HARTOS ENGINE_REGISTRY[key].required_package.
@@ -1357,8 +1357,7 @@ class TTSEngine:
             pass
 
         try:
-            from integrations.service_tools.media_agent import (
-                generate_media, check_media_status)
+            from integrations.service_tools.media_agent import check_media_status, generate_media
             raw = generate_media(
                 context=text, output_modality=modality,
                 input_text=text, duration=duration, style=genre)
@@ -1886,7 +1885,7 @@ class _SubprocessTTSBackend:
     # ── Interface expected by TTSEngine.synthesize ──────────────
 
     @property
-    def _device(self) -> Optional[str]:
+    def _device(self) -> str | None:
         """TTSEngine reads this to decide the VRAM-inference check path.
 
         Returns 'cuda' when the worker subprocess is alive (model is

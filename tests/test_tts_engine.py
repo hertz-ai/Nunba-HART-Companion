@@ -206,8 +206,9 @@ class TestKokoroEnglishLadder:
 
     def test_kokoro_in_english_preference_before_piper(self):
         from tts.tts_engine import (
-            BACKEND_KOKORO, BACKEND_PIPER,
             _FALLBACK_LANG_ENGINE_PREFERENCE,
+            BACKEND_KOKORO,
+            BACKEND_PIPER,
         )
         prefs = _FALLBACK_LANG_ENGINE_PREFERENCE['en']
         assert BACKEND_KOKORO in prefs
@@ -216,11 +217,11 @@ class TestKokoroEnglishLadder:
         assert prefs.index(BACKEND_KOKORO) < prefs.index(BACKEND_PIPER)
 
     def test_kokoro_registry_key_wired(self):
-        from tts.tts_engine import BACKEND_KOKORO, _BACKEND_TO_REGISTRY_KEY
+        from tts.tts_engine import _BACKEND_TO_REGISTRY_KEY, BACKEND_KOKORO
         assert _BACKEND_TO_REGISTRY_KEY[BACKEND_KOKORO] == 'kokoro'
 
     def test_kokoro_catalog_id_wired(self):
-        from tts.tts_engine import BACKEND_KOKORO, _BACKEND_TO_CATALOG
+        from tts.tts_engine import _BACKEND_TO_CATALOG, BACKEND_KOKORO
         # _registry_key_to_catalog_id('kokoro') == 'kokoro' (no underscores)
         assert _BACKEND_TO_CATALOG[BACKEND_KOKORO] == 'kokoro'
 
@@ -878,7 +879,7 @@ class TestSubprocessTTSBackend:
         adapter = self._make_adapter('f5_tts', mock_fn)
         try:
             adapter.synthesize(text='hi', output_path='/out.wav')
-            assert False, 'expected RuntimeError'
+            raise AssertionError('expected RuntimeError')
         except RuntimeError as e:
             assert getattr(e, 'transient', False) is True
 
@@ -935,7 +936,8 @@ class TestSubprocessTTSBackend:
         tool_worker_attr set so the subprocess adapter can find the
         ToolWorker instance. Missing this field = silent CPU fallback."""
         from integrations.channels.media.tts_router import (
-            ENGINE_REGISTRY, TTSDevice,
+            ENGINE_REGISTRY,
+            TTSDevice,
         )
         gpu_engines = [
             eid for eid, spec in ENGINE_REGISTRY.items()

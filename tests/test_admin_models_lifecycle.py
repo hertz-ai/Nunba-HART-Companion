@@ -70,8 +70,9 @@ def test_e1_ttsloader_load_spawns_worker(echo_tool_worker):
     """Calling TTSLoader.load() on a GPU entry must trigger
     _get_or_start() on the underlying ToolWorker — the admin UI's
     'Load' button really puts the model in memory."""
-    from models.orchestrator import TTSLoader
     from integrations.service_tools.model_catalog import ModelEntry, ModelType
+
+    from models.orchestrator import TTSLoader
 
     entry = ModelEntry(
         id='tts-f5_tts',
@@ -107,8 +108,9 @@ def test_e1_ttsloader_load_spawns_worker(echo_tool_worker):
 def test_e2_ttsloader_unload_stops_worker(echo_tool_worker):
     """Unload button must actually stop the worker subprocess and
     release VRAM — previously it was a pass/no-op."""
-    from models.orchestrator import TTSLoader
     from integrations.service_tools.model_catalog import ModelEntry, ModelType
+
+    from models.orchestrator import TTSLoader
 
     echo_tool_worker._get_or_start()
     assert echo_tool_worker.is_alive()
@@ -144,8 +146,9 @@ def test_e3_idle_stop_shows_in_is_loaded(echo_tool_worker):
     """When the ToolWorker's idle timer stops the subprocess, the
     loader's is_loaded() probe must return False so the catalog's
     stale loaded:True flag is corrected on the next refresh."""
-    from models.orchestrator import TTSLoader
     from integrations.service_tools.model_catalog import ModelEntry, ModelType
+
+    from models.orchestrator import TTSLoader
 
     # Shrink idle timeout and spawn
     echo_tool_worker.idle_timeout = 1.0
@@ -177,8 +180,9 @@ def test_e3_idle_stop_shows_in_is_loaded(echo_tool_worker):
 def test_e4_crash_shows_in_is_loaded(echo_tool_worker):
     """A subprocess crash mid-request must make is_loaded() return
     False so the catalog can reconcile away the stale flag."""
-    from models.orchestrator import TTSLoader
     from integrations.service_tools.model_catalog import ModelEntry, ModelType
+
+    from models.orchestrator import TTSLoader
 
     echo_tool_worker.call({'op': 'echo'})
     assert echo_tool_worker.is_alive()
@@ -209,8 +213,9 @@ def test_e5_stt_model_size_propagates_via_env_var():
     spawned subprocess picks up the user's selection. Previously it
     only mutated a parent-process global which the subprocess never
     saw."""
-    from models.orchestrator import STTLoader
     from integrations.service_tools.model_catalog import ModelEntry, ModelType
+
+    from models.orchestrator import STTLoader
 
     loader = STTLoader()
     entry = ModelEntry(
@@ -251,8 +256,9 @@ def test_e5b_stt_load_stops_running_worker_with_old_size():
     """If a whisper worker is already running with the old size,
     STTLoader.load() with a new size must stop it so the next call
     respawns with the new HEVOLVE_STT_MODEL_SIZE env var."""
-    from models.orchestrator import STTLoader
     from integrations.service_tools.model_catalog import ModelEntry, ModelType
+
+    from models.orchestrator import STTLoader
 
     loader = STTLoader()
     entry = ModelEntry(

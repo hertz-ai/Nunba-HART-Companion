@@ -763,7 +763,8 @@ class LlamaConfig:
         if self.is_cloud_configured():
             return True
         try:
-            import urllib.request, json as _json
+            import json as _json
+            import urllib.request
             port = self.config.get('server_port', 8080)
             req = urllib.request.Request(
                 f'http://127.0.0.1:{port}/v1/models',

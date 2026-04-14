@@ -346,7 +346,8 @@ def generate_build_hashes():
 
     Queried at runtime via GET /api/harthash (@HARTHASH magic word).
     """
-    import json, datetime
+    import datetime
+    import json
     scripts_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(scripts_dir)
     repos = {

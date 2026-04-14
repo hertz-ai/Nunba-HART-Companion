@@ -556,7 +556,7 @@ def _apply_post_install_patches(backend: str):
         target = os.path.join(user_sp, 'parler_tts', 'dac_wrapper', 'modeling_dac.py')
         if os.path.isfile(target):
             try:
-                with open(target, 'r') as f:
+                with open(target) as f:
                     src = f.read()
                 old = 'audio_values = self.model.decode(audio_values)'
                 new = ('try:\n'
@@ -707,7 +707,7 @@ def get_backend_status() -> dict[str, dict]:
             # RAISES ModuleNotFoundError (not returns None) when the
             # argument contains '==', so unstripped specs crash the
             # whole /tts/engines endpoint.
-            base_pkg = re.split(r'[=<>!~\s]', pkg, 1)[0]
+            base_pkg = re.split(r'[=<>!~\s]', pkg, maxsplit=1)[0]
             import_name = _PIP_TO_IMPORT.get(base_pkg, base_pkg.replace('-', '_'))
             if not is_package_installed(import_name):
                 missing.append(pkg)

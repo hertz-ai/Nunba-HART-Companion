@@ -341,7 +341,8 @@ class STTLoader(ModelLoader):
         import os
         try:
             from integrations.service_tools.whisper_tool import (
-                _CATALOG_ID_TO_FASTER_WHISPER_SIZE, _stt_tool,
+                _CATALOG_ID_TO_FASTER_WHISPER_SIZE,
+                _stt_tool,
             )
         except ImportError:
             logger.warning("STT load: whisper_tool not importable")
@@ -417,8 +418,8 @@ class VLMLoader(ModelLoader):
         hart_intelligence_entry.get_vision_service() lookup order so
         both loader and runtime see the same object."""
         try:
-            from integrations.vision.vision_service import VisionService
             import hart_intelligence_entry as _hie
+            from integrations.vision.vision_service import VisionService
         except ImportError as e:
             logger.error(f"VLM imports failed: {e}")
             return None

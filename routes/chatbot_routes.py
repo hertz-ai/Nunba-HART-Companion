@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 # Auth decorator — single source of truth in routes/auth.py
 from routes.auth import require_local_or_token as _require_local_or_token
 
-
 # ============== Nunba-layer TTS (works on ALL tiers) ==============
 
 def _fire_nunba_tts(text, user_id, request_id, language='en'):
@@ -47,8 +46,9 @@ def _fire_nunba_tts(text, user_id, request_id, language='en'):
 
     def _bg():
         try:
-            from tts.tts_engine import synthesize_text
             import re
+
+            from tts.tts_engine import synthesize_text
             # Clean text for TTS
             _clean = re.sub(r'```[\s\S]*?```', '', text)
             _clean = re.sub(r'`[^`]+`', '', _clean)
@@ -712,7 +712,7 @@ def publish_to_crossbar(user_id, data):
     """
     # 1. Embedded WAMP router (reaches crossbarWorker.js subscribers)
     try:
-        from wamp_router import publish_local, is_running
+        from wamp_router import is_running, publish_local
         if is_running():
             topic = f'com.hertzai.hevolve.chat.{user_id}'
             publish_local(topic, data)
@@ -3383,7 +3383,8 @@ def register_routes(app):
         """Serve a TTS audio file by filename. Used by frontend after WAMP/SSE push."""
         nonlocal _tts_search_dirs, _tts_search_dirs_ts
         from pathlib import Path
-        from flask import send_file, abort
+
+        from flask import abort, send_file
         # Security: only serve from known dirs, no path traversal
         if '..' in filename or '/' in filename or '\\' in filename:
             abort(400)

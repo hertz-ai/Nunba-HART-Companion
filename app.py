@@ -215,7 +215,7 @@ if getattr(sys, 'frozen', False):
     _trace(f"frozen: {getattr(sys, 'frozen', False)}")
     _trace(f"executable: {sys.executable}")
     try:
-        _disk_info = os.popen('wmic logicaldisk where DeviceID="C:" get FreeSpace /value').read().strip()
+        _disk_info = os.popen('wmic logicaldisk where DeviceID="C:" get FreeSpace /value').read().strip()  # noqa: S605
         _trace(f"disk free: {_disk_info}")
     except Exception:
         pass
@@ -378,7 +378,8 @@ if getattr(sys, 'frozen', False) and '--validate' not in sys.argv and '--install
         _app_base = os.path.dirname(os.path.abspath(sys.executable))
         _esp_path = os.path.join(_app_base, 'splash.png')
         if os.path.isfile(_esp_path):
-            from PIL import Image as _ESImg, ImageTk as _ESTk
+            from PIL import Image as _ESImg
+            from PIL import ImageTk as _ESTk
             _es_img = _ESImg.open(_esp_path)
             _ESW, _ESH = _es_img.size
             if _ESW > 900 or _ESH > 560:

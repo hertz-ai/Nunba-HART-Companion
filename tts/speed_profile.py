@@ -43,10 +43,10 @@ SPEED_PROFILES: dict[str, float] = {
 # Per the user's guideline — "speed > naturalness default".
 DEFAULT_PROFILE = 'balanced'
 
-_cached_profile: 'str | None' = None
+_cached_profile: str | None = None
 
 
-def _read_profile_from_disk() -> 'str | None':
+def _read_profile_from_disk() -> str | None:
     """Check ~/.nunba/tts_config.json for a user-pinned profile.
 
     Written by the admin UI / settings wizard when the user picks a

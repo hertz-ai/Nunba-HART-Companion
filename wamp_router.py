@@ -26,7 +26,7 @@ import logging
 import os
 import threading
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple  # noqa: UP035
 
 logger = logging.getLogger('nunba.wamp_router')
 
@@ -58,7 +58,8 @@ YIELD_MSG = 70
 # When NUNBA_WAMP_TICKET is set (or auto-generated for LAN mode),
 # the router requires ticket auth.  When empty, anonymous is allowed.
 import secrets
-_wamp_ticket: Optional[str] = os.environ.get('NUNBA_WAMP_TICKET', '')
+
+_wamp_ticket: str | None = os.environ.get('NUNBA_WAMP_TICKET', '')
 
 
 def _require_auth() -> bool:
@@ -97,15 +98,15 @@ class WampRealm:
     def __init__(self, name: str = 'realm1'):
         self.name = name
         # topic -> set of (session_id, subscription_id)
-        self.subscriptions: Dict[str, Set[Tuple[int, int]]] = defaultdict(set)
+        self.subscriptions: dict[str, set[tuple[int, int]]] = defaultdict(set)
         # subscription_id -> (session_id, topic)
-        self.sub_index: Dict[int, Tuple[int, str]] = {}
+        self.sub_index: dict[int, tuple[int, str]] = {}
         # uri -> (session_id, registration_id)
-        self.registrations: Dict[str, Tuple[int, int]] = {}
+        self.registrations: dict[str, tuple[int, int]] = {}
         # registration_id -> (session_id, uri)
-        self.reg_index: Dict[int, Tuple[int, str]] = {}
+        self.reg_index: dict[int, tuple[int, str]] = {}
         # invocation_id -> (caller_session_id, call_request_id)
-        self.pending_calls: Dict[int, Tuple[int, int]] = {}
+        self.pending_calls: dict[int, tuple[int, int]] = {}
         self.lock = threading.Lock()
 
 
@@ -115,7 +116,7 @@ class WampSession:
     def __init__(self, session_id: int, protocol):
         self.session_id = session_id
         self.protocol = protocol  # WebSocket protocol instance
-        self.realm: Optional[str] = None
+        self.realm: str | None = None
         self.authenticated: bool = False  # True after successful auth or when auth not required
         self.authid: str = 'anonymous'    # User identity for topic authorization
 
@@ -130,12 +131,12 @@ class WampSession:
 
 # ── Global router state ──────────────────────────────────────────────────
 
-_realms: Dict[str, WampRealm] = {}
-_sessions: Dict[int, WampSession] = {}
-_protocol_to_session: Dict[int, int] = {}  # id(protocol) -> session_id
+_realms: dict[str, WampRealm] = {}
+_sessions: dict[int, WampSession] = {}
+_protocol_to_session: dict[int, int] = {}  # id(protocol) -> session_id
 _state_lock = threading.Lock()
-_event_loop: Optional[asyncio.AbstractEventLoop] = None
-_router_thread: Optional[threading.Thread] = None
+_event_loop: asyncio.AbstractEventLoop | None = None
+_router_thread: threading.Thread | None = None
 _started = False
 
 
@@ -297,7 +298,7 @@ def _handle_publish(session: WampSession, msg: list):
 
 
 def _deliver_event(realm: WampRealm, topic: str, args: list, kwargs: dict,
-                   pub_id: int, exclude_session: Optional[int] = None):
+                   pub_id: int, exclude_session: int | None = None):
     """Deliver an EVENT message to all subscribers of a topic."""
     with realm.lock:
         subscribers = list(realm.subscriptions.get(topic, set()))
@@ -619,8 +620,8 @@ def _run_router(port: int, host: str):
 
     try:
         from autobahn.asyncio.websocket import (
-            WebSocketServerProtocol,
             WebSocketServerFactory,
+            WebSocketServerProtocol,
         )
     except ImportError:
         logger.error("autobahn not available — WAMP router cannot start")
@@ -732,7 +733,7 @@ def _register_with_watchdog(port: int, host: str):
         pass  # watchdog not available (standalone mode)
 
 
-_heartbeat_thread: Optional[threading.Thread] = None
+_heartbeat_thread: threading.Thread | None = None
 
 
 def _start_heartbeat_thread():

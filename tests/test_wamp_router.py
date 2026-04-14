@@ -45,9 +45,9 @@ class TestWampRouterImport:
 
     def test_publish_local_noop_when_not_started(self):
         """publish_local should silently no-op when router isn't running."""
-        from wamp_router import publish_local, _started
         # Save and temporarily clear
         import wamp_router as wr
+        from wamp_router import _started, publish_local
         old = wr._started
         wr._started = False
         try:
@@ -61,9 +61,7 @@ class TestWampMessageHandlers:
     """Unit tests for WAMP message handlers (no network)."""
 
     def test_handle_hello_welcome(self):
-        from wamp_router import (
-            _handle_hello, WampSession, _gen_id, _get_realm
-        )
+        from wamp_router import WampSession, _gen_id, _get_realm, _handle_hello
 
         sent = []
         class FakeProto:
@@ -82,9 +80,15 @@ class TestWampMessageHandlers:
 
     def test_handle_subscribe_and_publish(self):
         from wamp_router import (
-            _handle_hello, _handle_subscribe, _handle_publish,
-            WampSession, _gen_id, _get_realm, _sessions, _state_lock,
-            _protocol_to_session
+            WampSession,
+            _gen_id,
+            _get_realm,
+            _handle_hello,
+            _handle_publish,
+            _handle_subscribe,
+            _protocol_to_session,
+            _sessions,
+            _state_lock,
         )
 
         events_received = []
@@ -135,7 +139,7 @@ class TestWampMessageHandlers:
             _protocol_to_session.pop(id(pub_proto), None)
 
     def test_handle_goodbye(self):
-        from wamp_router import _handle_goodbye, WampSession, _gen_id
+        from wamp_router import WampSession, _gen_id, _handle_goodbye
 
         sent = []
         class FakeProto:
@@ -151,9 +155,15 @@ class TestWampMessageHandlers:
 
     def test_session_cleanup_removes_subscriptions(self):
         from wamp_router import (
-            _handle_hello, _handle_subscribe, _on_session_close,
-            WampSession, _gen_id, _get_realm, _sessions, _state_lock,
-            _protocol_to_session
+            WampSession,
+            _gen_id,
+            _get_realm,
+            _handle_hello,
+            _handle_subscribe,
+            _on_session_close,
+            _protocol_to_session,
+            _sessions,
+            _state_lock,
         )
 
         class FakeProto:
@@ -185,12 +195,17 @@ class TestBackendPublish:
     """Test publish_local() delivers events to subscribers."""
 
     def test_publish_local_delivers_to_subscriber(self):
-        from wamp_router import (
-            _handle_hello, _handle_subscribe, publish_local,
-            WampSession, _gen_id, _sessions, _state_lock,
-            _protocol_to_session
-        )
         import wamp_router as wr
+        from wamp_router import (
+            WampSession,
+            _gen_id,
+            _handle_hello,
+            _handle_subscribe,
+            _protocol_to_session,
+            _sessions,
+            _state_lock,
+            publish_local,
+        )
         old_started = wr._started
         wr._started = True
 
@@ -229,11 +244,26 @@ class TestWampRouterConstants:
 
     def test_message_type_ids(self):
         from wamp_router import (
-            HELLO, WELCOME, ABORT, GOODBYE, ERROR,
-            PUBLISH, PUBLISHED, SUBSCRIBE, SUBSCRIBED,
-            UNSUBSCRIBE, UNSUBSCRIBED, EVENT,
-            CALL, RESULT, REGISTER, REGISTERED,
-            UNREGISTER, UNREGISTERED, INVOCATION, YIELD_MSG
+            ABORT,
+            CALL,
+            ERROR,
+            EVENT,
+            GOODBYE,
+            HELLO,
+            INVOCATION,
+            PUBLISH,
+            PUBLISHED,
+            REGISTER,
+            REGISTERED,
+            RESULT,
+            SUBSCRIBE,
+            SUBSCRIBED,
+            UNREGISTER,
+            UNREGISTERED,
+            UNSUBSCRIBE,
+            UNSUBSCRIBED,
+            WELCOME,
+            YIELD_MSG,
         )
         assert HELLO == 1
         assert WELCOME == 2
