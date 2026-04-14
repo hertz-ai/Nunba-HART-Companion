@@ -715,21 +715,34 @@ def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
     """
     global _router_thread, _started
 
-    if _started or (_router_thread and _router_thread.is_alive()):
-        return True
+    # SRE finding: the old guard+assign sequence had a TOCTOU race — two
+    # concurrent ensure_wamp_running() callers (e.g. a channel adapter boot +
+    # a mobile peer discovery firing in the same tick) could both observe
+    # _started=False and _router_thread=None, then both spawn a daemon
+    # thread. Result: two WampRouter threads racing for port 8088, one wins
+    # the bind() and the other silently fails in _run_router. Wrap the
+    # check-and-spawn in the module-level _state_lock so only one caller
+    # ever reaches thread.start(). _state_lock is NOT held during
+    # thread.start() itself (safe — the new thread only touches _started
+    # after its own event loop is up, not while we hold the lock), and
+    # neither _run_router nor is_running re-enter start_wamp_router, so
+    # no deadlock is possible.
+    with _state_lock:
+        if _started or (_router_thread and _router_thread.is_alive()):
+            return True
 
-    # Allow port override via environment variable
-    port = int(os.environ.get('NUNBA_WAMP_PORT', port))
+        # Allow port override via environment variable
+        port = int(os.environ.get('NUNBA_WAMP_PORT', port))
 
-    # Auto-enable ticket auth when binding to LAN (non-localhost)
-    if host != '127.0.0.1':
-        _enable_auth_for_lan()
+        # Auto-enable ticket auth when binding to LAN (non-localhost)
+        if host != '127.0.0.1':
+            _enable_auth_for_lan()
 
-    _router_thread = threading.Thread(
-        target=_run_router, args=(port, host),
-        daemon=True, name='WampRouter',
-    )
-    _router_thread.start()
+        _router_thread = threading.Thread(
+            target=_run_router, args=(port, host),
+            daemon=True, name='WampRouter',
+        )
+        _router_thread.start()
 
     # Register with watchdog so silent crashes are detected and auto-restarted
     _register_with_watchdog(port, host)
