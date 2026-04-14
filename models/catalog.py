@@ -110,9 +110,11 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
     """Register music (ACE Step 1.5) and video (LTX2) generation models."""
     added = 0
 
-    if not catalog.get('audio_gen-acestep-1.5'):
+    # Use canonical ID 'audio_gen-acestep' matching HARTOS service_tool_map +
+    # fallback populator.  Avoids duplicate catalog entry (task #278).
+    if not catalog.get('audio_gen-acestep'):
         catalog.register(ModelEntry(
-            id='audio_gen-acestep-1.5',
+            id='audio_gen-acestep',
             name='ACE Step 1.5 (Music Generation)',
             model_type=ModelType.AUDIO_GEN,
             source='huggingface',
