@@ -1,20 +1,18 @@
-import React, { Suspense, useEffect, useState, useCallback } from 'react'
-
-import './assets/css/tailwind.css'
-
-import { NunbaThemeProvider } from './contexts/ThemeContext';
-
-import ReactGA from 'react-ga';
-import { useLocation, useNavigate } from 'react-router-dom';
-
-import MainRoutes from './MainRoute';
-import { SocialProvider } from './contexts/SocialContext';
-import { RealtimeProvider } from './contexts/RealtimeContext';
-import { ToastProvider } from './components/shared/ToastProvider';
-import PageSkeleton from './components/shared/PageSkeleton';
 import AgentContactRequest from './components/Agent/AgentContactRequest';
-import { GA_TRACKING_ID, API_BASE_URL } from './config/apiBase';
+import PageSkeleton from './components/shared/PageSkeleton';
+import {ToastProvider} from './components/shared/ToastProvider';
+import {GA_TRACKING_ID, API_BASE_URL} from './config/apiBase';
+import {RealtimeProvider} from './contexts/RealtimeContext';
+import {SocialProvider} from './contexts/SocialContext';
+import {NunbaThemeProvider} from './contexts/ThemeContext';
+import MainRoutes from './MainRoute';
 import realtimeService from './services/realtimeService';
+
+import React, {Suspense, useEffect, useState, useCallback} from 'react';
+import ReactGA from 'react-ga';
+import {useLocation, useNavigate} from 'react-router-dom';
+
+import './assets/css/tailwind.css';
 
 function App() {
   const [contactRequest, setContactRequest] = useState(null);
@@ -48,34 +46,43 @@ function App() {
         localStorage.setItem('agent_proactive_message', JSON.stringify(data));
       }
     });
-    return () => { unsub(); unsubDirect(); };
+    return () => {
+      unsub();
+      unsubDirect();
+    };
   }, []);
 
-  const handleAcceptContact = useCallback((req) => {
-    const jwt = localStorage.getItem('jwt');
-    const headers = { 'Content-Type': 'application/json' };
-    if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
-    fetch(`${API_BASE_URL}/agents/contact/respond`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ request_id: req.request_id, action: 'accept' }),
-    }).then(r => r.json()).then(data => {
-      if (data.success && data.agent_id) {
-        localStorage.setItem('active_agent_id', data.agent_id);
-        navigate('/');
-      }
-    }).catch(() => {});
-    setContactRequest(null);
-  }, [navigate]);
+  const handleAcceptContact = useCallback(
+    (req) => {
+      const jwt = localStorage.getItem('jwt');
+      const headers = {'Content-Type': 'application/json'};
+      if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
+      fetch(`${API_BASE_URL}/agents/contact/respond`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({request_id: req.request_id, action: 'accept'}),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.agent_id) {
+            localStorage.setItem('active_agent_id', data.agent_id);
+            navigate('/');
+          }
+        })
+        .catch(() => {});
+      setContactRequest(null);
+    },
+    [navigate]
+  );
 
   const handleDenyContact = useCallback((req) => {
     const jwt = localStorage.getItem('jwt');
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {'Content-Type': 'application/json'};
     if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
     fetch(`${API_BASE_URL}/agents/contact/respond`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ request_id: req.request_id, action: 'deny' }),
+      body: JSON.stringify({request_id: req.request_id, action: 'deny'}),
     }).catch(() => {});
     setContactRequest(null);
   }, []);
@@ -89,12 +96,22 @@ function App() {
             <a
               href="#main-content"
               style={{
-                position: 'absolute', left: '-9999px', top: 'auto',
-                width: '1px', height: '1px', overflow: 'hidden',
+                position: 'absolute',
+                left: '-9999px',
+                top: 'auto',
+                width: '1px',
+                height: '1px',
+                overflow: 'hidden',
                 zIndex: 9999,
               }}
-              onFocus={(e) => { e.target.style.cssText = 'position:fixed;top:8px;left:8px;z-index:9999;padding:8px 16px;background:#5B54E0;color:#fff;border-radius:4px;font-size:16px;font-weight:600;text-decoration:none;width:auto;height:auto;overflow:visible;'; }}
-              onBlur={(e) => { e.target.style.cssText = 'position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;'; }}
+              onFocus={(e) => {
+                e.target.style.cssText =
+                  'position:fixed;top:8px;left:8px;z-index:9999;padding:8px 16px;background:#5B54E0;color:#fff;border-radius:4px;font-size:16px;font-weight:600;text-decoration:none;width:auto;height:auto;overflow:visible;';
+              }}
+              onBlur={(e) => {
+                e.target.style.cssText =
+                  'position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;';
+              }}
             >
               Skip to main content
             </a>
