@@ -1669,6 +1669,45 @@ class TTSEngine:
             except Exception:
                 pass
 
+        # Language-match check — surface a user-visible WARNING (and push
+        # a WAMP toast) when the selected backend doesn't actually speak
+        # the requested language.  Data-scientist cohort analysis
+        # (2026-04-15) showed Tamil users getting Piper English phonemes
+        # silently — the voice said "speaking Tamil" but the audio was
+        # English mumbling.  The failure is worse than outright error
+        # because the user blames the product, not the routing.
+        try:
+            _preferred = _FALLBACK_LANG_ENGINE_PREFERENCE.get(
+                (self._language or 'en').split('-')[0],
+                _DEFAULT_PREFERENCE,
+            )
+            if self._active_backend not in _preferred:
+                logger.warning(
+                    f"TTS language mismatch: requested lang='{self._language}' "
+                    f"but active backend '{self._active_backend}' is not in "
+                    f"the preferred ladder {_preferred} — audio quality may "
+                    f"be degraded or wrong-language.",
+                )
+                # Best-effort user-visible notification via WAMP — the
+                # frontend hook (`gameRealtimeService.js`) subscribes to
+                # this topic and shows a toast.  Failure is silent here
+                # (WAMP may not be running in bundled mode).
+                try:
+                    from core.realtime import publish_async as _wamp_pub
+                    _wamp_pub(
+                        'com.hertzai.hevolve.tts.lang_mismatch',
+                        {
+                            'requested_lang': self._language,
+                            'active_backend': self._active_backend,
+                            'preferred': _preferred,
+                        },
+                        timeout=0.5,
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         # Serialize GPU inference — PyTorch models are NOT thread-safe.
         # Without this, concurrent calls (e.g. warm-up + chat) cause tensor
         # corruption, CUDA state errors, or segfaults.
