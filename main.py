@@ -153,29 +153,62 @@ _splash('Loading chat routes...')
 from routes import chatbot_routes
 
 _splash('Loading social platform...')
-# Try to import hart-backend directly (pip installed)
+# Try to import hart-backend directly (pip installed).  Uses
+# core.optional_import so the failure (if any) lands in
+# /api/admin/diag/degradations instead of being silently swallowed.
 HARTOS_BACKEND_DIRECT = False
+init_social = None
+social_bp = None
+get_engine = None
+init_db = None
 try:
-    from integrations.social import init_social, social_bp
-    from integrations.social.models import get_engine, init_db
-    HARTOS_BACKEND_DIRECT = True
-except ImportError:
-    pass
-
-# Import crash reporter
-try:
-    from desktop.crash_reporter import (
-        add_breadcrumb,
-        capture_exception,
-        capture_message,
-        create_crash_reporter_blueprint,
-        init_crash_reporting,
-        set_user,
+    from core.optional_import import optional_import as _opt_import
+    _social_mod = _opt_import(
+        'integrations.social',
+        reason='HARTOS social platform (posts, comments, channels, auth)',
     )
-    from desktop.crash_reporter import get_status as get_crash_status
-    CRASH_REPORTER_AVAILABLE = True
-except ImportError:
-    CRASH_REPORTER_AVAILABLE = False
+    _social_models = _opt_import(
+        'integrations.social.models',
+        reason='HARTOS social DB engine + init_db migration runner',
+    )
+    if _social_mod is not None and _social_models is not None:
+        init_social = _social_mod.init_social
+        social_bp = _social_mod.social_bp
+        get_engine = _social_models.get_engine
+        init_db = _social_models.init_db
+        HARTOS_BACKEND_DIRECT = True
+except Exception as _se:
+    # core.optional_import itself failing is a cold-boot bug — log loud.
+    logging.warning(f"social platform optional-import wiring failed: {_se}")
+
+# Import crash reporter — visible in /api/admin/diag/degradations so the
+# operator can SEE that crash telemetry is off (silent absence used to be
+# the failure mode for "we never get crash reports from this build").
+CRASH_REPORTER_AVAILABLE = False
+add_breadcrumb = None
+capture_exception = None
+capture_message = None
+create_crash_reporter_blueprint = None
+init_crash_reporting = None
+set_user = None
+get_crash_status = None
+try:
+    from core.optional_import import optional_import as _opt_import_cr
+    _cr_mod = _opt_import_cr(
+        'desktop.crash_reporter',
+        reason='Sentry crash reporter (operator-visible incident telemetry)',
+    )
+    if _cr_mod is not None:
+        add_breadcrumb = _cr_mod.add_breadcrumb
+        capture_exception = _cr_mod.capture_exception
+        capture_message = _cr_mod.capture_message
+        create_crash_reporter_blueprint = _cr_mod.create_crash_reporter_blueprint
+        init_crash_reporting = _cr_mod.init_crash_reporting
+        set_user = _cr_mod.set_user
+        get_crash_status = _cr_mod.get_status
+        CRASH_REPORTER_AVAILABLE = True
+except Exception as _cre:
+    logging.warning(f"crash_reporter optional-import wiring failed: {_cre}")
 
 # Define default paths in Documents (uses PROGRAM_DATA_DIR defined above)
 DEFAULT_LOG_DIR = os.path.join(PROGRAM_DATA_DIR, 'logs')
@@ -2024,28 +2057,43 @@ def admin_providers_capabilities():
 @app.route('/api/admin/resources/stats', methods=['GET'])
 def admin_resources_stats():
     """Get current resource usage: CPU, RAM, GPU, throttle, mode."""
+    from core.optional_import import optional_import
+    _gov_mod = optional_import(
+        'core.resource_governor',
+        reason='Resource governor (CPU/RAM throttle, mode controller)',
+    )
+    if _gov_mod is None:
+        return jsonify({'error': 'Resource governor not available'}), 503
     try:
-        from core.resource_governor import get_governor
-        gov = get_governor()
+        gov = _gov_mod.get_governor()
         stats = gov.get_stats()
-        # Add live system metrics
-        try:
-            import psutil
-            stats['cpu_percent'] = psutil.cpu_percent(interval=None)
-            mem = psutil.virtual_memory()
+        # Add live system metrics — both psutil (host process metrics) and
+        # vram_manager (GPU telemetry) are optional, logged once via the
+        # same registry that powers /api/admin/diag/degradations.
+        _psutil = optional_import(
+            'psutil', reason='Host CPU/RAM live metrics',
+        )
+        if _psutil is not None:
+            stats['cpu_percent'] = _psutil.cpu_percent(interval=None)
+            mem = _psutil.virtual_memory()
             stats['ram_used_gb'] = round(mem.used / (1024**3), 1)
             stats['ram_total_gb'] = round(mem.total / (1024**3), 1)
             stats['ram_percent'] = mem.percent
-        except ImportError:
-            pass
-        try:
-            from integrations.service_tools.vram_manager import vram_manager
-            stats['gpu'] = vram_manager.detect_gpu()
-        except Exception:
-            pass
+        _vram_mod = optional_import(
+            'integrations.service_tools.vram_manager',
+            reason='GPU VRAM telemetry (HARTOS service tool)',
+        )
+        if _vram_mod is not None:
+            try:
+                stats['gpu'] = _vram_mod.vram_manager.detect_gpu()
+            except Exception as ge:
+                # The MODULE imported but the live probe failed (driver
+                # crash, no CUDA at runtime).  Surface as a soft warning
+                # in the response, not a 503 — base stats are still useful.
+                stats['gpu_error'] = str(ge)
         return jsonify({'success': True, **stats})
-    except ImportError:
-        return jsonify({'error': 'Resource governor not available'}), 503
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/status', methods=["GET"])
@@ -2991,6 +3039,45 @@ def admin_diag_thread_dump():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/diag/degradations', methods=['GET'])
+@require_local_or_token
+def admin_diag_degradations():
+    """List every optional dependency that failed to import.
+
+    Powered by `core.optional_import` — every `try: import X; except: pass`
+    block in main.py was refactored to register failures here so operators
+    can DIAGNOSE silent feature degradation without re-bundling with print
+    statements.  The legacy pattern silently swallowed ImportError and the
+    affected feature simply never worked, with no logged signal.
+
+    Response:
+      {
+        success: True,
+        count: 3,
+        degradations: [
+          {module, reason, error, first_failed_at, attempts},
+          ...
+        ]
+      }
+
+    Guards: local-or-token gate.  On central tier this list could leak
+    paid-tier integration absence (info disclosure) — the SAME gate
+    protecting /api/admin/diag/thread-dump is sufficient because the
+    central-tier check there is policy-equivalent.
+    """
+    try:
+        from core.optional_import import list_degradations
+        items = list_degradations()
+        return jsonify({
+            'success': True,
+            'count': len(items),
+            'degradations': items,
+        })
+    except Exception as e:
+        logging.error(f"degradations admin endpoint failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # ── MCP bearer-token surface for Claude Code setup UX ─────────────────────
 # Background: commit f5b99d8 added `/api/mcp/local` bearer-token auth gate
 # in HARTOS/integrations/mcp/mcp_http_bridge.py.  Pre-existing Claude Code
@@ -3483,19 +3570,27 @@ _diarization_service = None  # Global DiarizationService instance
 
 
 def _start_vision_service():
-    """Start the VisionService in a daemon thread if GPU is available."""
+    """Start the VisionService in a daemon thread if GPU is available.
+
+    Uses core.optional_import so a missing `integrations.vision` lands in
+    /api/admin/diag/degradations (operator can see WHY visual context is
+    silent) instead of the legacy `except ImportError: pass` pattern.
+    """
     global _vision_service
+    from core.optional_import import optional_import
+    _vmod = optional_import(
+        'integrations.vision',
+        reason='HARTOS visual context (MiniCPM VLM sidecar)',
+    )
+    if _vmod is None:
+        return
     try:
-        # Import from hart-backend (installed as git dependency)
-        from integrations.vision import VisionService
-        _vision_service = VisionService(
+        _vision_service = _vmod.VisionService(
             ws_port=int(os.environ.get('VISION_WS_PORT', 5460)),
             minicpm_port=int(os.environ.get('HEVOLVE_MINICPM_PORT', 9891)),
         )
         _vision_service.start()
         logging.info("VisionService started (MiniCPM sidecar + frame receiver)")
-    except ImportError:
-        logging.info("VisionService not available (hart-backend vision module not found)")
     except Exception as e:
         logging.warning(f"VisionService failed to start: {e}")
 
@@ -3503,15 +3598,19 @@ def _start_vision_service():
 def _start_diarization_service():
     """Start the DiarizationService in a daemon thread if whisperx available."""
     global _diarization_service
+    from core.optional_import import optional_import
+    _amod = optional_import(
+        'integrations.audio',
+        reason='HARTOS speaker diarization (whisperx sidecar)',
+    )
+    if _amod is None:
+        return
     try:
-        from integrations.audio import DiarizationService
-        _diarization_service = DiarizationService(
+        _diarization_service = _amod.DiarizationService(
             port=int(os.environ.get('HEVOLVE_DIARIZATION_PORT', 8004)),
         )
         _diarization_service.start()
         logging.info("DiarizationService starting (sidecar)")
-    except ImportError:
-        logging.info("DiarizationService not available (whisperx not installed)")
     except Exception as e:
         logging.warning(f"DiarizationService failed to start: {e}")
 
