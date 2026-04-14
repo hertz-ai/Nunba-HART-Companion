@@ -170,7 +170,7 @@ function VRAMBar({compute}) {
                       display: 'flex',
                       gap: 6,
                       fontSize: 10,
-                      color: '#667',
+                      color: '#99a',
                     }}
                   >
                     {quant && (
@@ -216,8 +216,11 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
       : MODEL_TYPE_LABELS[model.model_type] || model.model_type;
   const deviceColor = DEVICE_COLORS[model.device] || '#666';
   const [dlStatus, setDlStatus] = useState(null); // {status, percent, message}
+  const [staleOpen, setStaleOpen] = useState(false);
   const validPurposes = ALL_PURPOSES;
   const activePurposes = model.purposes || [];
+  const staleReasons = (model.stale_reasons || []).join(' | ') || 'stale state';
+  const staleReasonId = `stale-reason-${model.id}`;
 
   // Poll download progress when downloading
   useEffect(() => {
@@ -278,20 +281,60 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
         </div>
         <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
           {model.stale && (
-            <span
-              title={(model.stale_reasons || []).join(' | ') || 'stale state'}
-              style={{
-                fontSize: 11,
-                padding: '2px 8px',
-                borderRadius: 10,
-                background: '#f4433622',
-                color: '#f44336',
-                fontWeight: 600,
-                cursor: 'help',
-              }}
-            >
-              ⚠ stale
-            </span>
+            <>
+              <button
+                type="button"
+                aria-describedby={staleReasonId}
+                aria-expanded={staleOpen}
+                onClick={() => setStaleOpen((v) => !v)}
+                title={staleReasons}
+                style={{
+                  fontSize: 11,
+                  padding: '6px 10px',
+                  minHeight: 32,
+                  borderRadius: 10,
+                  background: '#f4433644',
+                  color: '#f44336',
+                  fontWeight: 600,
+                  border: '1px solid #f44336',
+                  cursor: 'pointer',
+                }}
+              >
+                ⚠ stale
+              </button>
+              <span
+                id={staleReasonId}
+                style={{
+                  position: 'absolute',
+                  width: 1,
+                  height: 1,
+                  padding: 0,
+                  margin: -1,
+                  overflow: 'hidden',
+                  clip: 'rect(0,0,0,0)',
+                  whiteSpace: 'nowrap',
+                  border: 0,
+                }}
+              >
+                {staleReasons}
+              </span>
+              {staleOpen && (
+                <div
+                  role="note"
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: '#2a1a1a',
+                    color: '#ffcdd2',
+                    border: '1px solid #f44336',
+                    maxWidth: 260,
+                  }}
+                >
+                  {staleReasons}
+                </div>
+              )}
+            </>
           )}
           <span
             style={{
@@ -339,7 +382,7 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
       <div
         style={{display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center'}}
       >
-        <span style={{fontSize: 11, color: '#667'}}>Purpose:</span>
+        <span style={{fontSize: 11, color: '#99a'}}>Purpose:</span>
         {validPurposes.map((p) => {
           const isOn = activePurposes.includes(p);
           return (
@@ -392,7 +435,7 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
           display: 'flex',
           gap: 16,
           fontSize: 11,
-          color: '#667',
+          color: '#99a',
           marginBottom: 10,
         }}
       >
@@ -473,7 +516,15 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
           <div style={{fontSize: 11, color: '#FF9800', marginBottom: 4}}>
             {dlStatus.message || 'Downloading...'}
           </div>
-          <div style={{height: 4, background: '#333', borderRadius: 2}}>
+          <div
+            role="progressbar"
+            aria-valuenow={Math.round(dlStatus.percent || 0)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Download progress"
+            aria-valuetext={`${Math.round(dlStatus.percent || 0)}% — ${dlStatus.message || 'downloading'}`}
+            style={{height: 4, background: '#333', borderRadius: 2}}
+          >
             <div
               style={{
                 height: '100%',
@@ -957,7 +1008,7 @@ function BrowseHuggingFaceTab({onInstalled}) {
         <div style={{color: '#8899aa'}}>Querying HuggingFace Hub…</div>
       )}
       {!loading && !error && results.length === 0 && (
-        <div style={{color: '#667', padding: 20}}>No models found.</div>
+        <div style={{color: '#99a', padding: 20}}>No models found.</div>
       )}
       <div
         style={{
@@ -999,9 +1050,17 @@ function BrowseHuggingFaceTab({onInstalled}) {
               <button
                 onClick={() => install(m)}
                 disabled={installing === m.id}
+                aria-label={
+                  installing === m.id
+                    ? `Installing ${m.id}`
+                    : `Install ${m.id}`
+                }
+                aria-busy={installing === m.id}
                 style={{
                   ...btnStyle(installing === m.id ? '#666' : '#4CAF50'),
-                  padding: '4px 10px',
+                  padding: '10px 16px',
+                  minHeight: 44,
+                  minWidth: 44,
                   fontSize: 12,
                 }}
               >
@@ -1282,7 +1341,7 @@ export default function ModelManagementPage() {
           </div>
 
           {models.length === 0 && (
-            <div style={{textAlign: 'center', color: '#667', padding: 40}}>
+            <div style={{textAlign: 'center', color: '#99a', padding: 40}}>
               No models found for this filter.
             </div>
           )}
