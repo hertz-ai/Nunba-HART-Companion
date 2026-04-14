@@ -1,0 +1,147 @@
+name: GPU Perf Regression Compare (Layer 3)
+
+# Manual-trigger workflow: fetches the latest bench_results.json from the
+# newest published release (baseline) and compares it to the PR's most
+# recent bench artifact (uploaded by the self-hosted GPU runner from
+# gpu-tests.yml, layer 2).  Report is posted as a workflow summary.
+#
+# Why manual dispatch only:
+#   * Auto-running this on every PR would re-pull the baseline on every
+#     push → rate limits + pointless noise when no GPU PR is open.
+#   * `workflow_dispatch` lets a maintainer invoke it on-demand when a
+#     GPU-touching PR lands; CI bot can also trigger via `gh workflow run`.
+#
+# Baseline source of truth:
+#   Each release SHOULD attach its `bench_results.json` as an asset.
+#   Run `gh release upload vX.Y.Z bench_results.json` from the release
+#   job.  If no asset is present, the compare falls back to advisory-only
+#   (prints the PR report, emits no failure).
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to fetch bench artifact from'
+        required: true
+        type: number
+      regression_threshold:
+        description: 'Fraction (0.10 = 10%) above which to fail'
+        required: false
+        default: '0.10'
+      baseline_release:
+        description: 'Release tag for baseline (leave blank for latest)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ── Fetch baseline bench_results.json from release asset ──
+      - name: Download baseline from release
+        id: baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.baseline_release }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG=$(gh release list --limit 1 --json tagName \
+              --jq '.[0].tagName')
+          fi
+          echo "Using baseline release: $RELEASE_TAG"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+          if gh release download "$RELEASE_TAG" \
+               --pattern 'bench_results.json' \
+               --output baseline.json 2>/dev/null; then
+            echo "baseline_present=true" >> "$GITHUB_OUTPUT"
+            echo "Baseline size: $(wc -c < baseline.json) bytes"
+          else
+            echo "baseline_present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No bench_results.json on release $RELEASE_TAG — advisory-only"
+          fi
+
+      # ── Fetch PR bench artifact (uploaded by gpu-tests.yml) ──
+      - name: Download PR bench artifact
+        id: pr_artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # Find the most recent gpu-tests run for this PR
+          RUN_ID=$(gh run list --workflow=gpu-tests.yml \
+                     --json databaseId,headBranch,event,status \
+                     --jq ".[] | select(.event==\"pull_request\") | .databaseId" \
+                     | head -1)
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::No gpu-tests run found for PR #$PR_NUM"
+            exit 1
+          fi
+          echo "Found gpu-tests run: $RUN_ID"
+          gh run download "$RUN_ID" --name "bench_results_*" --dir pr_artifact/
+          cp pr_artifact/*/bench_results.json pr.json \
+            || cp pr_artifact/bench_results.json pr.json
+          echo "PR bench size: $(wc -c < pr.json) bytes"
+
+      # ── Compare (emits regression summary) ──
+      - name: Compare and generate summary
+        id: compare
+        env:
+          THRESHOLD: ${{ inputs.regression_threshold }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.baseline.outputs.baseline_present }}" != "true" ]; then
+            echo "## PR bench report (no baseline)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat pr.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          set +e
+          python scripts/bench_gpu.py \
+            --compare baseline.json pr.json \
+            --regression-threshold "$THRESHOLD" \
+            > compare.txt 2>&1
+          rc=$?
+          set -e
+
+          {
+            echo "## GPU Perf Regression Report"
+            echo "Baseline: \`${{ steps.baseline.outputs.tag }}\`"
+            echo "Threshold: $THRESHOLD"
+            echo ""
+            echo '```'
+            cat compare.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ $rc -ne 0 ]; then
+            echo "::error::Perf regression detected — see workflow summary"
+            exit 1
+          fi
+
+      - name: Upload compare artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-compare-${{ inputs.pr_number }}
+          path: |
+            baseline.json
+            pr.json
+            compare.txt
+          retention-days: 30
