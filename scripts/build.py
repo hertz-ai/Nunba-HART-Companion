@@ -948,6 +948,45 @@ def build_windows(python_exe, app_only=False, installer_only=False):
     else:
         print_info("HARTOS compile script not found — HevolveAI source strip skipped")
 
+    # ── Build-time patch for transformers __init__.py ──────────────────
+    # transformers 5.x uses `import_structure[frozenset({})].update(...)`
+    # which crashes under cx_Freeze because dict-key resolution for
+    # `frozenset({})` doesn't match at frozen-module import time.
+    # Previous approach: rewrite the file at runtime on every boot
+    # (app.py:648) — caused Defender-scan contention, needed a sentinel
+    # to be idempotent.  Proper fix: patch it ONCE during build so the
+    # runtime never touches the file.
+    def _patch_transformers_at_build():
+        _bad_line = 'import_structure[frozenset({})].update(_import_structure)'
+        _fixed_line = (
+            'import_structure.setdefault(frozenset({}), {})'
+            '.update(_import_structure)'
+        )
+        _patched_any = False
+        for _sp_candidate in [
+            os.path.join('build', 'Nunba', 'python-embed', 'Lib', 'site-packages'),
+            os.path.join('python-embed', 'Lib', 'site-packages'),
+        ]:
+            _tf_init = os.path.join(_sp_candidate, 'transformers', '__init__.py')
+            if not os.path.isfile(_tf_init):
+                continue
+            try:
+                with open(_tf_init, encoding='utf-8') as _f:
+                    _src = _f.read()
+                if _bad_line in _src:
+                    with open(_tf_init, 'w', encoding='utf-8') as _f:
+                        _f.write(_src.replace(_bad_line, _fixed_line))
+                    print_info(f"Patched transformers __init__ at {_tf_init}")
+                    _patched_any = True
+            except OSError as _pe:
+                print_info(f"Could not patch {_tf_init}: {_pe}")
+        if not _patched_any:
+            print_info(
+                "transformers __init__ already patched (or not found) — "
+                "no build-time change needed",
+            )
+    _patch_transformers_at_build()
+
     # Slim python-embed (remove pip, setuptools, tests, etc.)
     slim_python_embed()
 

@@ -649,44 +649,11 @@ if getattr(sys, 'frozen', False):
         sys.modules['torch.nn.functional'] = _torch_stub.nn.functional
         del _types, _torch_stub, _bad_torch, _TensorStub, _NoGradStub
 
-    _trace("torch pre-guard done, starting transformers fix")
-    # ── Fix transformers.__init__ frozenset crash in frozen builds ──
-    # transformers 5.x uses `import_structure[frozenset({})]` at line 772.
-    # In cx_Freeze frozen builds, the dict keys resolve differently and the
-    # frozenset({}) key is missing → KeyError at import time.
-    # Fix: patch the transformers/__init__.py file in site-packages to use
-    # .setdefault() instead of direct key access. This survives cx_Freeze tracing.
-    #
-    # Idempotency: on the very first boot we rewrite the file AND drop a
-    # sibling sentinel (`__init__.nunba_patched`).  On subsequent boots we
-    # look for the sentinel and skip the 200KB file read entirely — saves
-    # disk I/O and avoids contending with Windows Defender real-time
-    # scanning on every boot.
-    try:
-        import importlib.util as _ilu_tf
-        _tf_spec = _ilu_tf.find_spec('transformers')
-        if _tf_spec and _tf_spec.origin:
-            _tf_init = _tf_spec.origin
-            _tf_sentinel = _tf_init + '.nunba_patched'
-            if not os.path.isfile(_tf_sentinel):
-                with open(_tf_init, encoding='utf-8') as _f:
-                    _tf_src = _f.read()
-                _bad_line = 'import_structure[frozenset({})].update(_import_structure)'
-                if _bad_line in _tf_src:
-                    _fixed = _tf_src.replace(
-                        _bad_line,
-                        'import_structure.setdefault(frozenset({}), {}).update(_import_structure)',
-                    )
-                    with open(_tf_init, 'w', encoding='utf-8') as _f:
-                        _f.write(_fixed)
-                # Drop sentinel so we never re-read the 200KB file again.
-                try:
-                    with open(_tf_sentinel, 'w', encoding='utf-8') as _sf:
-                        _sf.write('patched')
-                except OSError:
-                    pass  # read-only fs — we'll re-check next boot (cheap)
-    except Exception:
-        pass
+    _trace("torch pre-guard done; transformers patch applied at build time")
+    # The transformers `__init__.py` frozenset({}) crash is patched ONCE
+    # at build time (see scripts/build.py:_patch_transformers_at_build).
+    # No runtime file I/O needed.  Kept as a one-line trace point so boot
+    # telemetry stays aligned with the old timeline.
 
 # ── Deferred frozen fixes — run AFTER splash is shown ──
 def _run_frozen_import_fixes():
