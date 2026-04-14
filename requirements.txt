@@ -1,4 +1,4 @@
-# AUTO-GENERATED from scripts/deps.py -- DO NOT EDIT MANUALLY
+# AUTO-GENERATED from scripts/deps.py — DO NOT EDIT MANUALLY
 # Regenerate: python scripts/deps.py requirements
 # Nunba 0.1.0 | Python Embed 3.12.6
 
@@ -53,6 +53,30 @@ pytz==2025.2
 aiohttp==3.13.3
 python-dotenv==1.2.1
 cryptography==46.0.5
+
+# Python-embed deps (transformers/torch worker deps)
+torch==2.10.0
+torchaudio==2.10.0
+transformers==5.1.0
+sentence-transformers==5.2.2
+tokenizers==0.22.2
+safetensors==0.7.0
+huggingface_hub==1.4.1
+regex==2024.11.6
+numpy==1.26.4
+tqdm==4.67.1
+pyyaml==6.0.2
+chromadb==1.5.0
+faiss-cpu==1.13.2
+opencv-python==4.13.0.92
+scikit-learn==1.7.2
+tiktoken==0.12.0
+langchain==1.2.10
+langchain-core==1.2.15
+langgraph==1.0.8
+langsmith==0.7.6
+chatterbox-tts
+parler-tts
 
 # Platform-conditional dependencies
 pystray==0.19.5; sys_platform == "win32"

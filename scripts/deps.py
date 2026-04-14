@@ -249,6 +249,16 @@ def generate_requirements(output_path='requirements.txt', platform=None):
     for name, ver in CORE_DEPS.items():
         lines.append(_format_dep(name, ver))
 
+    # Python-embed deps (torch, transformers, regex, tqdm, pyyaml, etc.).
+    # These MUST live inside python-embed/Lib/site-packages because the
+    # frozen app sets PYTHONNOUSERSITE=1, so gpu_worker subprocesses can't
+    # see cx_Freeze lib/.  Include them in requirements.txt so CI + builds
+    # install them into the python-embed target.
+    lines.append("")
+    lines.append("# Python-embed deps (transformers/torch worker deps)")
+    for name, ver in EMBED_DEPS.items():
+        lines.append(_format_dep(name, ver))
+
     # Platform-specific (use PEP 508 markers so one file works everywhere)
     _marker_map = {
         "win32": 'sys_platform == "win32"',
