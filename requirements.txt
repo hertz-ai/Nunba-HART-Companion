@@ -75,8 +75,6 @@ langchain==1.2.10
 langchain-core==1.2.15
 langgraph==1.0.8
 langsmith==0.7.6
-chatterbox-tts
-parler-tts
 
 # Platform-conditional dependencies
 pystray==0.19.5; sys_platform == "win32"

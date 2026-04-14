@@ -133,10 +133,11 @@ EMBED_DEPS = {
     "langchain-core": "1.2.15",
     "langgraph": "1.0.8",
     "langsmith": "0.7.6",
-    # TTS engines -- GPU engines auto-download models on first use
-    "chatterbox-tts": None,       # Chatterbox Turbo (English, [laugh]/[chuckle])
-    "parler-tts": None,           # Indic Parler (21 Indian langs + English)
-    # f5-tts and cosyvoice are NOT pip-installable -- handled by package_installer
+    # TTS engines -- ALL installed at runtime by tts/package_installer.py via
+    # pip --target to ~/.nunba/site-packages (avoids pinning conflicts — e.g.
+    # chatterbox-tts pins torch==2.6.0 + numpy<1.26, which would break our
+    # torch==2.10.0 + numpy==1.26.4 base).  Removed from requirements.txt so
+    # `pip install -r requirements.txt` doesn't ResolutionImpossible.
 }
 
 # =============================================================================

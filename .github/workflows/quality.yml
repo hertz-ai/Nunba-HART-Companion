@@ -153,7 +153,10 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt 2>&1 | tail -5
+          # Fail on pip errors (pipefail) + show enough lines to see
+          # ResolutionImpossible conflict details.
+          set -o pipefail
+          pip install -r requirements.txt 2>&1 | tail -60
 
           # Install sibling deps in order: hevolve-database → hevolveai → hart-backend
           for dep_dir in ../Hevolve_Database ../hevolveai ../HARTOS; do
