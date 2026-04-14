@@ -153,7 +153,7 @@ const AdminContentTasks = lazyRetry(() => import('./components/Admin/ContentTask
 const AdminNetworkNodes = lazyRetry(() => import('./pages/admin/NetworkNodesPage'));
 const AdminModelManagement = lazyRetry(() => import('./pages/admin/ModelManagementPage'));
 const AdminProviderManagement = lazyRetry(() => import('./pages/admin/ProviderManagementPage'));
-const AdminTaskLedger = lazyRetry(() => import('./pages/Admin/TaskLedgerPage'));
+const AdminTaskLedger = lazyRetry(() => import('./pages/admin/TaskLedgerPage'));
 
 function MainRoutes() {
   return (
