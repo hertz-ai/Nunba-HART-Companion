@@ -3174,24 +3174,17 @@ def start_background_services():
             if _can_preload:
                 import tempfile as _tf
                 _test_path = os.path.join(_tf.gettempdir(), '_nunba_tts_warmup.wav')
-                # Use a short phrase in the user's own language.  Passing the
-                # English string "test" to Tamil/Hindi/etc. engines produces
-                # broken audio or crashes (no phonemes for Latin letters).
-                _WARMUP_PHRASES = {
-                    'en': 'hello', 'ta': 'வணக்கம்', 'hi': 'नमस्ते',
-                    'bn': 'হ্যালো', 'gu': 'નમસ્તે', 'kn': 'ನಮಸ್ಕಾರ',
-                    'ml': 'നമസ്കാരം', 'mr': 'नमस्कार', 'te': 'నమస్కారం',
-                    'pa': 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ', 'ur': 'ہیلو',
-                    'zh': '你好', 'ja': 'こんにちは', 'ko': '안녕하세요',
-                    'es': 'hola', 'fr': 'bonjour', 'de': 'hallo',
-                    'it': 'ciao', 'pt': 'olá', 'ru': 'привет', 'ar': 'مرحبا',
-                }
-                _warmup_text = _WARMUP_PHRASES.get(preferred_lang, 'hello')
+                # Universal warmup: the `language=` parameter drives model
+                # selection (engine picks the right phoneme set per that code).
+                # The TEXT just needs to be tokenizer-safe across all languages.
+                # "." is a single sentence-end token every TTS tokenizer accepts
+                # — primes weights, produces ~200ms silence, works for every
+                # language without a per-language phrase dict.
                 try:
-                    engine.synthesize(_warmup_text, output_path=_test_path, language=preferred_lang)
+                    engine.synthesize(".", output_path=_test_path, language=preferred_lang)
                     if os.path.exists(_test_path):
                         os.unlink(_test_path)
-                    logging.info(f"TTS warm-up: engine pre-loaded with {preferred_lang!r} phrase")
+                    logging.info(f"TTS warm-up: engine pre-loaded (lang={preferred_lang})")
                 except Exception as _se:
                     logging.info(f"TTS warm-up: pre-load skipped ({_se}) — first response uses Piper")
 
