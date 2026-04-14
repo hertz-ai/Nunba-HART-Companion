@@ -1559,6 +1559,38 @@ _HUB_CATEGORY_FILTERS = {
 }
 
 
+# Organizations whose models we auto-trust.  Models from orgs OUTSIDE
+# this list require `confirm_unverified=True` in the install body so the
+# user consciously takes responsibility for a third-party artifact.
+# Defense against: typosquat orgs (e.g. `aí4bharat` with Unicode í),
+# drive-by "hot on HF Hub" installs, supply-chain attacks via repos
+# packaged in pickle format.
+_TRUSTED_HF_ORGS = frozenset({
+    'google', 'microsoft', 'openai', 'meta-llama', 'mistralai',
+    'Qwen', 'ai4bharat', 'facebook', 'HuggingFaceTB', 'HuggingFaceH4',
+    'suno', 'coqui', 'hexgrad', 'SparkAudio',
+    'nvidia', 'NousResearch', 'pyannote', 'openai-community',
+    'sentence-transformers', 'BAAI', 'intfloat', 'mixedbread-ai',
+    'stabilityai', 'runwayml', 'CompVis',
+    'hertz-ai', 'HertzAI',  # our own
+})
+
+
+def _normalize_hf_id(raw: str) -> str:
+    """NFKC-normalize + reject non-ASCII hf_ids to defeat Unicode
+    homoglyph attacks.  `aí4bharat/indic-parler-tts` (Latin Small I
+    With Acute, U+00ED) looks identical to `ai4bharat/...` but resolves
+    to an attacker-controlled repo."""
+    import unicodedata
+    cleaned = unicodedata.normalize('NFKC', raw).strip()
+    if any(ord(c) > 0x7F for c in cleaned):
+        raise ValueError(
+            f"hf_id must be ASCII only (non-ASCII char detected — "
+            f"possible homoglyph attack): {cleaned!r}",
+        )
+    return cleaned
+
+
 @app.route('/api/admin/models/hub/search', methods=['GET'])
 def admin_models_hub_search():
     """Search HuggingFace Hub by Nunba task category.
@@ -1572,6 +1604,10 @@ def admin_models_hub_search():
 
     Returns top N models from HF Hub matching the filter.
     """
+    # Local-only — avoid letting remote callers enumerate/recon via this
+    # endpoint (same policy as /hub/install).  Previously unauthenticated.
+    if not _is_local_request():
+        return jsonify({"error": "local only"}), 403
     try:
         from huggingface_hub import list_models
     except ImportError:
@@ -1655,15 +1691,72 @@ def admin_models_hub_install():
         from models.catalog import ModelEntry, get_catalog
         from models.orchestrator import get_orchestrator
         data = request.get_json(silent=True) or {}
-        hf_id = (data.get('hf_id') or '').strip()
+        raw_hf_id = (data.get('hf_id') or '').strip()
         category = (data.get('category') or '').lower().strip()
-        if not hf_id or '/' not in hf_id:
+        confirm_unverified = bool(data.get('confirm_unverified'))
+        if not raw_hf_id or '/' not in raw_hf_id:
             return jsonify({"error": "hf_id must be 'org/name'"}), 400
+        # ── Homoglyph / Unicode defense ──
+        try:
+            hf_id = _normalize_hf_id(raw_hf_id)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         if category not in _HUB_CATEGORY_FILTERS:
             return jsonify({
                 "error": "unknown category",
                 "valid": sorted(_HUB_CATEGORY_FILTERS.keys()),
             }), 400
+
+        # ── Trusted-org gate ──
+        # Unknown orgs are allowed ONLY if the user explicitly confirms
+        # they understand the supply-chain risk.  Frontend shows a red
+        # "unverified publisher" banner and collects the checkbox.
+        org = hf_id.split('/', 1)[0]
+        if org not in _TRUSTED_HF_ORGS and not confirm_unverified:
+            return jsonify({
+                "error": "unverified_org",
+                "message": (
+                    f"'{org}' is not in the trusted-publisher list. "
+                    f"If you've verified the author and repo are legitimate, "
+                    f"resubmit with confirm_unverified=true."
+                ),
+                "trusted_orgs": sorted(_TRUSTED_HF_ORGS),
+            }), 403
+
+        # ── Safetensors-only gate ──
+        # Reject repos whose weights are ONLY in pickle/.bin format —
+        # `torch.load()` on a malicious pickle achieves arbitrary code
+        # execution in the Nunba process (full user token).  If a repo
+        # has both .safetensors and .bin, safetensors is preferred and
+        # we accept.  If only .bin/.pt/.pkl, refuse.
+        try:
+            from huggingface_hub import list_repo_files
+            _files = set(list_repo_files(hf_id))
+            _has_safetensors = any(
+                f.endswith('.safetensors') for f in _files
+            )
+            _risky = {
+                f for f in _files
+                if f.endswith(('.bin', '.pt', '.pkl', '.pickle', '.ckpt'))
+            }
+            if _risky and not _has_safetensors:
+                return jsonify({
+                    "error": "unsafe_weights_format",
+                    "message": (
+                        "This repo ships weights only in pickle format "
+                        "(.bin/.pt/.pkl/.ckpt).  Loading these executes "
+                        "arbitrary code.  Nunba requires a .safetensors "
+                        "variant."
+                    ),
+                    "found_files": sorted(_risky)[:10],
+                }), 415
+        except Exception as _fe:
+            # If list_repo_files fails (private repo, network), fail
+            # closed — do not silently bypass the gate.
+            return jsonify({
+                "error": "file_probe_failed",
+                "message": f"could not verify repo contents: {_fe}",
+            }), 502
 
         # Category → model_type mapping for catalog registration
         type_map = {
