@@ -235,48 +235,170 @@ class LlamaConfig:
         except ImportError:
             return None
 
+    # ── Cohort-aware draft gate ──────────────────────────────────────────
+    # Data-scientist rework (2026-04 ship-gate, commit 2acf21a): the plain
+    # 10 GB threshold silently regressed English-only users who had room
+    # for draft+Kokoro/Piper but were being denied it. The cohort-aware
+    # branch below keeps the draft boot for `lang=en + small-TTS` in the
+    # 8–10 GB band while still blocking it for Indic users (whose Parler
+    # TTS is ~2 GB and would starve).  See `bench/README.md`.
+
+    # TTS engines whose on-GPU resident cost is ≤ ~2 GB — small enough to
+    # coexist with main (~3 GB) + draft (~1 GB) + buffers (~1.5 GB) on an
+    # 8 GB card.  Indic Parler (~2 GB *but* loaded alongside vocoder +
+    # language-specific projectors) and anything larger is excluded.
+    _SMALL_TTS_ENGINES = frozenset({'kokoro', 'piper'})
+
+    @staticmethod
+    def _read_preferred_lang() -> str:
+        """Read the user's preferred language from ~/Documents/Nunba/data/hart_language.json.
+
+        Returns 'en' on any failure — matches the default used by main.py
+        when the file is missing (first-run before LightYourHART).
+        """
+        try:
+            hart_lang_file = os.path.join(
+                os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
+            if os.path.exists(hart_lang_file):
+                with open(hart_lang_file) as f:
+                    return json.load(f).get('language', 'en') or 'en'
+        except Exception:
+            pass
+        return 'en'
+
+    @staticmethod
+    def _read_active_tts() -> str | None:
+        """Read the active TTS engine id (e.g. 'kokoro', 'piper', 'indic_parler').
+
+        Uses the tts_engine singleton if importable, else returns None.
+        None means "unknown" — callers must treat it conservatively.
+        """
+        try:
+            from tts.tts_engine import get_tts_engine
+            inst = get_tts_engine()
+            backend = getattr(inst, '_active_backend', None)
+            if backend and backend != 'none':
+                return str(backend).lower()
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _log_draft_decision(decision: str, lang: str, vram_total: float,
+                            vram_free: float, active_tts: str | None,
+                            reason: str) -> None:
+        """Append one JSON line per boot to draft_decision.jsonl (drift monitor).
+
+        Non-fatal: any I/O error is swallowed — the boot path must never
+        crash because we couldn't write a log line.
+        """
+        try:
+            import time as _time
+            log_dir = Path(os.path.expanduser('~')) / 'Documents' / 'Nunba' / 'logs'
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / 'draft_decision.jsonl'
+            entry = {
+                'ts': _time.time(),
+                'decision': decision,                # 'draft_enabled' | 'main_only'
+                'lang': lang,
+                'vram_total_gb': round(float(vram_total), 2),
+                'vram_free_gb': round(float(vram_free), 2),
+                'active_tts': active_tts,
+                'reason': reason,
+            }
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(entry) + '\n')
+        except Exception as e:
+            logger.debug(f"draft_decision log skipped: {e}")
+
     @staticmethod
     def should_boot_draft() -> bool:
         """Whether the system has enough VRAM to run a separate draft model.
 
-        Delegates entirely to VRAMManager — the single source of truth
-        for GPU state and budget decisions.
+        Cohort-aware gate (post-2acf21a rework):
 
-        Budget math for dual (main + draft + room for TTS):
+            VRAM >= 10 GB                    → draft (any lang, any TTS)
+            VRAM in [8,10) GB AND lang=='en' AND active_tts in {kokoro, piper}
+                                             → draft (small-TTS English cohort)
+            otherwise                        → main-only
+
+        Budget math for dual (main + draft + TTS):
             main LLM (Qwen3-4B, Q4)        ~3.0 GB
             draft LLM (Qwen3.5-0.8B, Q4)   ~1.0 GB
             mmproj (vision projector)       ~0.3 GB
             llama buffers + KV              ~1.5 GB
-            TTS headroom (indic_parler 2GB | cosyvoice 4GB | chatterbox 5.6GB)
-                                            2.0–5.6 GB
-            ─────────────────────────────────────
-            minimum for dual + smallest TTS  ~7.8 GB  (still fails large TTS)
-            comfortable dual + any TTS      ~10 GB
+            TTS headroom:
+                kokoro / piper              ~0.5–1.0 GB   (fits on 8 GB w/ draft)
+                indic_parler                ~2.0 GB       (needs 10 GB total)
+                cosyvoice                   ~4.0 GB       (needs 10 GB total)
+                chatterbox                  ~5.6 GB       (needs 16 GB, no draft anyway)
 
-        On ≤8GB laptops dual-model squeezes TTS out (Indic Parler blocked,
-        TTS falls through to Piper).  User asked: "main model shd be used
-        for draft purpose if we cannot fit two llms and tts".  So we require
-        ≥10 GB total for dual boot.  Below that, run main-only — llama-server
-        handles token generation without speculation; main LLM does all the
-        work that draft would classify (slower per-token but TTS can load).
+        Indic users never hit the 8–10 GB fast-path: their TTS ladder
+        resolves to indic_parler or F5, both of which blow the budget
+        when combined with draft. Falling back to main-only on 8 GB
+        for them is by design — it reclaims ~1 GB so Parler loads.
+
+        Every call emits one JSON line to
+        ~/Documents/Nunba/logs/draft_decision.jsonl (drift monitor).
         """
+        # Defaults for the log line if VRAM detection itself fails.
+        lang = LlamaConfig._read_preferred_lang()
+        active_tts = LlamaConfig._read_active_tts()
+        total = 0.0
+        free = 0.0
+
         try:
             from integrations.service_tools.vram_manager import vram_manager
-            total = vram_manager.get_total_vram()
-            free = vram_manager.get_free_vram()
+            total = float(vram_manager.get_total_vram())
+            free = float(vram_manager.get_free_vram())
             gpu = vram_manager.detect_gpu()
+
             if not gpu.get('cuda_available'):
+                LlamaConfig._log_draft_decision(
+                    'main_only', lang, total, free, active_tts, 'no_cuda')
                 return False
-            # 10 GB total + 1 GB free lets main+draft+TTS coexist on any
-            # ladder config (even chatterbox_ml at 14 GB goes main-only
-            # anyway because it would blow even a 16 GB card with draft).
-            viable = total >= 10.0 and free >= 1.0
+
+            # Primary gate: generous VRAM — dual is safe for any cohort.
+            if total >= 10.0 and free >= 1.0:
+                LlamaConfig._log_draft_decision(
+                    'draft_enabled', lang, total, free, active_tts,
+                    'vram_ge_10gb')
+                logger.info(
+                    f"Draft boot decision: total={total:.0f}GB, "
+                    f"free={free:.1f}GB → dual (>=10GB primary)")
+                return True
+
+            # Cohort-aware fast-path: 8–10 GB English + small TTS.
+            if (8.0 <= total < 10.0 and free >= 1.0
+                    and lang == 'en'
+                    and active_tts in LlamaConfig._SMALL_TTS_ENGINES):
+                LlamaConfig._log_draft_decision(
+                    'draft_enabled', lang, total, free, active_tts,
+                    'cohort_en_small_tts_8to10gb')
+                logger.info(
+                    f"Draft boot decision: total={total:.0f}GB, "
+                    f"free={free:.1f}GB, lang=en, tts={active_tts} "
+                    f"→ dual (cohort-aware 8–10GB fast-path)")
+                return True
+
+            # Everyone else: main-only.
+            reason = (
+                'vram_below_8gb' if total < 8.0
+                else 'cohort_indic_or_large_tts' if lang != 'en' or (
+                    active_tts not in LlamaConfig._SMALL_TTS_ENGINES)
+                else 'free_vram_too_low'
+            )
+            LlamaConfig._log_draft_decision(
+                'main_only', lang, total, free, active_tts, reason)
             logger.info(
                 f"Draft boot decision: total={total:.0f}GB, "
-                f"free={free:.1f}GB → {'dual' if viable else 'single (main-only, frees ~1GB for TTS)'}",
-            )
-            return viable
-        except Exception:
+                f"free={free:.1f}GB, lang={lang}, tts={active_tts} "
+                f"→ single (main-only; reason={reason})")
+            return False
+
+        except Exception as e:
+            LlamaConfig._log_draft_decision(
+                'main_only', lang, total, free, active_tts, f'exception:{type(e).__name__}')
             return False  # safe default — single model, no wasted startup
 
     def diagnose(self) -> dict:
