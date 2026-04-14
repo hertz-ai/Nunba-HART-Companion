@@ -199,10 +199,9 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=4096'
 
       # ── Cypress: Bundled mode (Flask serves React on :5000) ──
-      # continue-on-error: UI timing failures on free CI runners are expected.
-      # The pass rate is tracked in reports — not used as a gate.
+      # HARD GATE (task #281): Cypress failures now fail the workflow.
+      # continue-on-error removed — we fix test failures rather than mask them.
       - name: Cypress E2E tests
-        continue-on-error: true
         uses: cypress-io/github-action@v6
         with:
           working-directory: landing-page
