@@ -677,6 +677,28 @@ def _run_router(port: int, host: str):
             logger.warning("WAMP router did not start — realtime features will use SSE fallback")
 
 
+def ensure_wamp_running(reason: str = '') -> bool:
+    """Start the WAMP router if it isn't running yet.
+
+    Called by on-demand paths: a channel adapter being registered after
+    boot, a mobile peer being discovered, an admin enabling realtime
+    features — anything that needs cross-process messaging.  At cold boot
+    when no channels/peers are configured, main.py skips the router to
+    save ~100MB; this lets it wake later without restarting Nunba.
+
+    Idempotent — if already running, returns True immediately.
+    """
+    if is_running():
+        return True
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"WAMP router: on-demand start ({reason or 'unspecified'})")
+    except Exception:
+        pass
+    return start_wamp_router()
+
+
 def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
     """Start the embedded WAMP router in a daemon thread.
 

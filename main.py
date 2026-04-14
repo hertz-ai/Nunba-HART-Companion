@@ -3157,18 +3157,54 @@ def start_background_services():
         return
     _bg_services_started = True
 
-    # Start embedded WAMP router (port 8088) for realtime push.
-    # Must start BEFORE LangChain/crossbar_server (they are WAMP *clients*
-    # that connect TO this router). In bundled mode the cloud router at
-    # aws_rasa.hertzai.com is unreachable — this local router is the only
-    # transport for TTS audio delivery, chat streaming, game state, etc.
-    try:
-        from wamp_router import start_wamp_router
-        start_wamp_router()
-        logging.info("Embedded WAMP router starting on port %s",
-                     os.environ.get('NUNBA_WAMP_PORT', '8088'))
-    except Exception as e:
-        logging.warning("WAMP router failed to start (realtime will use SSE fallback): %s", e)
+    # Start embedded WAMP router (port 8088) for realtime push — but ONLY
+    # when we actually need cross-process messaging:
+    #   (a) At least one non-web channel adapter is registered (Telegram,
+    #       Discord, WhatsApp, Slack, etc. — these need WAMP for chat/agent
+    #       push from Flask to the adapter thread), OR
+    #   (b) At least one mobile peer is known via peer_link discovery.
+    # On a fresh install with no channels or peers, the local SPA uses
+    # SSE fallback for its realtime needs — saves ~80–120 MB resident memory
+    # (Twisted reactor + Autobahn router + connection registry).
+    #
+    # When a channel is added later via admin UI or a peer joins via
+    # peer_link, `ensure_wamp_running()` wakes the router on-demand.
+    def _wamp_is_needed() -> tuple[bool, str]:
+        try:
+            _adapters = getattr(channels.registry, '_adapters', None) or {}
+            _non_web = [ct for ct in _adapters if ct != 'web']
+            if _non_web:
+                return True, f"channels={_non_web}"
+        except Exception:
+            pass
+        try:
+            from hevolve.peer_link import get_peer_link_manager
+            pm = get_peer_link_manager()
+            if pm and getattr(pm, 'get_active_peers', lambda: [])():
+                return True, "mobile peer discovered"
+        except Exception:
+            pass
+        return False, ""
+
+    _needed, _reason = _wamp_is_needed()
+    if _needed:
+        try:
+            from wamp_router import start_wamp_router
+            start_wamp_router()
+            logging.info(
+                "Embedded WAMP router starting on port %s (reason: %s)",
+                os.environ.get('NUNBA_WAMP_PORT', '8088'), _reason,
+            )
+        except Exception as e:
+            logging.warning(
+                "WAMP router failed to start (realtime will use SSE fallback): %s", e,
+            )
+    else:
+        logging.info(
+            "WAMP router deferred — no non-web channels or mobile peers "
+            "at boot (SSE handles local realtime, saves ~100MB; router "
+            "will start on-demand when a channel/peer arrives)",
+        )
 
     # Start LangChain service in background thread (non-blocking)
     langchain_thread = threading.Thread(target=start_langchain_service, daemon=True)
