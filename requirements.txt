@@ -1,4 +1,4 @@
-# AUTO-GENERATED from scripts/deps.py — DO NOT EDIT MANUALLY
+# AUTO-GENERATED from scripts/deps.py -- DO NOT EDIT MANUALLY
 # Regenerate: python scripts/deps.py requirements
 # Nunba 0.1.0 | Python Embed 3.12.6
 
