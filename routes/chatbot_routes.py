@@ -1588,14 +1588,30 @@ def voice_transcribe():
         tmp.close()
 
         from integrations.service_tools.whisper_tool import whisper_transcribe
-        # Pass the user's declared preferred language through to whisper so
-        # short-utterance auto-detect doesn't mis-route (e.g., a Tamil "hi"
-        # getting tagged as English — data-scientist cohort analysis caught
-        # this as divergence point #1 between the `preferred_lang` signal
-        # and the STT path).  When unset, whisper auto-detects as before.
+        # STT language resolution (fix for 2026-04-15 Romanised-Tamil
+        # regression, caused by prior fix 07da0fb):
+        #
+        # PASSING `language='en'` to Whisper when the user is actually
+        # speaking Tamil forces phonetic transliteration — Tamil audio
+        # comes out as "naan sapduren" instead of "நான் சாப்பிடுகிறேன்",
+        # the LLM mirrors the script, and TTS then mumbles English
+        # phonemes over the Latin-char Tamil string.
+        #
+        # New policy:
+        # - Explicit per-request `preferred_lang` in form/args → HONOR it
+        #   (caller did the detection work).
+        # - `preferred_lang == 'en'` from the persisted default →
+        #   auto-detect instead (Whisper's detector is trustworthy for
+        #   >3s clips; English also detects as English, no regression).
+        # - No preferred_lang → auto-detect.
+        # This preserves Tamil-declared users (they pass 'ta' explicitly)
+        # while not forcing English on opportunistic multilingual use.
         _pref_lang = request.form.get('preferred_lang') or request.args.get('preferred_lang')
-        result = json.loads(whisper_transcribe(tmp.name, language=_pref_lang) if _pref_lang
-                            else whisper_transcribe(tmp.name))
+        _should_hint = bool(_pref_lang) and _pref_lang.split('-')[0].lower() not in ('', 'en', 'auto')
+        result = json.loads(
+            whisper_transcribe(tmp.name, language=_pref_lang) if _should_hint
+            else whisper_transcribe(tmp.name)
+        )
 
         # Sync STT model state with catalog on first successful transcribe
         try:
