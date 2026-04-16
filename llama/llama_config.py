@@ -2010,15 +2010,18 @@ def check_llama_health() -> bool:
     config = _get_cached_config()
     port = config.config.get("server_port", 8080)
 
-    try:
-        response = requests.get(f"http://localhost:{port}/health", timeout=2)
-        if response.status_code == 200:
-            return True
-        # Also check /v1/models as fallback
-        response = requests.get(f"http://localhost:{port}/v1/models", timeout=2)
-        return response.status_code == 200
-    except Exception:
-        return False
+    # Check the configured port AND common alternatives (8082 for
+    # orchestrator-assigned, 8081 for draft).  The orchestrator may
+    # start the LLM on a non-default port if 8080 was busy.
+    for _port in dict.fromkeys([port, 8082, 8081, 8080]):
+        try:
+            response = requests.get(
+                f"http://localhost:{_port}/health", timeout=1)
+            if response.status_code == 200:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def get_llama_endpoint() -> str:
