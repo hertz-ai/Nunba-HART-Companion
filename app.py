@@ -5696,6 +5696,7 @@ def main():
             if _mount_guard_fired[0]:
                 return
             _mount_guard_fired[0] = True
+            _trace("EVENT: on_loaded fired")
             logger.info("[MOUNT_GUARD] on_loaded fired — starting mount check")
 
             def _mount_guard():
@@ -5711,6 +5712,7 @@ def main():
                         "  return 'mounted';"
                         "})()"
                     )
+                    _trace(f"MOUNT_GUARD: initial check = {state}")
                     logger.info(f"[MOUNT_GUARD] Initial check: {state}")
 
                     if state == 'mounted':
@@ -5759,6 +5761,7 @@ def main():
                 if not _bg_first_show[0]:
                     return
                 _bg_first_show[0] = False
+                _trace("EVENT: on_shown fired (first show from hidden)")
 
                 def _ensure_react_mounted():
                     """Ensure React mounts inside pywebview after hidden→visible transition.
@@ -5802,6 +5805,7 @@ def main():
                         time.sleep(1.5 if attempt == 0 else 3.0)
 
                         state = _check_mount()
+                        _trace(f"BG_SHOWN: mount check #{attempt + 1} = {state}")
                         logger.info(f"[BACKGROUND] Mount check #{attempt + 1}: {state}")
 
                         if state == 'mounted':
