@@ -45,6 +45,14 @@ exclude_also =
 precision = 1
 show_missing = False
 
+# HARD QUALITY GATE — enforced by `coverage report --fail-under` and
+# pytest-cov --cov-fail-under. Lower this only with explicit cause.
+# Current observed baseline: ~5-10%, because most tests are still
+# source-grep. This will FAIL every build until the e2e families land.
+# That's intentional — it makes the "100% runtime coverage" target
+# visible and unavoidable instead of aspirational.
+fail_under = 99
+
 [html]
 directory = .coverage-html
 

@@ -19,11 +19,17 @@ REPO_ROOT="$PWD"
 FAILED=()
 PYTHON="${PYTHON:-python}"
 PYTEST="$PYTHON -m pytest"
+export NUNBA_SKIP_SINGLE_INSTANCE=1
 
-# Belt-and-suspenders: ensure pytest-timeout is present so every test
-# has a wall-clock deadline.  A hung test is a silent failure class
-# just like every other shallow-signal bug we've been fighting.
-$PYTHON -m pip install --quiet pytest-timeout 2>/dev/null || true
+# Belt-and-suspenders: ensure pytest-timeout + coverage tooling are
+# present.  Hung tests are a silent failure class; low coverage is
+# the same bug class one level up.
+$PYTHON -m pip install --quiet pytest-timeout pytest-cov coverage 2>/dev/null || true
+
+# Wipe old coverage fragments from a prior run so we measure only
+# this invocation.  `coverage combine` at the end aggregates what
+# every pytest tier produced via --cov parallel mode.
+$PYTHON -m coverage erase 2>/dev/null || true
 
 run_tier() {
     local name="$1"; shift
@@ -47,18 +53,26 @@ else
     echo "[skip] ruff not installed"
 fi
 
-# ── 2. Main pytest suite — everything under tests/ except harness
+# ── 2. Main pytest suite — everything under tests/ except harness + e2e
+#      pytest-cov runs in parallel mode; each tier appends to .coverage.*
 run_tier "pytest main" \
-    $PYTEST tests/ --ignore=tests/harness -v --tb=short
+    $PYTEST tests/ --ignore=tests/harness --ignore=tests/e2e \
+    --cov --cov-append -v --tb=short
 
-# ── 3. Defect-harness suite
+# ── 3. Defect-harness suite (static assertions; low cov contribution)
 run_tier "pytest harness (unit+integration)" \
-    $PYTEST tests/harness -m "unit or integration" -v --tb=short --rootdir tests/harness
+    $PYTEST tests/harness -m "unit or integration" --cov --cov-append \
+    -v --tb=short --rootdir tests/harness
+
+# ── 3b. E2E suite — the source of real runtime coverage
+run_tier "pytest e2e" \
+    $PYTEST tests/e2e --cov --cov-append -v --tb=short --rootdir tests/e2e
 
 # ── 4. Optional: live tier
 if [ "${NUNBA_LIVE:-0}" = "1" ]; then
     run_tier "pytest harness (live)" \
-        $PYTEST tests/harness -m "live" -v --tb=short --rootdir tests/harness
+        $PYTEST tests/harness -m "live" --cov --cov-append \
+        -v --tb=short --rootdir tests/harness
 fi
 
 # ── 5. Optional: Cypress
@@ -72,14 +86,31 @@ if [ "${NUNBA_STAGING:-0}" = "1" ] && [ -x scripts/staging_e2e_probe.sh ]; then
     run_tier "staging probes" bash scripts/staging_e2e_probe.sh
 fi
 
-# ── Aggregate
+# ── Combine coverage from every tier and enforce the 99% gate.
+#      .coveragerc has fail_under=99 so coverage.report exits non-zero
+#      below threshold.  This is the hard quality gate.
+echo ""
+echo "════════════════════════════════════════════════════════════"
+echo "  coverage combine + gate (fail_under=99)"
+echo "════════════════════════════════════════════════════════════"
+$PYTHON -m coverage combine 2>/dev/null || true
+run_tier "coverage gate (>=99% runtime)" \
+    $PYTHON -m coverage report --precision=1 --skip-covered --skip-empty
+$PYTHON -m coverage xml -o coverage.xml 2>/dev/null || true
+$PYTHON -m coverage html -d .coverage-html 2>/dev/null || true
+
+# ── Aggregate tier verdict
 echo ""
 echo "════════════════════════════════════════════════════════════"
 if [ ${#FAILED[@]} -eq 0 ]; then
-    echo "  ✓ ALL TIERS PASSED"
+    echo "  ✓ ALL TIERS PASSED + COVERAGE GATE GREEN"
     exit 0
 else
     echo "  ✗ FAILED TIERS (${#FAILED[@]}):"
     for f in "${FAILED[@]}"; do echo "    - $f"; done
+    echo ""
+    echo "  Coverage gate enforces >=99% runtime coverage."
+    echo "  Convert the remaining source-grep tests to real e2e drivers"
+    echo "  (see tests/e2e/ for the pattern) to close the gap."
     exit 1
 fi

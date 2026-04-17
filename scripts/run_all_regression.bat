@@ -12,9 +12,13 @@ cd /d "%~dp0.."
 if "%PYTHON%"=="" set PYTHON=python
 set FAIL_COUNT=0
 set FAIL_LIST=
+set NUNBA_SKIP_SINGLE_INSTANCE=1
 
-REM Belt-and-suspenders: ensure pytest-timeout is present.
-%PYTHON% -m pip install --quiet pytest-timeout 2>nul
+REM Ensure pytest-timeout + coverage tooling are present.
+%PYTHON% -m pip install --quiet pytest-timeout pytest-cov coverage 2>nul
+
+REM Wipe prior coverage fragments so we measure only this invocation.
+%PYTHON% -m coverage erase 2>nul
 
 echo.
 echo ============================================================
@@ -40,7 +44,7 @@ echo.
 echo ============================================================
 echo   pytest main
 echo ============================================================
-%PYTHON% -m pytest tests/ --ignore=tests/harness --ignore=tests/e2e -v --tb=short
+%PYTHON% -m pytest tests/ --ignore=tests/harness --ignore=tests/e2e --cov --cov-append -v --tb=short
 if errorlevel 1 (
     set /a FAIL_COUNT+=1
     set FAIL_LIST=!FAIL_LIST! pytest-main
@@ -50,10 +54,20 @@ echo.
 echo ============================================================
 echo   pytest harness (unit+integration)
 echo ============================================================
-%PYTHON% -m pytest tests/harness -m "unit or integration" -v --tb=short --rootdir tests/harness
+%PYTHON% -m pytest tests/harness -m "unit or integration" --cov --cov-append -v --tb=short --rootdir tests/harness
 if errorlevel 1 (
     set /a FAIL_COUNT+=1
     set FAIL_LIST=!FAIL_LIST! pytest-harness
+)
+
+echo.
+echo ============================================================
+echo   pytest e2e
+echo ============================================================
+%PYTHON% -m pytest tests/e2e --cov --cov-append -v --tb=short --rootdir tests/e2e
+if errorlevel 1 (
+    set /a FAIL_COUNT+=1
+    set FAIL_LIST=!FAIL_LIST! pytest-e2e
 )
 
 if "%NUNBA_LIVE%"=="1" (
@@ -98,8 +112,21 @@ if "%NUNBA_CYPRESS%"=="1" (
 
 echo.
 echo ============================================================
+echo   coverage combine + gate ^(fail_under=99^)
+echo ============================================================
+%PYTHON% -m coverage combine 2>nul
+%PYTHON% -m coverage report --precision=1 --skip-covered --skip-empty
+if errorlevel 1 (
+    set /a FAIL_COUNT+=1
+    set FAIL_LIST=!FAIL_LIST! coverage-gate
+)
+%PYTHON% -m coverage xml -o coverage.xml 2>nul
+%PYTHON% -m coverage html -d .coverage-html 2>nul
+
+echo.
+echo ============================================================
 if !FAIL_COUNT!==0 (
-    echo   ALL TIERS PASSED
+    echo   ALL TIERS PASSED + COVERAGE GATE GREEN
     exit /b 0
 ) else (
     echo   FAILED TIERS: !FAIL_COUNT!
