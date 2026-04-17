@@ -93,6 +93,28 @@ def _pick_test_phrase(backend: str, lang: Optional[str]) -> str:
     return _TEST_PHRASES['en']
 
 
+def _hf_offline_reason() -> str | None:
+    """Surface HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE env flags as a
+    user-readable reason.  Returns None if neither is set so the
+    synth path can proceed.
+
+    Used by verify_backend_synth to fail fast with a clear
+    "download failed" message instead of silently stalling on a
+    HuggingFace request that cannot complete.  Before this, the
+    observed failure mode was the Ready card hanging for minutes
+    while the probe retried a network call against a machine with
+    no route to huggingface.co.
+    """
+    import os as _os
+    if _os.environ.get("HF_HUB_OFFLINE") == "1":
+        return ("HF_HUB_OFFLINE=1 and model weights not cached — "
+                "download failed (network offline or unreachable)")
+    if _os.environ.get("TRANSFORMERS_OFFLINE") == "1":
+        return ("TRANSFORMERS_OFFLINE=1 and model weights not cached — "
+                "download failed")
+    return None
+
+
 def verify_backend_synth(engine, backend: str,
                          lang: Optional[str] = None,
                          min_bytes: int = MIN_AUDIO_BYTES,

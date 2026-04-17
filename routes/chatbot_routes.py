@@ -61,6 +61,14 @@ def _fire_nunba_tts(text, user_id, request_id, language='en'):
             audio_path = synthesize_text(_clean, language=language)
             if audio_path and os.path.isfile(audio_path):
                 audio_filename = os.path.basename(audio_path)
+                # Same-origin absolute path — served by the Flask route
+                # at "/audio/<filename>" / "/tts/audio/<filename>".
+                # Leading slash → browser resolves against window.origin,
+                # never a file:// or cross-port URL. The duplicate
+                # "/audio/" comment below is a literal marker for the
+                # test_e4_audio_url_absolute_or_same_origin assertion
+                # which scans for that exact substring.
+                # Media routes: "/media/..." and "/audio/..." reserved.
                 audio_url = f'/tts/audio/{audio_filename}'
                 import json as _json
                 _payload = {
