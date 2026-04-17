@@ -73,7 +73,11 @@ jobs:
         run: python -m pip install pytest pytest-html flask requests
 
       - name: Run backend tests
-        run: python -m pytest tests/ -v --tb=short --html=test-report-${{ matrix.os }}.html --self-contained-html
+        # --ignore=tests/harness: the defect-harness suite declares
+        # unit/integration/live markers only in tests/harness/pytest.ini
+        # and is covered by the dedicated defect-harness.yml workflow.
+        # Without --ignore, strict-markers trips here on first collection.
+        run: python -m pytest tests/ --ignore=tests/harness -v --tb=short --html=test-report-${{ matrix.os }}.html --self-contained-html
         # HARD GATE — test failures block merge
 
       - name: Upload pytest report
