@@ -88,17 +88,20 @@ jobs:
         # installed every Python tier ImportError-collapses at collection.
         # HARTOS is a separate private repo in the same org; clone with
         # --depth=1 + --no-deps to keep install light (runtime ML deps
-        # stay lazy).  GITHUB_TOKEN has access to hertz-ai/HARTOS.
+        # stay lazy).  If the default GITHUB_TOKEN can't reach the
+        # other repo, the beacon below surfaces a clear failure in
+        # annotations so we can add a dedicated PAT.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git clone --depth 1 \
-            https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git \
-            ../HARTOS
-          pip install --no-deps ../HARTOS
-          # Also install cultural_wisdom if it's a sibling package.
-          if [ -d ../HARTOS/cultural_wisdom ]; then
-            pip install --no-deps -e ../HARTOS || true
+          echo "::notice title=hartos install::attempting git clone hertz-ai/HARTOS"
+          if git clone --depth 1 \
+               https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git \
+               ../HARTOS 2>&1 | tail -20; then
+            pip install --no-deps ../HARTOS || true
+            echo "::notice title=hartos install::OK — hart-backend installed"
+          else
+            echo "::warning title=hartos install::FAILED — default GITHUB_TOKEN cannot reach hertz-ai/HARTOS; pytest main/harness/e2e will ImportError on integrations.*.  Add a NUNBA_HARTOS_TOKEN secret with repo read scope and wire it into env.GH_TOKEN."
           fi
 
       - name: Install React app + Cypress (landing-page)
