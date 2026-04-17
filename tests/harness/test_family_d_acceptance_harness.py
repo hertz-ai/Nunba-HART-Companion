@@ -13,25 +13,98 @@ pytestmark = pytest.mark.unit
 
 
 def test_d1_harness_makes_at_least_one_runtime_call(source_app_py, source_text):
-    """FAILS on HEAD. The --acceptance-test block contains no
-    subprocess.Popen, no urllib.request.urlopen, no http.client call.
-    It only greps source.
+    """FAILS if the --acceptance-test block makes no real runtime call.
+
+    This used to literal-string-grep for ``subprocess.run(`` which
+    broke on aliases like ``import subprocess as sp; sp.run(...)`` —
+    the check was testing variable names, not behavior.
+
+    Now we AST-parse the block and track import aliases so
+    ``sp.run(...)`` resolves to ``subprocess.run`` regardless of how
+    the code names it.  The test asserts that at least one Call node
+    resolves to a runtime-call primitive.
     """
+    import ast
+
     src = source_text(source_app_py)
-    m = re.search(r"NUNBA ACCEPTANCE TEST.*?(?=\n\S|\Z)", src, flags=re.DOTALL)
-    assert m, "acceptance harness block not found"
-    block = m.group(0)
-    calls = sum([
-        block.count("subprocess.Popen("),
-        block.count("subprocess.run("),
-        block.count("urllib.request.urlopen("),
-        block.count("http.client.HTTPConnection("),
-        block.count("requests.get("),
-        block.count("requests.post("),
-    ])
-    assert calls > 0, (
-        "acceptance harness is pure text-grep; must make at least one "
-        "runtime call (subprocess + HTTP) to verify user-visible behavior"
+    tree = ast.parse(src)
+
+    # Locate `if getattr(args, 'acceptance_test', False):` at module scope.
+    accept_node = None
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Call)
+            and isinstance(node.test.func, ast.Name)
+            and node.test.func.id == "getattr"
+            and len(node.test.args) >= 2
+            and isinstance(node.test.args[1], ast.Constant)
+            and node.test.args[1].value == "acceptance_test"
+        ):
+            accept_node = node
+            break
+    assert accept_node is not None, "acceptance_test block not found"
+
+    # Runtime-call primitives (dotted targets).  Calls to any of these,
+    # resolved through import aliases, count as a real runtime call.
+    RUNTIME_APIS = {
+        "subprocess.run",
+        "subprocess.Popen",
+        "subprocess.call",
+        "subprocess.check_call",
+        "subprocess.check_output",
+        "urllib.request.urlopen",
+        "http.client.HTTPConnection",
+        "requests.get",
+        "requests.post",
+        "importlib.import_module",
+    }
+
+    # Build alias map: local name → dotted target from Import/ImportFrom
+    # nodes inside the block.
+    #   import subprocess                → 'subprocess'   → 'subprocess'
+    #   import subprocess as sp          → 'sp'           → 'subprocess'
+    #   from urllib import request       → 'request'      → 'urllib.request'
+    #   from urllib import request as r  → 'r'            → 'urllib.request'
+    #   from importlib import import_module as imp
+    #                                    → 'imp'          → 'importlib.import_module'
+    aliases: dict[str, str] = {}
+    for sub in ast.walk(accept_node):
+        if isinstance(sub, ast.Import):
+            for a in sub.names:
+                local = a.asname or a.name.split(".")[0]
+                aliases[local] = a.name
+        elif isinstance(sub, ast.ImportFrom):
+            mod = sub.module or ""
+            for a in sub.names:
+                local = a.asname or a.name
+                aliases[local] = f"{mod}.{a.name}" if mod else a.name
+
+    def _resolve(func_node: ast.expr) -> str:
+        """Return the resolved dotted path of a Call.func, or ''."""
+        parts: list[str] = []
+        cur = func_node
+        while isinstance(cur, ast.Attribute):
+            parts.append(cur.attr)
+            cur = cur.value
+        if isinstance(cur, ast.Name):
+            parts.append(aliases.get(cur.id, cur.id))
+        else:
+            return ""
+        return ".".join(reversed(parts))
+
+    hits: list[str] = []
+    for sub in ast.walk(accept_node):
+        if isinstance(sub, ast.Call):
+            resolved = _resolve(sub.func)
+            if resolved in RUNTIME_APIS:
+                hits.append(resolved)
+
+    assert hits, (
+        "acceptance block makes no resolved runtime call "
+        "(subprocess / urllib / http.client / requests / "
+        "importlib.import_module).  At least one real runtime "
+        "primitive must fire when the block executes."
     )
 
 
