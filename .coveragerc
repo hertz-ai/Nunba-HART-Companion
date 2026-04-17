@@ -1,0 +1,52 @@
+[run]
+# Measure runtime code coverage during the e2e suite.  Sources listed
+# here are the Nunba code that ships to users — we explicitly track
+# coverage of the code that runs in production, not the test scaffolding.
+source =
+    app.py
+    main.py
+    tts
+    llama
+    routes
+    core
+    models
+    desktop
+
+# Exclude known non-runtime artifacts.
+omit =
+    */__pycache__/*
+    */tests/*
+    */.venv/*
+    */python-embed/*
+    */python-embed-310-backup/*
+    */build/*
+    */landing-page/*
+    */scripts/_dead_code_*
+    */scripts/setup_freeze_*
+    setup.py
+    conftest.py
+
+branch = True
+parallel = True
+concurrency = thread
+
+[report]
+# Lines that legitimately cannot be runtime-covered on CI.
+exclude_also =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    if sys\.platform ==
+    if IS_MACOS
+    if IS_LINUX
+    except ImportError
+    if getattr\(sys, .frozen., False\)
+
+precision = 1
+show_missing = False
+
+[html]
+directory = .coverage-html
+
+[xml]
+output = coverage.xml

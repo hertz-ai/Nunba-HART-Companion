@@ -210,8 +210,16 @@ def _check_single_instance():
         except Exception:
             pass
 
-# Skip single-instance check under pytest (PYTEST_CURRENT_TEST is set by pytest)
-if not os.environ.get('PYTEST_CURRENT_TEST'):
+# Skip single-instance check under pytest / coverage instrumentation.
+#   PYTEST_CURRENT_TEST — set by pytest (per-test, not at collection)
+#   PYTEST_DISABLE_PLUGIN_AUTOLOAD — set when pytest boots
+#   COVERAGE_RUN — set when coverage.py rewrites modules for measurement
+#   NUNBA_SKIP_SINGLE_INSTANCE — explicit local override for dev tests
+# All four indicate a non-user-facing invocation where "duplicate
+# instance" exit would sabotage the test harness itself.
+_test_envs = ('PYTEST_CURRENT_TEST', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD',
+              'COVERAGE_RUN', 'NUNBA_SKIP_SINGLE_INSTANCE')
+if not any(os.environ.get(_k) for _k in _test_envs):
     _check_single_instance()
 
 # === Frozen exe stdout/stderr fix ===
