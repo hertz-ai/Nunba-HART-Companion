@@ -2257,17 +2257,23 @@ def image_proxy():
             return send_from_directory(static_dir, fallback_files[0])
         return jsonify({'error': 'No image URL provided'}), 400
 
+    # Scheme + SSRF validation MUST fail hard before we fall into the
+    # network-error fallback path below — otherwise `file:///etc/passwd`
+    # produces a 200 with a decoy image, masking the SSRF attempt
+    # entirely (J98 red-product).  Validate up-front, outside the
+    # try/except that handles transient network failures.
+    parsed = urllib.parse.urlparse(image_url)
+    if parsed.scheme not in ('http', 'https'):
+        return jsonify({
+            'error': 'Only http/https URLs are allowed',
+            'scheme': parsed.scheme or '(empty)',
+        }), 400
+
+    hostname = parsed.hostname
+    if not hostname or _is_private_ip(hostname):
+        return jsonify({'error': 'Access to internal networks is not allowed'}), 403
+
     try:
-        # Validate URL
-        parsed = urllib.parse.urlparse(image_url)
-        if parsed.scheme not in ('http', 'https'):
-            raise ValueError('Invalid URL scheme')
-
-        # SSRF protection: block requests to private/internal networks
-        hostname = parsed.hostname
-        if not hostname or _is_private_ip(hostname):
-            return jsonify({'error': 'Access to internal networks is not allowed'}), 403
-
         # Fetch the image
         response = requests.get(image_url, timeout=10, stream=True)
         response.raise_for_status()
@@ -2279,7 +2285,9 @@ def image_proxy():
         return response.content, 200, {'Content-Type': content_type}
     except Exception as e:
         logging.warning(f"Image proxy failed for {image_url}: {e}")
-        # Return fallback image on any error
+        # Return fallback image ONLY on transient network / server errors
+        # (the scheme + SSRF gates above have already rejected malicious
+        # inputs, so anything landing here is a remote-host issue).
         static_dir = os.path.join(LANDING_PAGE_BUILD_DIR, 'static', 'media')
         try:
             fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
@@ -2287,7 +2295,7 @@ def image_proxy():
                 return send_from_directory(static_dir, fallback_files[0])
         except OSError:
             pass
-        return jsonify({'error': 'Failed to fetch image'}), 500
+        return jsonify({'error': 'Failed to fetch image'}), 502
 
 # ============== Register API routes BEFORE catch-all ==============
 # Register chatbot routes (includes /chat, /prompts, /tts, /custom_gpt)

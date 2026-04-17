@@ -1457,6 +1457,19 @@ def tts_kids_quick():
 
         audio_path = synthesize_text(text, voice=mapped_voice, speed=speed)
 
+        # J60 fallback: if the primary engine returns no audio (engine
+        # still warming, pocket_tts not installed, upstream 5xx), drop
+        # to Piper directly.  Piper is bundled + CPU-only so it's
+        # always callable — kids should get SOMETHING on first click,
+        # not a bare 503.  Ship-quick: reliability > voice quality.
+        if not (audio_path and os.path.exists(audio_path)):
+            try:
+                from tts.piper_tts import synthesize_text as _piper_synth
+                audio_path = _piper_synth(text, voice_id=None, speed=speed)
+            except Exception as _pe:
+                logger.warning(f"Kids TTS Piper fallback failed: {_pe}")
+                audio_path = None
+
         if audio_path and os.path.exists(audio_path):
             import base64
             with open(audio_path, 'rb') as f:
@@ -1465,7 +1478,13 @@ def tts_kids_quick():
                 "success": True,
                 "data": {"base64": b64, "format": "wav"}
             })
-        return jsonify({"success": False, "error": "Synthesis failed"}), 503
+        # Structured error so the kids UI can surface a retry prompt
+        # instead of a blank card.
+        return jsonify({
+            "success": False,
+            "error": "TTS engine warming up — try again in a few seconds",
+            "retry_after": 3,
+        }), 503
 
     except Exception as e:
         logger.error(f"Kids TTS quick error: {e}")

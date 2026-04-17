@@ -574,10 +574,15 @@ def install_backend_packages(backend: str,
     if not packages:
         return True, f"No packages needed for {backend}"
 
-    # Check what's already installed
+    # Check what's already installed.  Pip specs like `parler-tts==0.2.2`
+    # carry a version clause; strip it before doing the import-name
+    # lookup — otherwise `importlib.util.find_spec('parler_tts==0.2.2')`
+    # raises ValueError (J67 red-product).
+    import re as _re_pkgspec
     to_install = []
     for pkg in packages:
-        import_name = _PIP_TO_IMPORT.get(pkg, pkg.replace('-', '_'))
+        bare = _re_pkgspec.split(r'[=<>!~]', pkg, maxsplit=1)[0].strip()
+        import_name = _PIP_TO_IMPORT.get(bare, bare.replace('-', '_'))
         if not is_package_installed(import_name):
             to_install.append(pkg)
 
