@@ -23,27 +23,45 @@ class Result:
 
 
 def verify_stt(engine, audio_bytes: bytes | None = None,
+               expected_phrase: str | None = None,
                timeout_s: int = 30) -> Result:
-    """Run a minimal transcription against the STT engine.  Returns
-    ok=True only when the transcript is non-empty.
+    """Run a real transcription against the STT engine.
+
+    VERIFIED SIGNAL: ok=True iff the transcript is non-empty. If an
+    expected_phrase is supplied, the phrase (case-insensitive, stripped
+    of punctuation) must appear in the transcript — this is the
+    strongest form of verification for this model type.
+
+    DO NOT accept "engine returned without raising" as success — that
+    is the exact shallow-signal bug class this module exists to kill.
+    Whisper on a sine tone returns an empty string; that must FAIL so
+    the caller is forced to supply real speech audio (or pre-record a
+    canned 1-second 'hello' clip as a test fixture).
 
     Args:
-        engine:       A loaded STT engine with a .transcribe(bytes)
-                      method.
-        audio_bytes:  Optional canned audio.  If None, a 0.5s 440Hz
-                      sine tone is generated in-memory as a smoke
-                      input (transcribing this may return empty, which
-                      the test then accepts as "engine at least ran").
-        timeout_s:    Max wall time.
+        engine:          Loaded STT engine with .transcribe(bytes).
+        audio_bytes:     Canned audio.  REQUIRED for a truthful probe;
+                         if None we fall back to a sine tone which
+                         SHOULD fail verification.
+        expected_phrase: Optional. If supplied, stricter check — the
+                         phrase must appear in the transcript.
+        timeout_s:       Max wall time.
     """
     import io
     import math
+    import re
     import struct
     import threading
     import time
     import wave
 
+    _synthetic_input = False
     if audio_bytes is None:
+        # Fallback: sine tone. Whisper will return ''. The verifier will
+        # correctly FAIL with 'empty transcript'. This is intentional:
+        # a caller that hits this path sees a truthful error and is
+        # pushed to ship a real canned clip as a fixture.
+        _synthetic_input = True
         buf = io.BytesIO()
         with wave.open(buf, "wb") as w:
             w.setnchannels(1)
@@ -61,8 +79,26 @@ def verify_stt(engine, audio_bytes: bytes | None = None,
     def _run():
         try:
             tr = engine.transcribe(audio_bytes)
-            box["transcript"] = tr or ""
-            box["ok"] = True  # "engine ran" is success for STT smoke
+            transcript = (tr or "").strip()
+            box["transcript"] = transcript
+            if not transcript:
+                box["err"] = (
+                    "empty transcript — STT engine ran without error but "
+                    "returned no text" +
+                    (" (sine-tone fallback input; supply real speech audio)"
+                     if _synthetic_input else "")
+                )
+                return
+            if expected_phrase:
+                _norm = re.sub(r"[^\w\s]", "", transcript).lower()
+                _exp = re.sub(r"[^\w\s]", "", expected_phrase).lower().strip()
+                if _exp not in _norm:
+                    box["err"] = (
+                        f"transcript {transcript[:60]!r} does not contain "
+                        f"expected phrase {expected_phrase!r}"
+                    )
+                    return
+            box["ok"] = True
         except Exception as e:
             box["err"] = f"{type(e).__name__}: {e}"[:200]
 
