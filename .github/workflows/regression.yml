@@ -25,6 +25,11 @@ jobs:
   regression:
     name: all-tiers / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Cypress tier inside run_all_regression.sh caps at 120min; add
+    # headroom for install + pytest + coverage combine.  Default GH
+    # job timeout is 360min (6h) — 150min here is an explicit signal
+    # that anything longer means the job is stuck, not just slow.
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:

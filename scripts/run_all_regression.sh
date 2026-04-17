@@ -151,16 +151,19 @@ if [ "${NUNBA_CYPRESS:-1}" != "0" ] && [ -d landing-page ]; then
         echo "::notice title=cypress react::phase=skipped (landing-page/build exists)"
     fi
 
-    # Drive the browser suite.  `timeout 1500` is belt-and-suspenders:
-    # the whole browser tier must complete in 25min or the runner kills it
-    # and moves on, so we never silently hang the whole workflow again.
-    echo "::notice title=cypress run::phase=starting cypress npx run"
-    cd landing-page && timeout 1500 npx cypress run --browser chrome
+    # Drive the browser suite.  `timeout 7200` (120min) is the hard cap;
+    # the 57-spec suite in one shot regularly runs 30-60min on a single
+    # runner.  quality.yml shards the same suite 4-way (each ~30min cap)
+    # for faster signal — this regression job is the consolidated view.
+    # GH Actions default job timeout is 6h, so 2h budget here leaves
+    # plenty of room for coverage combine + report at the end.
+    echo "::notice title=cypress run::phase=starting cypress npx run (cap=7200s/120min)"
+    cd landing-page && timeout 7200 npx cypress run --browser chrome
     _CY_RC=$?
     cd "$REPO_ROOT"
     _CY_ELAPSED=$(( $(date +%s) - _CY_T0 ))
     if [ $_CY_RC -eq 124 ]; then
-        echo "::warning title=cypress run::phase=TIMEOUT 1500s wallclock hit"
+        echo "::warning title=cypress run::phase=TIMEOUT 7200s (120min) wallclock hit"
     elif [ $_CY_RC -eq 0 ]; then
         echo "::notice title=cypress run::phase=ok elapsed=${_CY_ELAPSED}s"
     else
