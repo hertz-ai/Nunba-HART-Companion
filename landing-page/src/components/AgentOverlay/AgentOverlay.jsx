@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../config/apiBase';
+import { NUNBA_CAMERA_CONSENT } from '../../constants/events';
 import realtimeService from '../../services/realtimeService';
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -218,7 +219,7 @@ function ApprovalOverlay({ data, onDismiss }) {
     const _action = String(data.action || '').toLowerCase();
     if (_action.includes('camera') || _action.includes('video')) {
       try {
-        window.dispatchEvent(new CustomEvent('nunba-camera-consent', {
+        window.dispatchEvent(new CustomEvent(NUNBA_CAMERA_CONSENT, {
           detail: {
             approved: decision === 'approve',
             user_id: data.user_id || data.agent_id,

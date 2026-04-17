@@ -5,6 +5,7 @@
  * Does NOT import Demopage — lightweight direct API calls only.
  */
 
+import {NUNBA_CAMERA_CONSENT} from '../../../../constants/events';
 import {useSocial} from '../../../../contexts/SocialContext';
 import useCameraFrameStream from '../../../../hooks/useCameraFrameStream';
 import {useTTS} from '../../../../hooks/useTTS';
@@ -134,8 +135,8 @@ export default function NunbaChatProvider({children}) {
         /* storage quota */
       }
     };
-    window.addEventListener('nunba-camera-consent', onConsent);
-    return () => window.removeEventListener('nunba-camera-consent', onConsent);
+    window.addEventListener(NUNBA_CAMERA_CONSENT, onConsent);
+    return () => window.removeEventListener(NUNBA_CAMERA_CONSENT, onConsent);
   }, []);
 
   useCameraFrameStream({

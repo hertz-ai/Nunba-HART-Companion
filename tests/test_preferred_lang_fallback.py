@@ -93,27 +93,27 @@ class TestPreferredLangFallback:
 
     def test_canonical_reader_returns_persisted_value(self, tmp_path, monkeypatch):
         """When hart_language.json has 'ta', the canonical reader
-        returns 'ta' — not 'en'.  Drives the real file, not a mock."""
-        # Route user_lang's data dir to tmp_path so the test is hermetic.
-        monkeypatch.setenv("NUNBA_DATA_DIR", str(tmp_path))
-        lang_file = tmp_path / "hart_language.json"
-        lang_file.write_text('{"preferred_lang": "ta"}', encoding="utf-8")
-
-        # Reload core.user_lang so it picks up the new data dir.
-        for mod in list(sys.modules):
-            if mod == "core.user_lang" or mod.startswith("core.user_lang."):
-                del sys.modules[mod]
+        returns 'ta' — not 'en'.  Drives the real file; the only
+        patch point is the module-level path constant."""
         try:
-            from core.user_lang import get_preferred_lang
+            import core.user_lang as user_lang_mod
         except Exception:
             import pytest
             pytest.skip("core.user_lang not importable in this env")
 
-        # The reader must read from the same data dir the writer uses.
-        # If it doesn't honor NUNBA_DATA_DIR we can't fully verify
-        # here — but we still assert the function exists and returns a
-        # non-empty string on some path.
-        val = get_preferred_lang()
-        assert isinstance(val, str) and len(val) >= 2, (
-            f"get_preferred_lang() must return a 2+ char lang code; got {val!r}"
+        # Write a valid hart_language.json with 'ta' selected.
+        lang_file = tmp_path / "hart_language.json"
+        lang_file.write_text(
+            '{"language": "ta", "source": "test"}', encoding="utf-8"
+        )
+        # Patch the module-level path + clear the mtime cache so the
+        # reader hits the tmp file on next call.
+        monkeypatch.setattr(user_lang_mod, "_HART_LANG_PATH", str(lang_file))
+        monkeypatch.setitem(user_lang_mod._cache, "value", None)
+        monkeypatch.setitem(user_lang_mod._cache, "mtime", 0)
+
+        val = user_lang_mod.get_preferred_lang()
+        assert val == "ta", (
+            f"Canonical reader must return the persisted language "
+            f"('ta' from hart_language.json); got {val!r}"
         )
