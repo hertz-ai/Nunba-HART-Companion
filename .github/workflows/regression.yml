@@ -31,7 +31,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     env:
       NUNBA_LIVE: ${{ (github.event_name == 'workflow_dispatch' && inputs.include_live == 'true') && '1' || '0' }}
-      NUNBA_CYPRESS: '0'
+      # Run Cypress against a coverage-instrumented Flask so every
+      # frontend-driven backend route counts toward Python coverage.
+      # Expect a large jump in the aggregate % once this is live.
+      NUNBA_CYPRESS: '1'
       NUNBA_STAGING: '0'
     steps:
       - uses: actions/checkout@v4
@@ -40,11 +43,25 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'landing-page/package-lock.json'
+
       - name: Install minimal test deps
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pytest pytest-timeout pytest-html pytest-xdist flask flask-cors requests
+          pip install ruff pytest pytest-timeout pytest-html pytest-xdist pytest-cov coverage flask flask-cors requests
+
+      - name: Install React app + Cypress (landing-page)
+        shell: bash
+        run: |
+          cd landing-page
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          # Cypress binary is needed by `npx cypress run` — install lazily once.
+          npx cypress install
 
       - name: Run all regression tiers (Linux/macOS)
         if: runner.os != 'Windows'
