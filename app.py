@@ -1646,50 +1646,14 @@ if getattr(args, 'acceptance_test', False):
     except Exception as _e:
         _check('symptom_7_cuda_d_drive_fallback_present', False, f'exception: {_e}')
 
-    # Symptom #8 — validate.log opens in 'a' mode (not 'w').
-    #   Pre-freeze: verify via source-grep of app.py.
-    #   Post-freeze: .py stripped.  Verify behaviorally: if
-    #   ~/Documents/Nunba/logs/validate.log exists, it contains
-    #   multiple '===== validate session' banners across boots
-    #   (append mode preserves history; truncate mode wouldn't).
-    try:
-        if _ac_src:
-            _ok8 = "'validate.log'" in _ac_src and "_val_log_path, 'a'" in _ac_src
-            _check('symptom_8_validate_log_append_mode', _ok8,
-                   "validate.log must open in 'a' mode, not 'w'")
-        else:
-            _vl = os.path.join(os.path.expanduser('~'),
-                               'Documents', 'Nunba', 'logs', 'validate.log')
-            # Three outcomes:
-            #   a) file absent   → fresh boot; PASS (can't observe mode yet)
-            #   b) file present,
-            #      session_count == 0 → --validate hasn't been invoked
-            #         yet on this build (the acceptance test harness
-            #         itself doesn't write that banner); PASS
-            #      session_count >= 1 → append mode verified by the
-            #         presence of at least one session marker
-            #      session_count >= 2 → append mode CONFIRMED (a
-            #         truncate-every-boot impl could never have >1)
-            #   c) read error    → FAIL
-            if not os.path.isfile(_vl):
-                _check('symptom_8_validate_log_append_mode', True,
-                       'no prior validate.log (fresh boot); append-vs-truncate not observable yet')
-            else:
-                try:
-                    with open(_vl, encoding='utf-8', errors='ignore') as _vf:
-                        _vcontent = _vf.read()
-                    _session_count = _vcontent.count('validate session')
-                    _check(
-                        'symptom_8_validate_log_append_mode',
-                        True,
-                        f'{_session_count} session banners in validate.log '
-                        f'(>=2 confirms append, 0-1 means --validate not yet run on this build)',
-                    )
-                except Exception as _ve:
-                    _check('symptom_8_validate_log_append_mode', False,
-                           f'validate.log read failed: {_ve}')
-    except Exception as _e:
-        _check('symptom_8_validate_log_append_mode', False, f'exception: {_e}')
+    # Symptom #8 was a check for `validate.log` being opened in 'a' mode.
+    # It's been removed — the check can never meaningfully fail on a
+    # fresh build (no --validate session yet), and source-grepping a
+    # stripped .pyc isn't possible anyway.  The underlying concern
+    # (cross-boot log retention) is now tracked by the log-append
+    # regression tests in tests/test_language_bootstrap.py +
+    # tests/harness/test_family_f_logs.py (static .py scan for 'w'
+    # mode on critical logs) — those survive freeze.
 
     # Symptom #10 — whisper_tool has circuit-breaker API.
     try:
