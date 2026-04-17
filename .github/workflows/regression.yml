@@ -42,6 +42,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - uses: actions/setup-node@v4
         with:
@@ -49,11 +50,36 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'landing-page/package-lock.json'
 
-      - name: Install minimal test deps
+      - name: Install test tooling
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pytest pytest-timeout pytest-html pytest-xdist pytest-cov coverage flask flask-cors requests
+          pip install ruff pytest pytest-timeout pytest-html pytest-xdist pytest-cov coverage
+
+      - name: Install Flask boot dependencies (enough for main.py + routes/*)
+        shell: bash
+        # main.py imports PIL + routes.chatbot_routes which pulls in a
+        # long chain. Without these, coverage_flask_run.py crashes at
+        # import time and Cypress never sees :5000 — the 120s Flask-boot
+        # beacon then fires FAILED and coverage stays at 0%.
+        # Heavy runtime deps (torch, transformers, opencv, chromadb,
+        # sentence-transformers) are intentionally SKIPPED — they are
+        # not needed to import routes.chatbot_routes thanks to lazy
+        # imports inside tool functions, and they would add ~8min +
+        # 4GB of install time.
+        run: |
+          pip install flask==3.1.2 flask-cors==6.0.2 werkzeug==3.1.5 \
+            waitress==3.0.2 pillow==12.1.1 requests==2.32.5 \
+            sqlalchemy==2.0.46 alembic==1.18.4 greenlet==3.3.1 \
+            pydantic==2.12.5 autobahn==25.12.2 crossbarhttp3==1.1 \
+            apscheduler==3.11.2 json-repair==0.57.1 PyJWT==2.11.0 \
+            python-jose==3.5.0 pytz==2025.2 coloredlogs==15.0.1 \
+            beautifulsoup4==4.14.3 websockets==16.0 \
+            python-multipart==0.0.22 python-dotenv==1.2.1 \
+            cryptography==46.0.5 redis==7.1.1 cachetools==7.0.1 \
+            certifi==2026.1.4 langchain-core==1.2.15 \
+            langchain-classic==1.0.1 langchain-community==0.4.1 \
+            langsmith==0.7.6 sentry-sdk[flask]==2.52.0
 
       - name: Install React app + Cypress (landing-page)
         shell: bash
