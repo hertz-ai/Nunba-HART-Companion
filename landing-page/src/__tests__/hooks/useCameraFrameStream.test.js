@@ -64,10 +64,18 @@ beforeEach(() => {
 // Import AFTER mocks
 import useCameraFrameStream from '../../hooks/useCameraFrameStream';
 
-const flush = () =>
-  new Promise((resolve) => {
-    setTimeout(resolve, 20);
-  });
+// Wait until the hook has completed its async handshake (getUserMedia
+// → video.play() → new WebSocket → onopen → two send() calls) or a
+// hard deadline fires.  Fixed-delay flush was flaky because the first
+// test in the suite paid a higher module-load latency than later tests.
+const flush = async (predicate, timeoutMs = 500) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    // Let pending microtasks + 10ms timers drain.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    if (!predicate || predicate()) return;
+  }
+};
 
 describe('useCameraFrameStream — VisionService :5460 handshake', () => {
   test('sends digit user_id first, then "video_start"', async () => {
@@ -76,7 +84,7 @@ describe('useCameraFrameStream — VisionService :5460 handshake', () => {
     );
 
     await act(async () => {
-      await flush();
+      await flush(() => mockWsInstances[0]?.sent?.length >= 2);
     });
 
     expect(mockWsInstances.length).toBe(1);
@@ -95,7 +103,7 @@ describe('useCameraFrameStream — VisionService :5460 handshake', () => {
     );
 
     await act(async () => {
-      await flush();
+      await flush(() => mockWsInstances[0]?.sent?.length >= 2);
     });
 
     const ws = mockWsInstances[0];
@@ -111,7 +119,7 @@ describe('useCameraFrameStream — VisionService :5460 handshake', () => {
     );
 
     await act(async () => {
-      await flush();
+      await flush(null, 50);
     });
 
     expect(mockWsInstances.length).toBe(0);
@@ -126,7 +134,7 @@ describe('useCameraFrameStream — VisionService :5460 handshake', () => {
     );
 
     await act(async () => {
-      await flush();
+      await flush(() => mockWsInstances[0]?.sent?.length >= 1);
     });
     expect(mockTrack.stop).not.toHaveBeenCalled();
 
