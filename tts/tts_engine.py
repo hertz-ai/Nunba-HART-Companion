@@ -202,11 +202,20 @@ _LANG_CAPABLE_BACKENDS: dict[str, frozenset[str]] = {
     'hr': frozenset({BACKEND_CHATTERBOX_ML}),
     'sk': frozenset({BACKEND_CHATTERBOX_ML}),
 }
-# Indic langs — ONLY Indic Parler. Chatterbox ML is excluded
-# conservatively because its Tamil/Hindi fidelity is unverified and a
-# wrong-language mumble is worse than refusing to synthesize.
+# Indic langs — prefer Indic Parler (authoritative 21 Indic langs)
+# but keep Chatterbox ML as a LOCAL fallback so a broken Indic Parler
+# import (parler_tts vs transformers version drift) doesn't demote the
+# whole user to text-only or worse, browser WebSpeech.  The fallback
+# order is honored by the ladder in `select_backend_for_lang`: try
+# Indic Parler first; on import/load failure, try Chatterbox ML; on
+# still-failure, return text-only.  "LOCAL FIRST WHEN AVAILABLE" —
+# Chatterbox ML is locally installed for every user who has any other
+# non-Latin lang, so the fallback has material coverage on most boxes.
 for _lang in _INDIC_LANGS:
-    _LANG_CAPABLE_BACKENDS[_lang] = frozenset({BACKEND_INDIC_PARLER})
+    _LANG_CAPABLE_BACKENDS[_lang] = frozenset({
+        BACKEND_INDIC_PARLER,
+        BACKEND_CHATTERBOX_ML,
+    })
 
 
 def _normalize_lang(lang: str | None) -> str:

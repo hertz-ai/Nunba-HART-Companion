@@ -449,7 +449,15 @@ def _deferred_platform_init():
     # Env var overrides; otherwise LlamaConfig.should_boot_draft() decides
     # based on VRAMManager (≥8GB → dual, 4-6GB → main only, ≤2GB → single 0.8B).
     _draft_env = os.environ.get('HEVOLVE_DRAFT_FIRST', '').strip()
-    _main_env = os.environ.get('HEVOLVE_EAGER_LLM', '').strip()
+    # Accept BOTH env var names so pytest fixtures using either spelling
+    # toggle eager-LLM-boot correctly.  Historically the flag migrated
+    # from NUNBA_DISABLE_LLAMA_AUTOSTART to HEVOLVE_EAGER_LLM; tests/e2e
+    # /conftest.py still sets the old name.  Either '0' disables eager
+    # boot so pytest collection doesn't hang waiting for llama-server.
+    _main_env = (
+        os.environ.get('HEVOLVE_EAGER_LLM', '').strip()
+        or ('0' if os.environ.get('NUNBA_DISABLE_LLAMA_AUTOSTART') == '1' else '')
+    )
 
     if _draft_env:
         _boot_draft = _draft_env != '0'

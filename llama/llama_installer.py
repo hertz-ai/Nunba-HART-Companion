@@ -310,6 +310,8 @@ class LlamaInstaller:
             result = subprocess.run(
                 [cmd, "llama-server"],
                 capture_output=True, text=True,
+                timeout=5,  # unbounded subprocess can hang indefinitely on a
+                            # contended box; 5 s is generous for where/which
                 startupinfo=si, creationflags=cf)
             if result.returncode == 0 and result.stdout.strip():
                 path = result.stdout.strip().split('\n')[0]
