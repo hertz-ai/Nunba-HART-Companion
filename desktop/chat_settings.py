@@ -49,7 +49,7 @@ import logging
 import os
 import sys
 import tempfile
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ DEFAULT_SCOPE = "all_agents"
 _FILENAME = "chat_settings.json"
 
 # Module-level cache so repeat calls within a process are O(1).
-_cached: "ChatSettings | None" = None
+_cached: ChatSettings | None = None
 
 
 @dataclass
