@@ -853,6 +853,108 @@ def api_guest_id():
         return jsonify({'error': 'unavailable'}), 503
     return jsonify({'guest_id': GUEST_ID}), 200
 
+
+@app.route('/api/guest-id', methods=['DELETE'])
+def api_guest_id_delete():
+    """Wipe local guest identity + per-bucket history.
+
+    Admin-driven destructive action: surface only behind the
+    "Clear all guest history now" button in admin/config/chat.
+    Body: ``{"confirm": true}`` (belt-and-suspenders against
+    accidental no-body DELETEs).
+
+    What gets wiped:
+      * ``guest_id.json`` under ~/Documents/Nunba/data/
+      * The module cache in ``desktop.guest_identity`` so the next
+        ``GET /api/guest-id`` re-derives a fresh id (same hardware
+        means same id — so this is more "rotate the cached file"
+        than "rotate the identity").
+    What does NOT get wiped (intentionally):
+      * SQLite ``conversation_history`` rows. The browser's local
+        per-bucket history is the user-facing surface; the SQLite
+        rows are agent-side memory and are governed by a separate
+        admin path (``/api/admin/clear-conversations``, J162).
+
+    Returns: ``{"deleted": true, "previous_guest_id": "g_..."}``
+    """
+    body = request.get_json(silent=True) or {}
+    if not body.get('confirm'):
+        return jsonify({
+            'error': 'confirm_required',
+            'message': 'Body must include {"confirm": true} to wipe guest identity.',
+        }), 400
+
+    prev = GUEST_ID
+    try:
+        from desktop.guest_identity import (
+            get_guest_id_file_path,
+            reset_cache_for_tests as _reset_guest_cache,
+        )
+        gid_path = get_guest_id_file_path()
+        if os.path.isfile(gid_path):
+            os.remove(gid_path)
+        _reset_guest_cache()
+    except Exception as e:  # noqa: BLE001 — never 5xx the admin
+        logging.warning("guest-id delete failed: %s", e)
+        return jsonify({'error': 'delete_failed', 'message': str(e)}), 500
+    return jsonify({'deleted': True, 'previous_guest_id': prev}), 200
+
+
+@app.route('/api/admin/config/chat', methods=['GET'])
+def api_admin_chat_config_get():
+    """Return the current admin-controlled chat-restore settings.
+
+    Schema:
+      ``restore_policy``   one of ("always","prompt","never","session")
+      ``restore_scope``    one of ("all_agents","active_only","manual")
+      ``cloud_sync_enabled`` bool — opt-in cross-device guest sync
+                          (Track 3 wires the export/import endpoints;
+                          the toggle is here so the UI is forward-
+                          compatible).
+
+    The frontend (NunbaChatProvider) fetches this on mount and uses
+    it to gate the auto-restore + auto-scroll behaviour. See
+    desktop/chat_settings.py for the canonical schema + writer.
+    """
+    try:
+        from desktop.chat_settings import get_chat_settings
+        return jsonify(get_chat_settings().to_dict()), 200
+    except Exception as e:  # noqa: BLE001
+        logging.warning("chat-config GET failed: %s", e)
+        # Defensive default — frontend treats this as 'always' so the
+        # user still gets restore behaviour even if the settings file
+        # is unreachable.
+        return jsonify({
+            'restore_policy': 'always',
+            'restore_scope': 'all_agents',
+            'cloud_sync_enabled': False,
+            'fallback': True,
+        }), 200
+
+
+@app.route('/api/admin/config/chat', methods=['PUT'])
+def api_admin_chat_config_put():
+    """Update the admin-controlled chat-restore settings.
+
+    Body: any subset of ``{restore_policy, restore_scope,
+    cloud_sync_enabled}``. Unknown keys are ignored (forward
+    compat for older clients), invalid enum values 400.
+
+    Auth: this endpoint is local-only by virtue of Nunba's flask
+    binding to 127.0.0.1; admin gating in the broader sense is
+    out-of-scope for the MVP per CLAUDE.md (single-user desktop).
+    """
+    try:
+        from desktop.chat_settings import update_chat_settings
+        payload = request.get_json(silent=True) or {}
+        new_settings = update_chat_settings(payload)
+        return jsonify(new_settings.to_dict()), 200
+    except ValueError as ve:
+        return jsonify({'error': 'invalid_payload', 'message': str(ve)}), 400
+    except Exception as e:  # noqa: BLE001
+        logging.error("chat-config PUT failed: %s", e)
+        return jsonify({'error': 'update_failed', 'message': str(e)}), 500
+
 def get_embedded_python_path():
     """Get the path to the embedded Python executable"""
     if getattr(sys, 'frozen', False):

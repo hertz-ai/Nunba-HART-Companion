@@ -343,6 +343,8 @@ build_exe_options = {
         "desktop.platform_utils",  # Platform utilities
         "desktop.splash_effects",  # Splash screen effects
         "desktop.media_classification",  # Media classification
+        "desktop.guest_identity",  # Hardware-derived stable guest_id (J201)
+        "desktop.chat_settings",  # Admin-controlled restore policy/scope (J207)
         "routes.hartos_backend_adapter",  # Backend adapter (single-file module)
         "numpy",
         "jose",  # python-jose — JWT handling (HARTOS social auth)
