@@ -92,6 +92,87 @@ function _migrateLegacyKeys() {
   }
 }
 
+/**
+ * One-shot migration for the hardware-derived guest_id upgrade.
+ *
+ * Before this change the guest user_id was either a random UUID (minted
+ * by OtpAuthModal on first boot) or the literal 'guest'.  Storage
+ * buckets were keyed by that ephemeral id.  After the upgrade the
+ * canonical guest id is `window.__NUNBA_GUEST_ID__` (hardware-derived,
+ * stable across reinstalls).  We copy every `nunba_chat_<oldId>_*`
+ * bucket to `nunba_chat_<newId>_*` so the user's conversations are
+ * reachable under the new id.
+ *
+ * Runs ONCE per (oldId → newId) pair; idempotent.
+ */
+function _migrateToHardwareGuestId(newGuestId) {
+  if (!newGuestId) return;
+  try {
+    const breadcrumbKey = `nunba_chat_migrated_hw_${newGuestId}`;
+    if (localStorage.getItem(breadcrumbKey)) return;
+    const oldId = localStorage.getItem('guest_user_id');
+    // Nothing to migrate if there was no prior guest id, or if we're
+    // already using the hardware-derived id (handled by
+    // populate-from-global below).
+    if (!oldId || oldId === newGuestId) {
+      localStorage.setItem(breadcrumbKey, '1');
+      return;
+    }
+    const prefixOld = `nunba_chat_${oldId}_`;
+    const prefixNew = `nunba_chat_${newGuestId}_`;
+    const moves = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefixOld)) continue;
+      moves.push(k);
+    }
+    for (const k of moves) {
+      const newKey = prefixNew + k.slice(prefixOld.length);
+      if (!localStorage.getItem(newKey)) {
+        const val = localStorage.getItem(k);
+        if (val != null) localStorage.setItem(newKey, val);
+      }
+    }
+    localStorage.setItem(breadcrumbKey, '1');
+  } catch {
+    /* quota / access */
+  }
+}
+
+/**
+ * Resolve the canonical guest_id for this install, preferring (in
+ * order): existing localStorage entry, Flask-injected global, 'guest'.
+ *
+ * Also lazily populates `guest_user_id` in localStorage from the
+ * injected global the FIRST time we see it, so downstream code that
+ * still reads `localStorage.getItem('guest_user_id')` (e.g. legacy
+ * Demopage paths, Cypress fixtures) keeps working.
+ */
+function _resolveGuestId() {
+  try {
+    const injected =
+      (typeof window !== 'undefined' && window.__NUNBA_GUEST_ID__) || null;
+    let stored = null;
+    try {
+      stored = localStorage.getItem('guest_user_id');
+    } catch {
+      stored = null;
+    }
+    // Prefer injected (hardware-stable) if localStorage was wiped.
+    if (!stored && injected) {
+      try {
+        localStorage.setItem('guest_user_id', injected);
+      } catch {
+        /* quota */
+      }
+      return injected;
+    }
+    return stored || injected || null;
+  } catch {
+    return null;
+  }
+}
+
 function loadMessages(userId, agentId) {
   try {
     _migrateLegacyKeys();
@@ -126,11 +207,30 @@ export default function NunbaChatProvider({children}) {
   // made every fresh guest (no currentUser, no hevolve_access_id)
   // collapse to bucket `nunba_chat_1_default`, bleeding conversations
   // across distinct device/guest pairs.  See J204 regression test.
+  //
+  // `window.__NUNBA_GUEST_ID__` is the hardware-derived stable id
+  // Flask injects into index.html at request time (see main.py
+  // _inject_guest_id_into_html).  It lets a fresh-install (wiped
+  // localStorage) recover the SAME guest identity on the SAME
+  // hardware — closing the WebView2-UserDataFolder-wipe gap that
+  // J201 guards against.
+  const hwGuestId =
+    (typeof window !== 'undefined' && window.__NUNBA_GUEST_ID__) || null;
+  const resolvedGuest = _resolveGuestId();
   const userId =
     currentUser?.id ||
     localStorage.getItem('hevolve_access_id') ||
-    localStorage.getItem('guest_user_id') ||
+    resolvedGuest ||
+    hwGuestId ||
     'guest';
+
+  // One-shot storage-key migration: if the user had prior chat
+  // history under the OLD guest_user_id and we've now picked up the
+  // hardware-derived id, copy buckets forward so conversations
+  // appear under the new id.
+  useEffect(() => {
+    if (hwGuestId) _migrateToHardwareGuestId(hwGuestId);
+  }, [hwGuestId]);
 
   // Core state
   const [isExpanded, setIsExpanded] = useState(false);
