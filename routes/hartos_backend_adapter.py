@@ -335,6 +335,7 @@ def chat(
     autonomous: bool = False,
     agentic_execute: bool = False,
     agentic_plan: dict = None,
+    intelligence_preference: str = 'auto',
     **kwargs
 ) -> dict[str, Any]:
     """
@@ -384,6 +385,13 @@ def chat(
     }
     if agentic_plan:
         payload["agentic_plan"] = agentic_plan
+    # Tier ladder pref: forwarded so HARTOS dispatcher can route
+    # delegate='hive' to MoE HiveMind fusion when user asks for it.
+    # Older HARTOS builds ignore unknown keys, so this is safe to send
+    # unconditionally; we still guard the key so tests that snapshot
+    # the payload shape don't see spurious defaults.
+    if intelligence_preference and intelligence_preference != 'auto':
+        payload["intelligence_preference"] = intelligence_preference
 
     # Direct in-process call when hart-backend is available
     if _hartos_backend_available and _hevolve_app:

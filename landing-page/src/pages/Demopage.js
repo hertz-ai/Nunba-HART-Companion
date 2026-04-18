@@ -2930,6 +2930,13 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       image_url: userImage || null,
       file_url: fileUrl || null,
       preferred_lang: localStorage.getItem('hart_language') || 'en',
+      // User tier ladder: 'local_only' | 'auto' | 'hive_preferred' (from
+      // the intelligence toggle on this page).  Forwarded through
+      // /chat → hevolve_chat → HARTOS adapter → HARTOS dispatcher so
+      // `hive_preferred` can consult the MoE HiveMind (hevolveai
+      // `hive_mind.fuse_thoughts`) instead of the single expert model.
+      // Default 'auto' preserves today's behavior end-to-end.
+      intelligence_preference: intelligencePreference,
     });
 
     // Clear form data

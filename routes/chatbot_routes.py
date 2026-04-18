@@ -2171,6 +2171,18 @@ def chat_route():
     autonomous_creation = data.get('autonomous_creation', False) or data.get('autonomous', False)
     agentic_execute = data.get('agentic_execute', False)
     agentic_plan = data.get('agentic_plan', None)
+    # Tier ladder preference from the Demopage toggle (localStorage key
+    # `intelligence_preference`).  Accepts the existing 3-value enum:
+    #   'local_only' — always local models, never the hive
+    #   'auto'       — draft-first classifier decides per turn (default)
+    #   'hive_preferred' — when draft delegates='hive', HARTOS may
+    #                      consult MoE HiveMind fusion instead of a
+    #                      single cloud expert.
+    # Default 'auto' preserves today's behavior for any caller that
+    # omits the field.
+    intelligence_preference = data.get('intelligence_preference', 'auto')
+    if intelligence_preference not in ('local_only', 'auto', 'hive_preferred'):
+        intelligence_preference = 'auto'
     # preferred_lang: honor the body, then fall back to the canonical
     # persisted reader (hart_language.json via core.user_lang).
     # Bare default 'en' forced English TTS + bypassed the draft-skip
@@ -2355,6 +2367,7 @@ def chat_route():
                     agentic_execute=bool(agentic_execute),
                     agentic_plan=agentic_plan,
                     preferred_lang=preferred_lang,
+                    intelligence_preference=intelligence_preference,
                 )
                 # Surface explicit LangChain errors (guardrails, prompt injection, etc.)
                 if result.get('error') and not (result.get('text') or result.get('response')):
