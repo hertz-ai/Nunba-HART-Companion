@@ -56,10 +56,10 @@ BACKEND_NONE = "none"
 
 _SPEED_PROFILES = {'fast': 1.25, 'balanced': 1.10, 'natural': 1.00, 'slow': 0.90}
 _DEFAULT_SPEED_PROFILE = 'balanced'
-_cached_speed_profile: Optional[str] = None
+_cached_speed_profile: str | None = None
 
 
-def _read_speed_profile_from_disk() -> Optional[str]:
+def _read_speed_profile_from_disk() -> str | None:
     try:
         cfg_path = Path.home() / '.nunba' / 'tts_config.json'
         if not cfg_path.is_file():
