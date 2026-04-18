@@ -127,6 +127,16 @@ EMBED_DEPS = {
     "packaging": None,  # transformers dependency_versions_check requires metadata
     "accelerate": None, # transformers checks at import; light package (~5MB)
     "sentencepiece": None, # transformers dependency_versions_check
+    # sympy + mpmath: torch 2.10 declares `sympy>=1.13.3` and torch._dynamo
+    # imports sympy at the top of torch/utils/_sympy/functions.py.  Indic
+    # Parler TTS (and every transformers-backed generator that hits
+    # torch.fx.experimental.symbolic_shapes) crashes with
+    # `ModuleNotFoundError: No module named 'sympy'` when missing.
+    # Pin to 1.14.0 (matches torch 2.10's own pinned install).  mpmath is
+    # the one hard sympy dep (mpmath<1.4,>=1.1.0) — listed explicitly so
+    # the embed install doesn't silently drop it when --no-deps is used.
+    "sympy": "1.14.0",
+    "mpmath": "1.3.0",
     # NOTE: descript-audio-codec (dac) is NOT here — it pulls a massive
     # transitive tree (descript-audiotools → librosa → scipy → matplotlib).
     # It's installed at RUNTIME by install_backend_full('indic_parler')

@@ -759,11 +759,17 @@ def slim_python_embed():
     # Tier 2: Remove confirmed-unused large packages.
     # Verified: zero imports in Nunba core or HARTOS core code.
     # Packages like torch, cv2, numpy, faiss, transformers ARE used and kept.
+    # sympy was previously listed here but is LOAD-BEARING: torch 2.10's
+    # torch._dynamo / torch.fx.experimental.symbolic_shapes / torch.utils._sympy
+    # all import sympy at torch import time.  Indic Parler TTS (and every
+    # transformers-backed generator) crashes with `ModuleNotFoundError:
+    # No module named 'sympy'` when it's stripped from python-embed.
+    # It now lives in EMBED_DEPS (deps.py) so the presence gate reinstalls
+    # it on every build; do NOT re-add it to unused_packages.
     unused_packages = [
         # Not imported anywhere in core code (0 references)
         'scipy', 'scipy.libs',           # 137 MB - not imported
         'pandas',                          # 60 MB  - not imported
-        'sympy',                           # 56 MB  - transitive dep only
         'chromadb_rust_bindings',          # 57 MB  - chromadb not used in core
         'sklearn',                         # 41 MB  - not imported
         'kubernetes', 'kubernetes_asyncio',# 34 MB  - server-only, not desktop

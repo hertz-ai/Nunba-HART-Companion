@@ -359,6 +359,16 @@ build_exe_options = {
         "redis",
         "bs4",
 
+        # torch._dynamo / torch.fx.experimental.symbolic_shapes import sympy
+        # at module-load time.  cx_Freeze's tracer can't follow torch (it's
+        # in excludes[] — too heavy for the main bundle) but Indic Parler's
+        # gpu_worker subprocess imports sympy through torch.  Listing sympy
+        # here is defensive per Gate 6 (feedback_frozen_build_pitfalls.md
+        # Rule 1): any runtime-discovered module must be declared.  The
+        # real install target for sympy is python-embed/Lib/site-packages/
+        # (see EMBED_DEPS in scripts/deps.py); cx_Freeze will skip it in
+        # lib/ because the main exe's sys.path resolves python-embed first.
+        "sympy",
     ],
     "zip_includes": [],
     "build_exe": "build/Nunba",
@@ -375,19 +385,21 @@ build_exe_options = {
         # wandb is pulled transitively by autogen → flaml; never used
         # at runtime and adds ~60MB of .exe + proto files to the build.
         "wandb", "wandb_core",
-        # Heavy transitive deps not used at runtime (~229MB total):
+        # Heavy transitive deps not used at runtime (~200MB total):
         # pandas: 37M (only chromadb.utils.results optional formatting)
         # sklearn: 30M (only HevolveAI latent_transfer, excluded above)
-        # sympy: 29M (transitive, unused)
         # onnxruntime: 36M (transitive via langchain)
         # faiss: 24M + faiss_cpu: 50M libs (transitive, chromadb optional)
         # kubernetes: 18M (chromadb distributed mode, not enabled)
         # grpc: 12M (chromadb/OpenTelemetry optional)
         # lief: 12M (binary analysis, unknown transitive)
         # bitsandbytes: 166M (HevolveAI optional GPU accelerator)
+        # NOTE: sympy was previously excluded but is load-bearing via
+        # torch._dynamo → torch.utils._sympy → sympy at import time for
+        # Indic Parler / any transformers TTS worker.  It now lives in
+        # python-embed (EMBED_DEPS) and packages[] above.
         "pandas", "pandas.tests",
         "sklearn", "sklearn.tests",
-        "sympy", "sympy.tests",
         "onnxruntime",
         "faiss", "faiss_cpu",
         "kubernetes",
