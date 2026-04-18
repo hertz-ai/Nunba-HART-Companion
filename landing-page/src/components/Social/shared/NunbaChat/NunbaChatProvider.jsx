@@ -295,6 +295,9 @@ export default function NunbaChatProvider({children}) {
   // restoreScope  ∈ ('all_agents','active_only','manual')
   const [restorePolicy, setRestorePolicy] = useState('always');
   const [restoreScope, setRestoreScope] = useState('all_agents');
+  // cloudSyncEnabled (Track C) — mirrors desktop.chat_settings.
+  // Gated off by default; requires admin opt-in AND signed-in user.
+  const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
   const [restoreSettingsLoaded, setRestoreSettingsLoaded] = useState(false);
   // restorePromptVisible drives the one-tap "Restore your last chat?"
   // banner shown when restore_policy === 'prompt'. Once the user picks
@@ -362,6 +365,9 @@ export default function NunbaChatProvider({children}) {
         if (cancelled || !j) return;
         if (j.restore_policy) setRestorePolicy(j.restore_policy);
         if (j.restore_scope) setRestoreScope(j.restore_scope);
+        if (typeof j.cloud_sync_enabled === 'boolean') {
+          setCloudSyncEnabled(j.cloud_sync_enabled);
+        }
         setRestoreSettingsLoaded(true);
       })
       .catch(() => {
@@ -373,6 +379,139 @@ export default function NunbaChatProvider({children}) {
       cancelled = true;
     };
   }, []);
+
+  // Track C — Cloud sync (opt-in cross-device restore).
+  //
+  // Gate: cloudSyncEnabled === true AND currentUser?.id (signed-in).
+  // Guests MUST NEVER sync to the server — there's no identity to
+  // key on and the privacy-default is "local only".
+  //
+  // Flow on mount:
+  //   1. Pull /api/chat-sync/pull
+  //   2. For each agent_key in pulled.buckets, compare its
+  //      updated_at against localStorage[STORAGE_KEY(uid, key)] and
+  //      keep the newer side. Write the winner back to localStorage.
+  //   3. Trigger a setMessages refresh if the current agent's bucket
+  //      changed.
+  //
+  // Flow on message change:
+  //   - debounced push of the CURRENT agent's bucket only (not the
+  //     entire localStorage) to keep payloads small.
+  useEffect(() => {
+    if (!cloudSyncEnabled) return undefined;
+    if (!currentUser?.id) return undefined;
+    if (!restoreSettingsLoaded) return undefined;
+    if (restorePolicy === 'never') return undefined;
+
+    let cancelled = false;
+    const token = localStorage.getItem('hevolve_access_token') || '';
+    if (!token) return undefined;
+
+    fetch('/api/chat-sync/pull', {
+      method: 'GET',
+      headers: {Authorization: `Bearer ${token}`},
+      credentials: 'same-origin',
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((blob) => {
+        if (cancelled || !blob || !blob.buckets) return;
+        const buckets = blob.buckets || {};
+        let touchedCurrentAgent = false;
+        const agentKey = currentAgent?.prompt_id || 'default';
+        Object.keys(buckets).forEach((key) => {
+          const cloud = buckets[key] || {};
+          const cloudTs = Number(cloud.updated_at || 0);
+          try {
+            const localRaw = localStorage.getItem(STORAGE_KEY(userId, key));
+            const local = localRaw ? JSON.parse(localRaw) : null;
+            const localTs = Number((local && local.updated_at) || 0);
+            if (cloudTs > localTs) {
+              localStorage.setItem(
+                STORAGE_KEY(userId, key),
+                JSON.stringify({
+                  messages: Array.isArray(cloud.messages) ? cloud.messages : [],
+                  updated_at: cloudTs,
+                }),
+              );
+              if (String(key) === String(agentKey)) {
+                touchedCurrentAgent = true;
+              }
+            }
+          } catch {
+            /* corrupt local or quota — skip this bucket */
+          }
+        });
+        if (touchedCurrentAgent) {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY(userId, agentKey));
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed?.messages)) setMessages(parsed.messages);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      })
+      .catch(() => {
+        /* network down — silent; next mount retries */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cloudSyncEnabled,
+    currentUser?.id,
+    restoreSettingsLoaded,
+    restorePolicy,
+    userId,
+    currentAgent,
+  ]);
+
+  // Debounced push of the CURRENT agent bucket when messages change.
+  // Debounce keeps the wire quiet during a fast-typing burst; 1.5s is
+  // a pragmatic compromise between "feels instant" and "doesn't spam".
+  useEffect(() => {
+    if (!cloudSyncEnabled) return undefined;
+    if (!currentUser?.id) return undefined;
+    if (!restoreSettingsLoaded) return undefined;
+    if (restorePolicy === 'never') return undefined;
+    if (!messages || messages.length === 0) return undefined;
+    const token = localStorage.getItem('hevolve_access_token') || '';
+    if (!token) return undefined;
+    const agentKey = currentAgent?.prompt_id || 'default';
+
+    const timer = setTimeout(() => {
+      const body = {
+        buckets: {
+          [agentKey]: {
+            messages,
+            updated_at: Date.now(),
+          },
+        },
+        updated_at: Date.now(),
+      };
+      fetch('/api/chat-sync/push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+      }).catch(() => {
+        /* offline-tolerant — next change re-attempts */
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [
+    cloudSyncEnabled,
+    currentUser?.id,
+    restoreSettingsLoaded,
+    restorePolicy,
+    messages,
+    currentAgent,
+  ]);
 
   // restore_policy === 'session' → clear localStorage on tab close so
   // the next boot starts fresh. We use the storage 'beforeunload' hook
