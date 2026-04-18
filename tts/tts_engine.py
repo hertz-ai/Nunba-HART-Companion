@@ -274,6 +274,12 @@ _FALLBACK_LANG_ENGINE_PREFERENCE = {
     'zh': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
     'it': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
     'ru': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
+    # Portuguese — Chatterbox ML covers pt natively (see
+    # _FALLBACK_ENGINE_CAPABILITIES[CHATTERBOX_ML]['languages']).
+    # CosyVoice3's 9-lang set excludes pt, so we skip it here to avoid
+    # routing Portuguese users through a wrong-language fallback chain
+    # (the J210 gap, 2026-04-18 live audit).
+    'pt': [BACKEND_CHATTERBOX_ML, BACKEND_PIPER],
 }
 # Add all Indic languages → Indic Parler TTS
 for _lang in _INDIC_LANGS:
