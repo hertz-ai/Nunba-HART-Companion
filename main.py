@@ -1888,6 +1888,34 @@ def _get_trusted_orgs_legacy_view():
 _TRUSTED_HF_ORGS = _get_trusted_orgs_legacy_view  # callable, not a set
 
 
+# Category → default capabilities mapping for HF-installed models.
+# Today hub-install writes `capabilities={}` — which makes
+# `ModelCatalog.select_best(require_capability=…)` silently reject the
+# newly-installed model for every capability-driven route.  Seeding a
+# small, well-known capability set from the user-selected category
+# unblocks capability-based routing without introducing any new enum
+# or taxonomy — the keys below are the ones already used by seeded
+# populators (`'image_input'`, `'tts'`, `'stt'`, `'music_gen'`, etc.).
+_CATEGORY_CAPABILITIES: Dict[str, Dict[str, bool]] = {
+    'llm':         {'text_gen': True, 'reason': True},
+    'draft':       {'text_gen': True, 'reason': True, 'draft': True},
+    'translate':   {'text_gen': True, 'translate': True},
+    'vision':      {'image_input': True, 'text_gen': True},
+    'caption':     {'image_input': True, 'caption': True},
+    'grounding':   {'image_input': True, 'grounding': True},
+    'ocr':         {'image_input': True, 'ocr': True},
+    'tts':         {'audio_gen': True, 'tts': True},
+    'stt':         {'audio_input': True, 'stt': True},
+    'diarization': {'audio_input': True, 'diarization': True},
+    'vad':         {'audio_input': True, 'vad': True},
+    'embedding':   {'embedding': True},
+    'rerank':      {'rerank': True},
+    'music':       {'audio_gen': True, 'music_gen': True},
+    'image-gen':   {'image_gen': True},
+    'video-gen':   {'video_gen': True},
+}
+
+
 def _normalize_hf_id(raw: str) -> str:
     """NFKC-normalize + reject non-ASCII hf_ids to defeat Unicode
     homoglyph attacks.  `aí4bharat/indic-parler-tts` (Latin Small I
@@ -2111,6 +2139,18 @@ def admin_models_hub_install():
         if catalog.get(safe_id):
             return jsonify({"error": f"already registered as '{safe_id}'"}), 409
 
+        # Seed capability dict from the user-chosen category so
+        # capability-gated routing (`select_best(require_capability=…)`)
+        # can actually pick this HF install.  Without this the entry
+        # would register with `capabilities={}` and be invisible to
+        # every capability-specific task.
+        _seeded_caps = dict(_CATEGORY_CAPABILITIES.get(category, {}))
+        # Source-tag marks the entry as "not yet runtime-proven"; the
+        # background validate probe will flip `install_validated` to
+        # True once `loader.load()` succeeds.  Until then, the
+        # dispatcher capability gate treats the entry with caution.
+        _seeded_caps['install_validated'] = False
+
         entry_dict = {
             'id': safe_id,
             'name': data.get('name') or hf_id.rsplit('/', 1)[-1],
@@ -2120,6 +2160,7 @@ def admin_models_hub_install():
             'enabled': True,
             'purposes': [p for p in (data.get('purposes') or []) if p in catalog.ALL_PURPOSES],
             'lang_priority': data.get('languages') or [],
+            'capabilities': _seeded_caps,
             'source': 'hub-install',
         }
         entry = ModelEntry.from_dict(entry_dict)
