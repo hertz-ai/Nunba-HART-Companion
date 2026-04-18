@@ -2,6 +2,8 @@ import {settingsApi, chatApi} from '../../services/socialApi';
 
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import HistoryIcon from '@mui/icons-material/History';
 import ImageIcon from '@mui/icons-material/Image';
 import MemoryIcon from '@mui/icons-material/Memory';
 import SaveIcon from '@mui/icons-material/Save';
@@ -29,11 +31,15 @@ import {
 } from '@mui/material';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
 import FormControl from '@mui/material/FormControl';
+import FormLabel from '@mui/material/FormLabel';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
 import Select from '@mui/material/Select';
 import React, {useState, useEffect} from 'react';
 
@@ -146,6 +152,17 @@ export default function SettingsPage() {
   const [aiTestResult, setAiTestResult] = useState(null);
   const [aiTesting, setAiTesting] = useState(false);
 
+  // Chat Restore state (J207) — single source of truth is the
+  // /api/admin/config/chat endpoint which reads desktop.chat_settings.
+  // Defaults match the backend dataclass so the UI never flashes
+  // stale values on first paint.
+  const [chatRestore, setChatRestore] = useState({
+    restore_policy: 'always',
+    restore_scope: 'all_agents',
+    cloud_sync_enabled: false,
+  });
+  const [forgetBusy, setForgetBusy] = useState(false);
+
   const CLOUD_PROVIDERS = {
     openai: {name: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gpt-3.5-turbo'], default: 'gpt-4o-mini', needsEndpoint: false, needsApiVersion: false},
     anthropic: {name: 'Anthropic Claude', models: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'], default: 'claude-sonnet-4-20250514', needsEndpoint: false, needsApiVersion: false},
@@ -176,6 +193,15 @@ export default function SettingsPage() {
         if (msg.includes('Authorization') || msg.includes('token')) {
           setFeedback({type: 'error', message: 'Authentication required. Please log in with an admin account.'});
         }
+      }
+      // Chat Restore (J207) — separate try/catch so a missing endpoint
+      // on an older backend doesn't flash an auth error for the whole
+      // page. Defaults already set in state; only overwrite on success.
+      try {
+        const cr = await settingsApi.getChat();
+        if (cr?.data) setChatRestore((prev) => ({...prev, ...cr.data}));
+      } catch (err) {
+        console.warn('[SettingsPage] Chat restore config unavailable:', err?.message || err);
       }
       // Load LLM config separately (may not have backend running)
       try {
@@ -273,6 +299,47 @@ export default function SettingsPage() {
     setSaving(null);
   };
 
+  // Chat Restore (J207) — partial-update PUT: only send the field(s)
+  // that changed so an older backend that doesn't know about
+  // cloud_sync_enabled still accepts the policy/scope keys it does
+  // understand.
+  const handleSaveChatRestore = async (patch) => {
+    setSaving('chat_restore');
+    setFeedback(null);
+    try {
+      const res = await settingsApi.updateChat(patch);
+      if (res?.data) setChatRestore((prev) => ({...prev, ...res.data}));
+      setFeedback({type: 'success', message: 'Chat restore settings saved'});
+    } catch (err) {
+      console.error('[SettingsPage] Failed to save chat restore:', err);
+      setFeedback({type: 'error', message: err.response?.data?.error || 'Failed to save chat restore settings'});
+    }
+    setSaving(null);
+  };
+
+  const handleForgetMe = async () => {
+    // Destructive: wipes ~/Documents/Nunba/data/guest_id.json so the
+    // next chat turn derives a fresh id. Confirm at the browser level
+    // because no amount of server-side undo brings back the old id.
+    const ok = window.confirm(
+      'Forget this device? Your guest identity will be wiped and a new one ' +
+      'derived on next chat. Agent history bound to the old identity will no ' +
+      'longer be accessible. This cannot be undone.',
+    );
+    if (!ok) return;
+    setForgetBusy(true);
+    setFeedback(null);
+    try {
+      const res = await chatApi.forgetGuest();
+      const prev = res?.data?.previous_guest_id || '(none)';
+      setFeedback({type: 'success', message: `Device forgotten. Previous id: ${prev}`});
+    } catch (err) {
+      console.error('[SettingsPage] Failed to forget device:', err);
+      setFeedback({type: 'error', message: err.response?.data?.error || 'Failed to forget device'});
+    }
+    setForgetBusy(false);
+  };
+
   const tabs = [
     {icon: <SecurityIcon />, label: 'Security', color: '#ff9800'},
     {icon: <ImageIcon />, label: 'Media', color: '#9c27b0'},
@@ -280,6 +347,7 @@ export default function SettingsPage() {
     {icon: <MemoryIcon />, label: 'Memory', color: '#7C4DFF'},
     {icon: <VisibilityIcon />, label: 'Embodied AI', color: '#e91e63'},
     {icon: <SmartToyIcon />, label: 'AI Provider', color: '#4CAF50'},
+    {icon: <HistoryIcon />, label: 'Chat Restore', color: '#00BCD4'},
   ];
 
   return (
@@ -1318,6 +1386,169 @@ export default function SettingsPage() {
                         }}
                       >
                         {aiTesting ? 'Testing...' : 'Test Connection'}
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grow>
+            </TabPanel>
+
+            {/* ============ Tab 6: Chat Restore (J207) ============ */}
+            <TabPanel value={tab} index={6}>
+              <Grow in={true} timeout={400}>
+                <Card sx={cardStyle}>
+                  <CardContent sx={{p: 3}}>
+                    <Typography variant="h6" sx={{color: '#fff', fontWeight: 600, mb: 1}}>
+                      Chat Restore Across Restarts
+                    </Typography>
+                    <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)', mb: 3}}>
+                      Control what happens to your conversation history when
+                      Nunba restarts or is reinstalled on the same device.
+                      Guest identity persists under
+                      ~/Documents/Nunba/data/guest_id.json.
+                    </Typography>
+
+                    {/* Restore policy */}
+                    <FormControl component="fieldset" sx={{mb: 3, width: '100%'}}>
+                      <FormLabel sx={{color: '#fff', fontWeight: 500, mb: 1, '&.Mui-focused': {color: '#00BCD4'}}}>
+                        When should past messages restore?
+                      </FormLabel>
+                      <RadioGroup
+                        value={chatRestore.restore_policy}
+                        onChange={(e) => setChatRestore((p) => ({...p, restore_policy: e.target.value}))}
+                        sx={{color: 'rgba(255,255,255,0.8)'}}
+                      >
+                        <FormControlLabel
+                          value="always"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>Always</b> — restore every past message on open (default).</>}
+                        />
+                        <FormControlLabel
+                          value="prompt"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>Prompt</b> — ask me each time I open the chat.</>}
+                        />
+                        <FormControlLabel
+                          value="session"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>Session</b> — keep within one session; wipe on close.</>}
+                        />
+                        <FormControlLabel
+                          value="never"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>Never</b> — always start with a blank slate.</>}
+                        />
+                      </RadioGroup>
+                    </FormControl>
+
+                    <Divider sx={{borderColor: 'rgba(255,255,255,0.08)', mb: 3}} />
+
+                    {/* Restore scope */}
+                    <FormControl component="fieldset" sx={{mb: 3, width: '100%'}}>
+                      <FormLabel sx={{color: '#fff', fontWeight: 500, mb: 1, '&.Mui-focused': {color: '#00BCD4'}}}>
+                        Which agents should restore?
+                      </FormLabel>
+                      <RadioGroup
+                        value={chatRestore.restore_scope}
+                        onChange={(e) => setChatRestore((p) => ({...p, restore_scope: e.target.value}))}
+                        sx={{color: 'rgba(255,255,255,0.8)'}}
+                      >
+                        <FormControlLabel
+                          value="all_agents"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>All agents</b> — restore every agent's history (default).</>}
+                        />
+                        <FormControlLabel
+                          value="active_only"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>Active agent only</b> — only the agent I'm chatting with.</>}
+                        />
+                        <FormControlLabel
+                          value="manual"
+                          control={<Radio sx={{color: 'rgba(255,255,255,0.4)', '&.Mui-checked': {color: '#00BCD4'}}} />}
+                          label={<><b>Manual</b> — show the restore banner; nothing loads by itself.</>}
+                        />
+                      </RadioGroup>
+                    </FormControl>
+
+                    <Divider sx={{borderColor: 'rgba(255,255,255,0.08)', mb: 3}} />
+
+                    {/* Cloud sync */}
+                    <Box sx={{mb: 3}}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={!!chatRestore.cloud_sync_enabled}
+                            onChange={(e) => setChatRestore((p) => ({...p, cloud_sync_enabled: e.target.checked}))}
+                            sx={switchStyle}
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography sx={{color: '#fff', fontWeight: 500}}>
+                              Sync chat across devices (cloud)
+                            </Typography>
+                            <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.5)'}}>
+                              Opt-in. Requires sign-in. When off, history stays on this device only.
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Box>
+
+                    {/* Save button */}
+                    <Box sx={{display: 'flex', gap: 2, alignItems: 'center', mb: 3}}>
+                      <Button
+                        variant="contained"
+                        startIcon={<SaveIcon />}
+                        disabled={saving === 'chat_restore'}
+                        onClick={() => handleSaveChatRestore({
+                          restore_policy: chatRestore.restore_policy,
+                          restore_scope: chatRestore.restore_scope,
+                          cloud_sync_enabled: !!chatRestore.cloud_sync_enabled,
+                        })}
+                        sx={saveButtonStyle}
+                      >
+                        {saving === 'chat_restore' ? 'Saving...' : 'Save Chat Restore Settings'}
+                      </Button>
+                    </Box>
+
+                    <Divider sx={{borderColor: 'rgba(255,68,68,0.2)', mb: 3}} />
+
+                    {/* Forget Me — destructive */}
+                    <Box sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      background: 'rgba(255,68,68,0.05)',
+                      border: '1px solid rgba(255,68,68,0.2)',
+                    }}>
+                      <Typography variant="h6" sx={{color: '#ff6666', fontWeight: 600, mb: 1}}>
+                        Forget this device
+                      </Typography>
+                      <Typography variant="body2" sx={{color: 'rgba(255,255,255,0.6)', mb: 2}}>
+                        Wipes ~/Documents/Nunba/data/guest_id.json. Your next
+                        chat starts from a fresh guest identity; agent history
+                        keyed to the old identity will no longer be accessible
+                        from this device. Cannot be undone.
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteForeverIcon />}
+                        disabled={forgetBusy}
+                        onClick={handleForgetMe}
+                        sx={{
+                          borderColor: 'rgba(255,68,68,0.4)',
+                          color: '#ff6666',
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          '&:hover': {
+                            borderColor: '#ff4444',
+                            background: 'rgba(255,68,68,0.1)',
+                          },
+                        }}
+                      >
+                        {forgetBusy ? 'Forgetting...' : 'Forget this device'}
                       </Button>
                     </Box>
                   </CardContent>
