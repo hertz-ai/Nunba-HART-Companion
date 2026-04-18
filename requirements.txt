@@ -53,6 +53,7 @@ pytz==2025.2
 aiohttp==3.13.3
 python-dotenv==1.2.1
 cryptography==46.0.5
+httplib2==0.22.0
 
 # Python-embed deps (transformers/torch worker deps)
 torch==2.10.0

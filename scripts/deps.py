@@ -95,6 +95,11 @@ CORE_DEPS = {
     "aiohttp": "3.13.3",
     "python-dotenv": "1.2.1",
     "cryptography": "46.0.5",
+    # httplib2 0.22.0 is the known-good pairing with pyparsing 3.0.x/3.1.0
+    # (HARTOS's pyparsing pin).  Newer httplib2 (>=0.31) uses pp.DelimitedList
+    # which requires pyparsing>=3.1, breaking google_chat_adapter import when
+    # env drift lands pyparsing 3.0.x.  Match HARTOS's exact pin.
+    "httplib2": "0.22.0",
 }
 
 # =============================================================================
