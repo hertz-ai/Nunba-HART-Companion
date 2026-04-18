@@ -2258,9 +2258,17 @@ def image_proxy():
 
     image_url = request.args.get('url', '')
     if not image_url:
-        # Return fallback image
+        # Return fallback image — but tolerate a missing static_dir
+        # (dev worktree without a built React bundle, or a frozen
+        # install where the media directory layout differs).  Without
+        # this guard `os.listdir(missing)` raises FileNotFoundError
+        # which bubbles up as 500 and fails J98 "never 500 on bad
+        # input" contract.
         static_dir = os.path.join(LANDING_PAGE_BUILD_DIR, 'static', 'media')
-        fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
+        try:
+            fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
+        except OSError:
+            fallback_files = []
         if fallback_files:
             return send_from_directory(static_dir, fallback_files[0])
         return jsonify({'error': 'No image URL provided'}), 400
