@@ -698,7 +698,14 @@ def install_backend_full(backend: str,
         status = f"{'Ready' if success else 'Partial'}: packages={pkg_msg}, models={model_msg}"
         if progress_cb:
             if success:
-                progress_cb(f"{display_name} is ready to use!")
+                # Intentionally phrased so the frontend's
+                # string-heuristic does NOT flip the banner to green
+                # on install-complete.  The banner only turns green
+                # after tts.tts_handshake.run_handshake emits a
+                # tts_handshake event with status='ready'.  Install
+                # success is a proxy signal; audio bytes are the
+                # only truth.
+                progress_cb(f"{display_name} installed — verifying voice...")
             else:
                 progress_cb(f"{display_name} setup incomplete: {status}")
 

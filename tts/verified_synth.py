@@ -45,27 +45,17 @@ logger = logging.getLogger(__name__)
 # 10KB excludes truncated/error files while allowing short test phrases.
 MIN_AUDIO_BYTES = 10_000
 
-# Test phrase per language — short enough to synthesize in <30s on CPU,
-# long enough to exceed MIN_AUDIO_BYTES after WAV header overhead.
-_TEST_PHRASES = {
-    'en': "Hello, this is a test.",
-    'ta': "வணக்கம், இது ஒரு சோதனை.",
-    'hi': "नमस्ते, यह एक परीक्षण है।",
-    'te': "హలో, ఇది ఒక పరీక్ష.",
-    'ml': "ഹലോ, ഇത് ഒരു പരീക്ഷണമാണ്.",
-    'kn': "ಹಲೋ, ಇದು ಒಂದು ಪರೀಕ್ಷೆ.",
-    'bn': "হ্যালো, এটি একটি পরীক্ষা।",
-    'mr': "नमस्कार, ही एक चाचणी आहे.",
-    'gu': "નમસ્તે, આ એક પરીક્ષણ છે.",
-    'pa': "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ, ਇਹ ਇੱਕ ਟੈਸਟ ਹੈ।",
-    'ur': "ہیلو، یہ ایک ٹیسٹ ہے۔",
-    'zh': "你好,这是一个测试。",
-    'ja': "こんにちは、これはテストです。",
-    'ko': "안녕하세요, 이것은 테스트입니다.",
-    'fr': "Bonjour, ceci est un test.",
-    'es': "Hola, esto es una prueba.",
-    'de': "Hallo, das ist ein Test.",
-}
+# Test phrases come from the canonical GREETINGS dict in
+# core.constants.  Historically this module defined its own
+# _TEST_PHRASES — that was a parallel-path DRY violation (the same
+# concept "localized sample phrase for the handshake" lived in two
+# places and drifted).  One writer, one source of truth.
+#
+# Imported at module scope so tests that AST-inspect this file still
+# see no inline dict literal.  See tests/test_greetings_constants.py
+# for the guard.
+from core.constants import GREETINGS as _TEST_PHRASES  # noqa: F401
+from core.constants import GREETING_FALLBACK_LANG as _FALLBACK_LANG
 
 
 @dataclass
@@ -83,14 +73,15 @@ class Result:
 def _pick_test_phrase(backend: str, lang: str | None) -> str:
     """Pick a test phrase based on backend capability + requested lang.
 
-    Falls back to English if the requested lang isn't in _TEST_PHRASES.
+    Falls back to the canonical GREETING_FALLBACK_LANG ('en') when
+    the requested lang isn't in GREETINGS.
     """
     if lang and lang in _TEST_PHRASES:
         return _TEST_PHRASES[lang]
     # Indic Parler without an explicit lang → Tamil (primary target cohort).
-    if backend == 'indic_parler' and not lang:
+    if backend == 'indic_parler' and not lang and 'ta' in _TEST_PHRASES:
         return _TEST_PHRASES['ta']
-    return _TEST_PHRASES['en']
+    return _TEST_PHRASES[_FALLBACK_LANG]
 
 
 def _hf_offline_reason() -> str | None:

@@ -168,12 +168,46 @@ const ChatMessageList = ({
         }
 
         if (message.type === 'setup_progress') {
+          // Retry / Switch-engine handlers POST to the TTS handshake
+          // API; success fires a fresh tts_handshake SSE which the
+          // Demopage listener grafts back onto this card by engine.
+          const handleRetry = async () => {
+            try {
+              await fetch('/api/tts/handshake/retry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  engine: message.handshake?.engine,
+                  lang: message.handshake?.lang,
+                }),
+              });
+            } catch (e) {
+              console.warn('[handshake] retry failed', e);
+            }
+          };
+          const handleSwitchEngine = async (engine) => {
+            try {
+              await fetch('/api/tts/handshake/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  engine,
+                  lang: message.handshake?.lang,
+                }),
+              });
+            } catch (e) {
+              console.warn('[handshake] switch failed', e);
+            }
+          };
           return (
             <SetupProgressCard
               key={`setup-${message.jobType || index}`}
               steps={message.steps || []}
               jobType={message.jobType || ''}
               isComplete={message.isComplete || false}
+              handshake={message.handshake || { status: 'pending' }}
+              onRetry={handleRetry}
+              onSwitchEngine={handleSwitchEngine}
             />
           );
         }

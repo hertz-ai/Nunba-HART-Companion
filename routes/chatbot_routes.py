@@ -1401,6 +1401,106 @@ def tts_engines_list():
         return jsonify({'error': 'Package installer not available'}), 503
 
 
+def _get_tts_engine_singleton():
+    """Return the live TTSEngine singleton, or None if not ready.
+
+    Reused by both tts_handshake_retry and tts_handshake_switch so
+    there's one lookup path — no parallel engine-resolution logic.
+    """
+    try:
+        from tts.tts_engine import get_tts_engine
+        return get_tts_engine()
+    except Exception:
+        return None
+
+
+def tts_handshake_retry():
+    """POST /tts/handshake/retry
+
+    User clicked "Retry" on a failed voice-check card.  Clear the
+    cached verdict and re-run the handshake in a background thread.
+    Returns immediately; the result arrives via tts_handshake SSE.
+
+    Body: { "engine": "indic_parler", "lang": "ta" }
+    """
+    data = request.get_json(silent=True) or {}
+    engine_id = data.get('engine') or ''
+    lang = data.get('lang') or None
+    if not engine_id:
+        return jsonify({'error': 'engine required'}), 400
+
+    engine = _get_tts_engine_singleton()
+    if engine is None:
+        return jsonify({'error': 'TTS engine not initialized'}), 503
+
+    try:
+        from tts import tts_handshake as _hs
+    except ImportError:
+        return jsonify({'error': 'handshake module unavailable'}), 503
+
+    import threading as _t
+
+    def _run():
+        try:
+            _hs.retry(engine, engine_id, lang=lang)
+        except Exception as e:
+            logger.warning(f"[tts_handshake_retry] {engine_id}/{lang}: {e}")
+
+    _t.Thread(target=_run, daemon=True,
+              name=f"handshake-retry-{engine_id}").start()
+    return jsonify({'ok': True, 'engine': engine_id, 'lang': lang,
+                    'message': 'handshake running — watch tts_handshake SSE'})
+
+
+def tts_handshake_switch():
+    """POST /tts/handshake/switch
+
+    User picked a fallback engine on a failed voice-check card.
+    Switch the active backend, invalidate the prior handshake cache,
+    then run a fresh handshake for the new (backend, lang) pair.
+
+    Body: { "engine": "piper", "lang": "ta" }
+    """
+    data = request.get_json(silent=True) or {}
+    engine_id = data.get('engine') or ''
+    lang = data.get('lang') or None
+    if not engine_id:
+        return jsonify({'error': 'engine required'}), 400
+
+    engine = _get_tts_engine_singleton()
+    if engine is None:
+        return jsonify({'error': 'TTS engine not initialized'}), 503
+
+    try:
+        from tts import tts_handshake as _hs
+    except ImportError:
+        return jsonify({'error': 'handshake module unavailable'}), 503
+
+    import threading as _t
+
+    def _run():
+        try:
+            # Force the engine over to the chosen fallback. Swallow
+            # switch errors so the handshake still runs and reports
+            # its own verdict — we never want the switch call itself
+            # to silently succeed while audio never plays.
+            if hasattr(engine, 'set_backend'):
+                try:
+                    engine.set_backend(engine_id)
+                except Exception as e:
+                    logger.warning(f"[tts_handshake_switch] set_backend "
+                                   f"{engine_id} failed: {e}")
+            _hs.invalidate(engine_id)
+            _hs.run_handshake(engine, engine_id, lang=lang)
+        except Exception as e:
+            logger.warning(f"[tts_handshake_switch] {engine_id}/{lang}: {e}")
+
+    _t.Thread(target=_run, daemon=True,
+              name=f"handshake-switch-{engine_id}").start()
+    return jsonify({'ok': True, 'engine': engine_id, 'lang': lang,
+                    'message': 'switch + handshake running — watch tts_handshake SSE'})
+
+
 # ========== Kids Learning TTS Routes ===========
 
 # In-memory job tracker for async TTS
@@ -3480,6 +3580,20 @@ def register_routes(app):
     # TTS engine management routes (install + status)
     app.route("/tts/setup-engine", methods=["POST"])(tts_setup_engine)
     app.route("/tts/engines", methods=["GET"])(tts_engines_list)
+
+    # TTS first-run voice-check handshake (retry / switch fallback).
+    # Registered under both /tts/* (canonical, matches sibling routes)
+    # AND /api/tts/* (matches frontend fetch paths).  One handler, two
+    # URL prefixes — no duplicate implementation.  Unique endpoint=
+    # names required so Flask doesn't complain about dup registration.
+    app.add_url_rule("/tts/handshake/retry", view_func=tts_handshake_retry,
+                     methods=["POST"], endpoint="tts_handshake_retry")
+    app.add_url_rule("/tts/handshake/switch", view_func=tts_handshake_switch,
+                     methods=["POST"], endpoint="tts_handshake_switch")
+    app.add_url_rule("/api/tts/handshake/retry", view_func=tts_handshake_retry,
+                     methods=["POST"], endpoint="tts_handshake_retry_api")
+    app.add_url_rule("/api/tts/handshake/switch", view_func=tts_handshake_switch,
+                     methods=["POST"], endpoint="tts_handshake_switch_api")
 
     # Kids Learning TTS routes (called by kidsLearningApi.js TTSManager)
     app.route("/api/social/tts/quick", methods=["POST"])(tts_kids_quick)

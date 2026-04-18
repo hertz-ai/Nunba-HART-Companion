@@ -1951,7 +1951,14 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       }
     });
 
-    // Setup progress — TTS engine install, model downloads
+    // Setup progress — TTS engine install, model downloads.
+    // isComplete here only means "install job ended" — it is NOT a
+    // "Ready" banner gate.  The banner only turns green when a
+    // tts_handshake event with status='ready' arrives (see below).
+    // If we keyed the banner off setup_progress text like we used
+    // to, the Indic Parler "installed" message flipped the banner
+    // green BEFORE verification ran — and then the engine crashed
+    // silently on first use (2026-04-18 sympy ModuleNotFoundError).
     const unsubSetup = realtimeService.on('setup_progress', (data) => {
       if (data.type !== 'setup_progress') return;
       setMessages((prev) => {
@@ -1963,7 +1970,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           updated[existingIdx] = {
             ...updated[existingIdx],
             steps: [...updated[existingIdx].steps, data],
-            isComplete: data.complete || data.message?.includes('ready to use') || data.message?.includes('Ready') || data.message?.includes('failed'),
+            isComplete: Boolean(data.complete),
           };
           return updated;
         }
@@ -1972,9 +1979,75 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           jobType: data.job_type,
           steps: [data],
           isComplete: false,
+          handshake: { status: 'pending' },
           timestamp: new Date(),
         }];
       });
+    });
+
+    // TTS handshake — authoritative voice-ready signal.  Fires
+    // AFTER the backend produces real audio bytes for the localized
+    // greeting phrase (GREETINGS dict in core.constants).  Only this
+    // event is allowed to flip the banner to green.
+    const unsubHandshake = realtimeService.on('tts_handshake', (data) => {
+      if (data.type !== 'tts_handshake') return;
+      // Attach to the matching setup card (by engine name) if one
+      // exists; otherwise create a floating handshake card so the
+      // verdict still reaches the user on a re-run that skipped install.
+      const jobType = `tts_setup_${data.engine}`;
+      setMessages((prev) => {
+        const existingIdx = prev.findIndex(
+          (m) => m.type === 'setup_progress' && m.jobType === jobType
+        );
+        const handshake = {
+          status: data.status,
+          engine: data.engine,
+          lang: data.lang,
+          err: data.err || '',
+          fallbacks: Array.isArray(data.fallbacks) ? data.fallbacks : [],
+        };
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            handshake,
+            // A verified 'ready' is terminal — mark complete so the
+            // progress bar fills.  A 'failed' is also terminal.
+            isComplete: data.status === 'ready' || data.status === 'failed',
+          };
+          return updated;
+        }
+        return [...prev, {
+          type: 'setup_progress',
+          jobType,
+          steps: [],
+          isComplete: handshake.status === 'ready' || handshake.status === 'failed',
+          handshake,
+          timestamp: new Date(),
+        }];
+      });
+      // Play the greeting the user just heard the engine synth —
+      // inline b64 payload means zero extra fetch.  The engine also
+      // played locally on the server host; in dev mode the server
+      // and user share a machine, so this guards against double
+      // playback by skipping when audio_b64 is empty.
+      if (data.status === 'ready' && data.audio_b64) {
+        try {
+          const bin = window.atob(data.audio_b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.play().catch(() => {
+            // Autoplay blocked — attach a one-shot click resumer.
+            const resume = () => { audio.play().catch(() => {}); document.removeEventListener('click', resume); };
+            document.addEventListener('click', resume, { once: true });
+          });
+        } catch (e) {
+          console.warn('[tts_handshake] playback decode failed', e);
+        }
+      }
     });
 
     // Capability updates — "I can see/talk/hear" when models load
@@ -1986,7 +2059,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       }
     });
 
-    return () => { unsubTts(); unsubSetup(); unsubCapability(); };
+    return () => { unsubTts(); unsubSetup(); unsubHandshake(); unsubCapability(); };
   }, []);
 
   useEffect(() => {

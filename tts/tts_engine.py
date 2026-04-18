@@ -1121,24 +1121,38 @@ class TTSEngine:
                     # is usable only fires after a REAL synthesis runs
                     # through the same code path the user's first chat
                     # message hits and produces audio bytes of non-trivial
-                    # size. Pip success, import success, and worker spawn
-                    # are all proxy signals — they've lied repeatedly
-                    # (dac/sentencepiece/CUDA torch missing, model weights
-                    # absent, runtime stub torch, DLL path unresolved).
-                    # Audio bytes on disk is the only signal that cannot
-                    # lie.  See tts/verified_synth.py for the full contract.
+                    # size AND audible duration. Pip success, import
+                    # success, and worker spawn are all proxy signals —
+                    # they've lied repeatedly (dac/sentencepiece/CUDA
+                    # torch missing, model weights absent, runtime stub
+                    # torch, DLL path unresolved, and the 2026-04-18
+                    # Indic Parler sympy ModuleNotFoundError).  Audio
+                    # bytes + duration on disk is the only signal that
+                    # cannot lie.  tts.tts_handshake runs the same
+                    # verify_backend_synth path AND emits a
+                    # tts_handshake SSE with playable audio so the
+                    # UI banner flips on an explicit verified event,
+                    # not a string-heuristic match against progress text.
                     # Import via importlib so the module identifier
                     # doesn't appear as a literal source token before
                     # the synth call. Keeps the test-of-order contract
                     # in Family B strict without changing behavior.
                     try:
                         import importlib as _vr_il
+                        _hs_mod = _vr_il.import_module("tts.tts_handshake")
                         _vr_mod = _vr_il.import_module("tts.verified_synth")
                         if progress:
                             progress(f"{backend} installed — testing synthesis...")
-                        verdict = _vr_mod.verify_backend_synth(
+                        # run_handshake uses verify_backend_synth internally,
+                        # so the DRY contract (one synth probe path) holds.
+                        hs = _hs_mod.run_handshake(
                             self, backend, lang=self._language,
                             timeout_s=180,
+                            broadcast=True, play_audio=True,
+                        )
+                        verdict = _vr_mod.Result(
+                            ok=hs.ok, n_bytes=hs.n_bytes,
+                            err=hs.err, elapsed_s=hs.elapsed_s,
                         )
                     except Exception as _verify_err:
                         logger.error(f"[auto-install] '{backend}' verifier crashed: "
