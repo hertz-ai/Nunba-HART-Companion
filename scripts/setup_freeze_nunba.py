@@ -332,6 +332,7 @@ build_exe_options = {
         "tts.piper_tts",  # Piper TTS for CPU text-to-speech
         "tts.package_installer",  # Runtime TTS package installer
         "tts.backend_venv",  # Per-backend venv infra (Track A)
+        "tts.indic_parler_worker",  # Subprocess entrypoint (runs inside venv) (Track B)
         "tts.tts_engine",  # Unified TTS engine (auto-selects GPU/CPU backend)
         "tts.tts_handshake",  # First-run voice-check handshake (gates Ready banner)
         "tts.verified_synth",  # Verified-signal gate (consumed by tts_handshake + _bg_install)
