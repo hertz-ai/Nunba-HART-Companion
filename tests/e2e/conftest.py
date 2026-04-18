@@ -283,17 +283,23 @@ def _pick_live_base_url() -> str | None:
     Priority order:
       1. Explicit `NUNBA_LIVE_URL` env var (any tier, any port).
       2. Default journey harness port :5189 (Phase-A spawn).
-      3. The operator's production :5000 Nunba desktop instance.
+      3. The operator's production :5000 Nunba desktop instance
+         (only used if `NUNBA_COVERAGE_STRICT` is not set — coverage
+         runs must NOT route through an instance where coverage.py
+         isn't instrumented, so the strict flag skips :5000).
     """
     import requests
     candidates = []
     env_url = os.environ.get("NUNBA_LIVE_URL")
     if env_url:
         candidates.append(env_url.rstrip("/"))
-    candidates.extend([
-        "http://localhost:5189",
-        "http://localhost:5000",
-    ])
+    candidates.append("http://localhost:5189")
+    # Skip the fallback to :5000 when coverage is being measured —
+    # otherwise journey tests exercise a non-instrumented daemon and
+    # coverage reports 0% because the in-proc pytest never touches
+    # the app code.
+    if not os.environ.get("NUNBA_COVERAGE_STRICT"):
+        candidates.append("http://localhost:5000")
     seen = set()
     for url in candidates:
         if url in seen:

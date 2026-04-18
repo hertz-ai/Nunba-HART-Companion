@@ -25,6 +25,15 @@ omit =
     */scripts/setup_freeze_*
     setup.py
     conftest.py
+    # HARTOS is a separate repo with its own coverage gate — don't
+    # fold its line counts into the Nunba budget, or every HARTOS
+    # refactor would shift the Nunba number.  HARTOS code IS still
+    # exercised at runtime (imported as a pip dep); we only omit it
+    # from the Nunba report, not from what the tests drive.
+    C:/Users/*/PycharmProjects/HARTOS/*
+    */site-packages/HARTOS/*
+    */site-packages/hevolveai/*
+    */site-packages/hevolve_database/*
 
 branch = True
 parallel = True

@@ -149,3 +149,18 @@ bench/results/
 # Journey-suite run artifacts (regenerated each pytest run)
 tests/journey/run.log
 tests/journey/results.xml
+tests/journey/results_*.xml
+
+# Coverage harness generated outputs (keep scripts + docs, drop outputs)
+tests/coverage/python/
+tests/coverage/js/
+tests/coverage/flask_stdout.log
+tests/coverage/flask_stderr.log
+tests/coverage/serve_stdout.log
+tests/coverage/MERGED_SUMMARY.md
+tests/coverage/phase4_*
+tests/coverage/phase5_*
+
+# nyc / istanbul JS outputs
+landing-page/coverage/
+landing-page/.nyc_output/

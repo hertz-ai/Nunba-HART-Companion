@@ -2393,6 +2393,53 @@ def status():
     return jsonify(response), 200
 
 
+# ────────────────────────────────────────────────────────────────
+# Coverage helper endpoints (loopback-only, coverage-run only).
+#
+# These are registered ONLY when the process was launched with
+# `coverage run …` (which sets up a Coverage instance as the
+# current tracer).  Windows `taskkill /F` bypasses atexit, so the
+# only reliable way to collect a `.coverage.*` fragment is an HTTP
+# call that flushes + exits in the middle of a Python instruction.
+#
+# Gated by `NUNBA_COVERAGE_ENABLED=1` in the env AND by
+# `_is_local_request()` (loopback only) so these cannot be hit
+# from a network peer.
+# ────────────────────────────────────────────────────────────────
+if os.environ.get('NUNBA_COVERAGE_ENABLED') == '1':
+    @app.route('/_debug/coverage/flush', methods=['GET', 'POST'])
+    def _cov_flush():  # pragma: no cover — loopback helper
+        if not _is_local_request():
+            return jsonify({'error': 'loopback only'}), 403
+        try:
+            import coverage
+            cov = coverage.Coverage.current()
+            if cov is not None:
+                cov.save()
+                return jsonify({'ok': True, 'flushed': True})
+            return jsonify({'ok': False, 'error': 'no active Coverage instance'}), 500
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+
+    @app.route('/_debug/coverage/shutdown', methods=['GET', 'POST'])
+    def _cov_shutdown():  # pragma: no cover — loopback helper
+        if not _is_local_request():
+            return jsonify({'error': 'loopback only'}), 403
+        try:
+            import coverage
+            cov = coverage.Coverage.current()
+            if cov is not None:
+                cov.save()
+        except Exception:
+            pass
+        # Schedule process exit AFTER the HTTP response has flushed.
+        # A short Timer avoids killing mid-response and losing the
+        # 200 that the client needs to confirm shutdown.
+        import threading as _t
+        _t.Timer(0.25, lambda: os._exit(0)).start()
+        return jsonify({'ok': True, 'shutdown': True})
+
+
 @app.route('/backend/watchdog', methods=["GET"])
 def watchdog_status():
     """Return the LangChain watchdog status."""
