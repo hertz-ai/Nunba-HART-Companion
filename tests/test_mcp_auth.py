@@ -40,14 +40,29 @@ def mcp_module(tmp_path, monkeypatch):
     We redirect LOCALAPPDATA (and HOME fallback) to tmp_path so
     _ensure_mcp_token() creates its file there, and we clear the
     module-level token cache between tests.
+
+    IMPORTANT: we explicitly delete HARTOS_MCP_DISABLE_AUTH,
+    HARTOS_MCP_TOKEN, and HARTOS_MCP_TOKEN_FILE from the environment
+    so that dev boxes / CI runners that may have set these for other
+    purposes don't bypass the auth gate we're specifically testing.
+    Without this guard the 5 "expect 403" tests silently pass-through
+    to the tool handler with 200 on any machine where any of those
+    env vars is set.
     """
     pytest.importorskip('flask')
     bridge = pytest.importorskip('integrations.mcp.mcp_http_bridge')
+    monkeypatch.delenv('HARTOS_MCP_DISABLE_AUTH', raising=False)
+    monkeypatch.delenv('HARTOS_MCP_TOKEN', raising=False)
+    monkeypatch.delenv('HARTOS_MCP_TOKEN_FILE', raising=False)
     monkeypatch.setenv('LOCALAPPDATA', str(tmp_path))
     monkeypatch.setenv('HOME', str(tmp_path))
     monkeypatch.setenv('USERPROFILE', str(tmp_path))
     # Reset cached token so each test gets a clean read-or-create
     monkeypatch.setattr(bridge, '_MCP_TOKEN_CACHE', None, raising=False)
+    # Reset the "we already warned about disabled auth" flag so each
+    # test starts with a fresh state if anything inside the test toggles
+    # the env var back on.
+    monkeypatch.setattr(bridge, '_MCP_AUTH_DISABLED_WARNED', False, raising=False)
     return bridge
 
 

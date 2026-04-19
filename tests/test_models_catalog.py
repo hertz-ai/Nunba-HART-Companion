@@ -287,7 +287,7 @@ class TestPopulateMediaGen:
         # Ensure entries don't already exist
         added = populate_media_gen(cat)
         # First call adds 2 (or 0 if already in shared singleton); verify both exist
-        ace = cat.get('audio_gen-acestep-1.5')
+        ace = cat.get('audio_gen-acestep')
         ltx = cat.get('video_gen-ltx2')
         assert ace is not None
         assert ltx is not None
@@ -296,7 +296,7 @@ class TestPopulateMediaGen:
         from models.catalog import populate_media_gen
         cat = _fresh_catalog()
         populate_media_gen(cat)
-        ace = cat.get('audio_gen-acestep-1.5')
+        ace = cat.get('audio_gen-acestep')
         assert ace is not None
         assert ace.model_type == ModelType.AUDIO_GEN
         assert ace.supports_gpu is True
@@ -325,7 +325,7 @@ class TestPopulateMediaGen:
         from models.catalog import populate_media_gen
         cat = _fresh_catalog()
         populate_media_gen(cat)
-        ace = cat.get('audio_gen-acestep-1.5')
+        ace = cat.get('audio_gen-acestep')
         assert ace.vram_gb == 6.0
 
     def test_ltx_video_vram(self):
@@ -339,7 +339,7 @@ class TestPopulateMediaGen:
         from models.catalog import populate_media_gen
         cat = _fresh_catalog()
         populate_media_gen(cat)
-        ace = cat.get('audio_gen-acestep-1.5')
+        ace = cat.get('audio_gen-acestep')
         ltx = cat.get('video_gen-ltx2')
         assert ace.idle_timeout_s == 300
         assert ltx.idle_timeout_s == 300
@@ -348,7 +348,7 @@ class TestPopulateMediaGen:
         from models.catalog import populate_media_gen
         cat = _fresh_catalog()
         populate_media_gen(cat)
-        ace = cat.get('audio_gen-acestep-1.5')
+        ace = cat.get('audio_gen-acestep')
         ltx = cat.get('video_gen-ltx2')
         assert ace.auto_load is False
         assert ltx.auto_load is False

@@ -82,7 +82,10 @@ jobs:
         # with ModuleNotFoundError: No module named 'PIL' without it.
         # flask-cors is explicitly required by main.py — its test
         # scaffolding imports the Flask app factory which calls CORS(app).
-        run: python -m pip install pytest pytest-html pytest-timeout pyyaml pillow flask flask-cors requests
+        # PyJWT is needed by routes/kids_media_routes._get_user_id_from_request
+        # which decodes Bearer JWTs — tests that hit that path get
+        # ModuleNotFoundError: No module named 'jwt' without it.
+        run: python -m pip install pytest pytest-html pytest-timeout pyyaml pillow flask flask-cors requests PyJWT
 
       # Install HARTOS (hart-backend) so `from core.*` / `from
       # integrations.*` imports in Nunba's tests resolve.  Without

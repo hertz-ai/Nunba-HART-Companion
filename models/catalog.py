@@ -139,17 +139,28 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
         added += 1
     else:
         # HARTOS's fallback populator (model_catalog.py:660) registers
-        # audio_gen-acestep with tags=['local', 'audio_gen'] which omits
-        # 'music'/'generative' — making test_ace_step_is_music fail. Nunba
-        # is the desktop shell that surfaces these models to users, so the
-        # user-facing tags are OWNED here. Merge the missing canonical tags
-        # onto the existing entry instead of overwriting (preserves whatever
-        # HARTOS added).
+        # audio_gen-acestep with a narrower surface:
+        #   tags=['local', 'audio_gen']                (no music/generative)
+        #   supports_cpu = (vram < 5)  →  False for 6.0GB VRAM
+        #   idle_timeout_s = 600
+        # Nunba is the desktop shell that surfaces these models to end
+        # users, so the user-facing surface is OWNED here. Merge the
+        # Nunba-canonical values onto the existing entry instead of
+        # overwriting it wholesale (preserves whatever HARTOS added that
+        # we don't have an opinion on, e.g. capabilities.music_gen flag).
         _tags = list(_existing.tags or [])
         for _t in ('local', 'music', 'generative'):
             if _t not in _tags:
                 _tags.append(_t)
         _existing.tags = _tags
+        # supports_cpu=True → acestep can degrade to CPU via torch_to_cpu
+        # offload; HARTOS's heuristic `vram<5` is too strict for our use
+        # case (we explicitly set supports_cpu_offload=True).
+        _existing.supports_cpu = True
+        # idle_timeout_s=300 → matches the 5-minute eviction budget Nunba
+        # docs advertise for media-gen models; HARTOS's 600s is an LLM
+        # default that leaves acestep resident too long on low-VRAM desks.
+        _existing.idle_timeout_s = 300
 
     if not catalog.get('video_gen-ltx2'):
         catalog.register(ModelEntry(
