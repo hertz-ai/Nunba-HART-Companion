@@ -1288,33 +1288,42 @@ def build_windows(python_exe, app_only=False, installer_only=False):
         if _extracted:
             print_info(f"Extracted {_extracted} missing stdlib .pyc from python312.zip to lib/")
 
-    # ── Acceptance gate — OPTIONAL after-step (2026-04-19) ─────────
+    # ── Acceptance gate — HARD-FAIL by default (2026-04-19 restore) ─
     # Runs Nunba.exe --acceptance-test to verify Stage-A/Stage-B fixes
     # survived the freeze.  Three modes:
     #
-    #   Default: runs with 180s timeout; failure/timeout → WARN, build
-    #            continues.  Downgraded from a hard blocker because the
-    #            langchain-fix loop on some dev machines wedges the
-    #            acceptance subprocess for 80+ min of CPU with no log
-    #            output — the frozen bundle itself is usable, the
-    #            verify step just won't return.
+    #   Default (STRICT): runs with 180s timeout; failure/timeout →
+    #            returns False, installer packaging blocked.  This is
+    #            the restored pre-regression behavior — a build that
+    #            can't boot its own verify subprocess is NOT shippable.
+    #            The 240s-cold-boot stall that motivated downgrading
+    #            this to warn-only (see commit 5dec11da) has been
+    #            fixed in the 2026-04-19 deferred-init refactor, so
+    #            strict is safe again.
     #
     #   NUNBA_SKIP_ACCEPTANCE=1 or --skip-acceptance: entire block is
-    #            bypassed (INFO log, no subprocess spawn).  Fastest
-    #            path for local dev iteration.
+    #            bypassed (INFO log, no subprocess spawn).  Intended for
+    #            rapid local iteration when the tester already knows
+    #            the bundle boots.  `build.bat` prepends this flag by
+    #            default for dev-loop ergonomics.  CI workflows must
+    #            NOT set this — CI's whole job is to catch what local
+    #            devs might skip.
     #
-    #   NUNBA_STRICT_ACCEPTANCE=1 or --strict-acceptance: restores the
-    #            old behavior (failure → return False, installer
-    #            packaging blocked).  Use this in CI / nightly where
-    #            we want to catch Stage-A/B regressions.
+    #   NUNBA_WARN_ACCEPTANCE=1 or --warn-acceptance: downgrade failures
+    #            to warnings (the old default).  Use only as a temporary
+    #            escape hatch while debugging a flaky verify step —
+    #            NOT a long-term mode, since it masks real regressions.
     _skip_acc = (
         os.environ.get('NUNBA_SKIP_ACCEPTANCE', '').strip().lower()
         in ('1', 'true', 'yes')
     )
-    _strict_acc = (
-        os.environ.get('NUNBA_STRICT_ACCEPTANCE', '').strip().lower()
+    # Strict is now the DEFAULT.  Only flip to warn-only when the
+    # operator explicitly opts in via --warn-acceptance / env.
+    _warn_acc = (
+        os.environ.get('NUNBA_WARN_ACCEPTANCE', '').strip().lower()
         in ('1', 'true', 'yes')
     )
+    _strict_acc = not _warn_acc
     _built_exe = os.path.join('build', 'Nunba', 'Nunba.exe')
     if _skip_acc:
         print_info(
@@ -1340,17 +1349,17 @@ def build_windows(python_exe, app_only=False, installer_only=False):
         if not _ac_ok:
             if _strict_acc:
                 print_error(
-                    "Acceptance test FAILED (strict mode) — blocking "
-                    "installer packaging. See "
-                    "~/Documents/Nunba/logs/acceptance.log for details."
+                    "Acceptance test FAILED (strict mode — the default as "
+                    "of 2026-04-19).  Installer packaging BLOCKED.  See "
+                    f"{_acc_log} for the tee'd subprocess output.  To "
+                    "unblock temporarily (NOT for CI), rerun with "
+                    "--warn-acceptance or set NUNBA_WARN_ACCEPTANCE=1."
                 )
                 return False
             print_warn(
                 "Acceptance test FAILED or TIMED OUT — continuing "
-                "because strict mode is OFF.  Run with "
-                "--strict-acceptance (or NUNBA_STRICT_ACCEPTANCE=1) "
-                "to enforce in CI.  See "
-                "~/Documents/Nunba/logs/acceptance.log."
+                "because NUNBA_WARN_ACCEPTANCE is set.  This masks a "
+                "real boot regression; investigate before shipping."
             )
         else:
             print_info("Acceptance test PASSED")
@@ -1875,22 +1884,37 @@ def main():
                         help='Set Sentry DSN directly (non-interactive)')
     parser.add_argument('--skip-acceptance', action='store_true',
                         help='Skip the post-freeze acceptance-test subprocess '
-                        'entirely (fastest for local dev; workaround for the '
-                        'langchain-fix infinite-loop that wedges --acceptance-test '
-                        'on some machines)')
+                        'entirely.  Fastest for local dev iteration; build.bat '
+                        'prepends this by default.  Do NOT use in CI.')
     parser.add_argument('--strict-acceptance', action='store_true',
-                        help='Block the installer step if acceptance fails '
-                        '(CI / nightly mode).  Default is WARN-only so local '
-                        'devs are not blocked by verify-step bugs')
+                        help='[DEPRECATED — strict is now the DEFAULT as of '
+                        '2026-04-19.]  Kept for backward compat with existing '
+                        'invocations; has no additional effect.')
+    parser.add_argument('--warn-acceptance', action='store_true',
+                        help='Downgrade acceptance-test failures from HARD-FAIL '
+                        'to WARN.  Temporary escape hatch while diagnosing a '
+                        'flaky verify step; must NOT be used in CI or release '
+                        'builds (it masks boot regressions).')
 
     args = parser.parse_args()
 
     # Plumb acceptance-gate flags to env vars so build_windows() can
     # read them without threading kwargs through every build function.
+    # `--strict-acceptance` is deprecated (strict is now the default);
+    # we keep the flag so existing invocations still parse but the
+    # env var it used to set (NUNBA_STRICT_ACCEPTANCE) is no longer
+    # read by build_windows().
     if args.skip_acceptance:
         os.environ['NUNBA_SKIP_ACCEPTANCE'] = '1'
+    if args.warn_acceptance:
+        os.environ['NUNBA_WARN_ACCEPTANCE'] = '1'
     if args.strict_acceptance:
-        os.environ['NUNBA_STRICT_ACCEPTANCE'] = '1'
+        # No-op (strict is default) — log a one-line migration hint so
+        # script callers know they can drop the flag.
+        print_info(
+            "--strict-acceptance is now a no-op (strict is the default "
+            "as of 2026-04-19).  Safe to remove from invocations."
+        )
 
     # Change to project directory (build.py lives in scripts/)
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
