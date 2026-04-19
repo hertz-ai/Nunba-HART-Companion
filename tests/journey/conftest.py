@@ -45,12 +45,36 @@ from conftest import (  # type: ignore  # noqa: E402,F401
     ephemeral_port,
     isolated_nunba_home,
     llama_mock_server,
-    nunba_flask_app,
+    nunba_flask_app as _fixture_nunba_flask_app,
     nunba_subprocess_factory,
     piper_voice_path,
     real_piper_engine,
     wait_for_port,
 )
+
+
+# ── NUNBA_USE_LIVE override ─────────────────────────────────────────
+# When NUNBA_USE_LIVE=1, we bypass the in-process Flask fixture and
+# route `nunba_flask_app` to an HTTP client that talks to the already-
+# running desktop Nunba on :5000.  This avoids re-importing main.py
+# (HARTOS + torch + redis cold-boot) for every test.
+
+
+@pytest.fixture
+def nunba_flask_app(request):  # noqa: F811 — intentional override
+    if os.environ.get("NUNBA_USE_LIVE") != "1":
+        return request.getfixturevalue("_fixture_nunba_flask_app")
+    # Live mode — import lazily to avoid circulars
+    from tests.journey._live_client import _LiveNunba  # type: ignore
+    base = os.environ.get("NUNBA_LIVE_URL", "http://localhost:5000")
+    try:
+        import requests
+        r = requests.get(f"{base}/backend/health", timeout=5)
+        if r.status_code >= 500:
+            pytest.skip(f"Live Nunba at {base} unhealthy: {r.status_code}")
+    except Exception as e:
+        pytest.skip(f"Live Nunba not reachable at {base}: {e}")
+    return _LiveNunba(base)
 
 # ── journey marker ─────────────────────────────────────────────────
 
