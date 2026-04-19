@@ -75,6 +75,27 @@ jobs:
         # without it pytest exits with "unrecognized arguments".
         run: python -m pip install pytest pytest-html pytest-timeout flask requests
 
+      # Install HARTOS (hart-backend) so `from core.*` / `from
+      # integrations.*` imports in Nunba's tests resolve.  Without
+      # this, 19+ test modules fail collection with
+      # `ModuleNotFoundError: No module named 'core'`.  Pattern
+      # lifted from regression.yml — clone shallow, --no-deps, skip
+      # heavy ML deps (torch/transformers stay lazy at call sites).
+      - name: Install HARTOS (hart-backend) from source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::notice title=hartos install::attempting git clone hertz-ai/HARTOS"
+          if git clone --depth 1 \
+               https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git \
+               ../HARTOS 2>&1 | tail -20; then
+            pip install --no-deps ../HARTOS || true
+            echo "::notice title=hartos install::OK — hart-backend installed"
+          else
+            echo "::warning title=hartos install::FAILED — default GITHUB_TOKEN cannot reach hertz-ai/HARTOS; 19+ Nunba tests will ImportError on core.*/integrations.*.  Add a NUNBA_HARTOS_TOKEN secret with repo read scope and wire it into env.GH_TOKEN."
+          fi
+
       - name: Run backend tests
         # --ignore=tests/harness: the defect-harness suite declares
         # unit/integration/live markers only in tests/harness/pytest.ini
