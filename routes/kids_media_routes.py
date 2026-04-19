@@ -47,13 +47,27 @@ _SPEED_MIN, _SPEED_MAX = 0.25, 4.0
 
 
 def _cleanup_jobs():
-    """Remove completed/failed jobs older than TTL."""
+    """Remove completed/failed jobs older than TTL.
+
+    Uses a bounded lock acquire (5s) rather than `with _jobs_lock:` so a
+    misbehaving background-job thread can never wedge a Flask request
+    thread indefinitely.  If the lock is contended we simply skip this
+    pass — cleanup is best-effort; the NEXT request will retry and jobs
+    just stay in memory a bit longer.  Prevents pytest-timeout hangs
+    when a test leaves a job thread alive across the fixture boundary.
+    """
     now = time.time()
-    with _jobs_lock:
+    acquired = _jobs_lock.acquire(timeout=5.0)
+    if not acquired:
+        logger.debug("_cleanup_jobs: _jobs_lock contended, skipping pass")
+        return
+    try:
         expired = [k for k, v in _async_jobs.items()
                    if now - v.get('created', 0) > _JOB_TTL]
         for k in expired:
             del _async_jobs[k]
+    finally:
+        _jobs_lock.release()
 
 
 def _get_user_id_from_request():
