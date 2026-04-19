@@ -29,8 +29,19 @@ ttk_mock = MagicMock()
 
 @pytest.fixture(autouse=True)
 def mock_tkinter():
-    """Mock tkinter globally — indicator_window creates Tk windows on import."""
-    with patch.dict('sys.modules', {'tkinter': tk_mock, 'tkinter.ttk': ttk_mock}):
+    """Mock tkinter so RibbonIndicator's `tk.Tk()` never hits a real display.
+
+    The module-under-test already did ``import tkinter as tk`` at import
+    time, so patching ``sys.modules['tkinter']`` alone doesn't affect the
+    rebound name ``desktop.indicator_window.tk``. On headless Linux CI
+    runners (no $DISPLAY), constructing RibbonIndicator crashed with
+    ``_tkinter.TclError: no display name and no $DISPLAY environment
+    variable``. Patch the module attribute directly to cover both fresh
+    imports AND already-cached modules.
+    """
+    import desktop.indicator_window as iw_mod
+    with patch.dict('sys.modules', {'tkinter': tk_mock, 'tkinter.ttk': ttk_mock}), \
+         patch.object(iw_mod, 'tk', tk_mock):
         yield
 
 

@@ -20,6 +20,10 @@ try:
 except Exception:
     # ImportError if missing, AttributeError if cv2.__version__ fails in frozen exe
     PYAUTOGUI_AVAILABLE = False
+    # Keep the name bound to None so tests that `patch.object(...pyautogui, ...)`
+    # or `patch('desktop.indicator_window.pyautogui', ...)` don't hit
+    # AttributeError when pyautogui isn't installed in the runner env.
+    pyautogui = None  # type: ignore[assignment]
 
 # Configure logging
 user_docs = os.path.join(os.path.expanduser('~'), 'Documents')
