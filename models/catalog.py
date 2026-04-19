@@ -112,7 +112,8 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
 
     # Use canonical ID 'audio_gen-acestep' matching HARTOS service_tool_map +
     # fallback populator.  Avoids duplicate catalog entry (task #278).
-    if not catalog.get('audio_gen-acestep'):
+    _existing = catalog.get('audio_gen-acestep')
+    if not _existing:
         catalog.register(ModelEntry(
             id='audio_gen-acestep',
             name='ACE Step 1.5 (Music Generation)',
@@ -136,6 +137,19 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
             auto_load=False,
         ), persist=False)
         added += 1
+    else:
+        # HARTOS's fallback populator (model_catalog.py:660) registers
+        # audio_gen-acestep with tags=['local', 'audio_gen'] which omits
+        # 'music'/'generative' — making test_ace_step_is_music fail. Nunba
+        # is the desktop shell that surfaces these models to users, so the
+        # user-facing tags are OWNED here. Merge the missing canonical tags
+        # onto the existing entry instead of overwriting (preserves whatever
+        # HARTOS added).
+        _tags = list(_existing.tags or [])
+        for _t in ('local', 'music', 'generative'):
+            if _t not in _tags:
+                _tags.append(_t)
+        _existing.tags = _tags
 
     if not catalog.get('video_gen-ltx2'):
         catalog.register(ModelEntry(

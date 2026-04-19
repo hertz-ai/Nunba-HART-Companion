@@ -73,7 +73,11 @@ jobs:
         # pytest-timeout is required because the repo-root pytest.ini
         # declares --timeout=60 --timeout-method=thread in addopts;
         # without it pytest exits with "unrecognized arguments".
-        run: python -m pip install pytest pytest-html pytest-timeout flask requests
+        # pyyaml is needed by test_build_deploy_rules::TestMkDocsConfig
+        # (parses mkdocs.yml) and tests/test_scripts_and_main that touch
+        # YAML config — missing it triggers ModuleNotFoundError in 3+
+        # tests with zero production impact, just test scaffolding.
+        run: python -m pip install pytest pytest-html pytest-timeout pyyaml flask requests
 
       # Install HARTOS (hart-backend) so `from core.*` / `from
       # integrations.*` imports in Nunba's tests resolve.  Without

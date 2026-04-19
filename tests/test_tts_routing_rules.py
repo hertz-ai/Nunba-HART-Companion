@@ -223,10 +223,18 @@ class TestCatalogMapping:
         for b in backends:
             assert b in _BACKEND_TO_CATALOG, f"Backend {b} has no catalog mapping"
 
-    def test_pocket_tts_maps_to_piper(self):
-        assert _CATALOG_TO_BACKEND['pocket-tts'] == BACKEND_PIPER
+    def test_pocket_tts_is_its_own_backend(self):
+        # pocket_tts was promoted from a Piper-fallback alias to its own
+        # HARTOS-registered backend (via ENGINE_REGISTRY in tts_router). The
+        # catalog entry 'pocket-tts' now resolves to the 'pocket_tts'
+        # backend key, which has its own CPU in-process synthesizer in
+        # integrations/service_tools/pocket_tts_tool.py.
+        assert _CATALOG_TO_BACKEND['pocket-tts'] == 'pocket_tts'
 
     def test_espeak_maps_to_piper(self):
+        # espeak remains a Piper fallback — there is no standalone espeak
+        # backend in Nunba, it's the last-resort CPU voice invoked via
+        # pocket_tts_tool._espeak_synthesize (HARTOS-side).
         assert _CATALOG_TO_BACKEND['espeak'] == BACKEND_PIPER
 
     def test_f5_tts_maps_correctly(self):

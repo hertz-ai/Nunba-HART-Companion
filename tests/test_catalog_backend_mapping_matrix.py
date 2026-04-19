@@ -42,8 +42,19 @@ FORWARD_IDS = [f"catalog_{k}" for k, _ in FORWARD_ENTRIES]
 def test_forward_mapping_exists(catalog_id, expected_backend):
     assert expected_backend is not None
 
+# Backends that are registered in HARTOS ENGINE_REGISTRY + exposed in
+# Nunba's _BACKEND_TO_CATALOG for routing, but deliberately NOT in
+# _FALLBACK_ENGINE_CAPABILITIES because Nunba has no in-process
+# implementation — they dispatch entirely via HARTOS RuntimeToolManager
+# subprocess. The capabilities matrix is the Nunba-local fallback for
+# degraded mode; HARTOS-subprocess-only backends don't belong there.
+_HARTOS_SUBPROCESS_ONLY_BACKENDS = {'pocket_tts', 'luxtts'}
+
+
 @pytest.mark.parametrize('catalog_id,expected_backend', FORWARD_ENTRIES, ids=FORWARD_IDS)
 def test_forward_maps_to_known_backend(catalog_id, expected_backend):
+    if expected_backend in _HARTOS_SUBPROCESS_ONLY_BACKENDS:
+        pytest.skip(f"{expected_backend} is HARTOS-subprocess-only; no Nunba capabilities row")
     assert expected_backend in _FALLBACK_ENGINE_CAPABILITIES, \
         f"catalog {catalog_id} → {expected_backend} not in engine capabilities"
 
@@ -136,7 +147,7 @@ class TestCatalogTTSEntries:
                 mapped = _CATALOG_TO_BACKEND.get(bare_id.replace('-', '_'))
             # Not all catalog TTS entries need Nunba backend mapping
             # (some may be HARTOS-only), so just log unmapped
-            if mapped:
+            if mapped and mapped not in _HARTOS_SUBPROCESS_ONLY_BACKENDS:
                 assert mapped in _FALLBACK_ENGINE_CAPABILITIES
 
 
@@ -159,8 +170,14 @@ class TestLegacyMappings:
         if b1 and b2:
             assert b1 == b2, f"{hyphen}→{b1} vs {underscore}→{b2}"
 
-    def test_pocket_tts_maps_to_piper(self):
-        assert _CATALOG_TO_BACKEND.get('pocket-tts') == BACKEND_PIPER
+    def test_pocket_tts_is_its_own_backend(self):
+        # pocket_tts was promoted from a Piper fallback alias to its own
+        # first-class HARTOS backend (registered in tts_router
+        # ENGINE_REGISTRY with its own pocket_tts_synthesize call).
+        # The catalog → backend mapping reflects that promotion.
+        assert _CATALOG_TO_BACKEND.get('pocket-tts') == 'pocket_tts'
 
     def test_espeak_maps_to_piper(self):
+        # espeak has no standalone backend; routed through Piper as the
+        # last-resort CPU voice.
         assert _CATALOG_TO_BACKEND.get('espeak') == BACKEND_PIPER
