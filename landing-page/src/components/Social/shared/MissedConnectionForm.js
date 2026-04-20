@@ -1,4 +1,5 @@
-import React, {useState, useEffect, useRef} from 'react';
+import AutoSuggestInput from './AutoSuggestInput';
+
 import {
   Dialog,
   DialogTitle,
@@ -11,7 +12,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import AutoSuggestInput from './AutoSuggestInput';
+import React, {useState, useEffect, useRef} from 'react';
 
 export default function MissedConnectionForm({open, onClose, onCreated}) {
   const theme = useTheme();

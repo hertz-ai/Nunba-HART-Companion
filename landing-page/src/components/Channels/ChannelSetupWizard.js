@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import QRPairingDisplay from './QRPairingDisplay';
+
+import { channelUserApi, channelsApi } from '../../services/socialApi';
+
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LaunchIcon from '@mui/icons-material/Launch';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Stepper, Step, StepLabel,
   Grid, Card, CardActionArea, CardContent, Typography, TextField, Box, Chip,
   CircularProgress, Alert, Collapse, IconButton
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import LaunchIcon from '@mui/icons-material/Launch';
-import { channelUserApi, channelsApi } from '../../services/socialApi';
-import QRPairingDisplay from './QRPairingDisplay';
+import React, { useState, useEffect } from 'react';
+
+
 
 const STEPS = ['Select Channel', 'Configure', 'Confirm'];
 

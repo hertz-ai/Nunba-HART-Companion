@@ -51,6 +51,10 @@ def _get_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    # busy_timeout (milliseconds): block on a competing writer for
+    # up to 3s instead of immediately raising "database is locked".
+    # Matches CLAUDE.md topology spec for flat deployments under WAL.
+    conn.execute("PRAGMA busy_timeout=3000")
     return conn
 
 

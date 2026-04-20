@@ -821,17 +821,25 @@ class TestVibeVoiceDetectGpuWmic:
             assert _detect_gpu_wmic() is None
 
     def test_wmic_nvidia_gpu(self):
+        # _detect_gpu_wmic internally calls tts._subprocess.hidden_startupinfo()
+        # which reads subprocess.STARTUPINFO — a Windows-only attribute that
+        # doesn't exist in Python on Linux/macOS. On non-Windows CI runners
+        # patching sys.platform='win32' alone isn't enough; the STARTUPINFO
+        # AttributeError bubbles out of the try/except broad-catch and
+        # _detect_gpu_wmic returns None. Also patch hidden_startupinfo so
+        # the subprocess.run mock actually drives the success branch.
         from tts.vibevoice_tts import _detect_gpu_wmic
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = f"NVIDIA GeForce RTX 3080|{10 * 1024**3}\n"
 
-        with patch("sys.platform", "win32"):
-            with patch("subprocess.run", return_value=mock_result):
-                result = _detect_gpu_wmic()
-                assert result is not None
-                assert result["gpu_vendor"] == "nvidia"
-                assert result["vram_gb"] == pytest.approx(10.0, abs=0.1)
+        with patch("sys.platform", "win32"), \
+             patch("tts._subprocess.hidden_startupinfo", return_value=(None, 0)), \
+             patch("subprocess.run", return_value=mock_result):
+            result = _detect_gpu_wmic()
+            assert result is not None
+            assert result["gpu_vendor"] == "nvidia"
+            assert result["vram_gb"] == pytest.approx(10.0, abs=0.1)
 
     def test_wmic_low_vram_returns_none(self):
         from tts.vibevoice_tts import _detect_gpu_wmic

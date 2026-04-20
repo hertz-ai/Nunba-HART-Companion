@@ -1,4 +1,5 @@
-import React from 'react';
+import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+
 import {
   Card,
   CardContent,
@@ -7,7 +8,7 @@ import {
   keyframes,
   useTheme,
 } from '@mui/material';
-import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import React from 'react';
 
 /* Premium shimmer — slightly slower and more elegant than default wave */
 const premiumShimmer = keyframes`

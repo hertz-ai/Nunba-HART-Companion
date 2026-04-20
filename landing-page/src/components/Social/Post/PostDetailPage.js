@@ -2,10 +2,6 @@ import CommentForm from './CommentForm';
 import CommentThread from './CommentThread';
 
 import {postsApi, commentsApi} from '../../../services/socialApi';
-import {useRoleAccess} from '../../RoleGuard';
-import CommunityBadge from '../shared/CommunityBadge';
-import UserChip from '../shared/UserChip';
-import VoteButtons from '../shared/VoteButtons';
 import {
   socialTokens,
   RADIUS,
@@ -13,7 +9,12 @@ import {
   GRADIENTS,
   EASINGS,
 } from '../../../theme/socialTokens';
+import {useRoleAccess} from '../../RoleGuard';
+import CommunityBadge from '../shared/CommunityBadge';
+import UserChip from '../shared/UserChip';
+import VoteButtons from '../shared/VoteButtons';
 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   Card,
   CardContent,
@@ -29,10 +30,9 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import React, {useState, useEffect} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
 import {Helmet} from 'react-helmet-async';
+import {useParams, useNavigate} from 'react-router-dom';
 
 export default function PostDetailPage() {
   const {postId} = useParams();

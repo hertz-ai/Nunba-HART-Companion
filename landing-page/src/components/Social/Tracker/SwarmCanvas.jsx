@@ -6,9 +6,9 @@
  * Click detection, hover tooltips, performance cap at 500 particles.
  */
 
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 
 // ---- Physics constants ----
 const SPRING_K = 0.003;     // attraction to cluster center

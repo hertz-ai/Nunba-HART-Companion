@@ -11,6 +11,15 @@
  * Chat pages (/, /local) are isolated — always use the default theme.
  */
 
+import {themeApi} from '../services/socialApi';
+import buildMuiTheme from '../theme/themeBuilder';
+import {
+  DEFAULT_THEME_CONFIG,
+  mergeThemeConfig,
+  getPresetById,
+} from '../theme/themePresets';
+
+import {ThemeProvider as MuiThemeProvider, CssBaseline} from '@mui/material';
 import React, {
   createContext,
   useContext,
@@ -19,15 +28,8 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
-import {ThemeProvider as MuiThemeProvider, CssBaseline} from '@mui/material';
 import {useLocation} from 'react-router-dom';
-import buildMuiTheme from '../theme/themeBuilder';
-import {
-  DEFAULT_THEME_CONFIG,
-  mergeThemeConfig,
-  getPresetById,
-} from '../theme/themePresets';
-import {themeApi} from '../services/socialApi';
+
 
 // Safe wrapper — theme API failures must NEVER trigger auth token clearing.
 // The socialApi 401 interceptor clears localStorage on 401, which would log the

@@ -15,7 +15,24 @@
  *  - "Materializing" preview step — card assembles piece by piece
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import ThoughtExperimentCard from './ThoughtExperimentCard';
+
+import { postsApi } from '../../../services/socialApi';
+import {
+  INTENT_COLORS, INTENT_LABELS, INTENT_GRADIENT_MAP,
+  GRADIENTS, RADIUS, EASINGS, socialTokens,
+} from '../../../theme/socialTokens';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import BalanceIcon from '@mui/icons-material/Balance';
+import CloseIcon from '@mui/icons-material/Close';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import MemoryIcon from '@mui/icons-material/Memory';
+import ParkIcon from '@mui/icons-material/Park';
+import PeopleIcon from '@mui/icons-material/People';
+import PublishIcon from '@mui/icons-material/Publish';
+import SchoolIcon from '@mui/icons-material/School';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Stepper, Step, StepLabel,
@@ -24,22 +41,7 @@ import {
   Tabs, Tab, MenuItem, CircularProgress,
   useTheme, keyframes,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import PublishIcon from '@mui/icons-material/Publish';
-import PeopleIcon from '@mui/icons-material/People';
-import ParkIcon from '@mui/icons-material/Park';
-import SchoolIcon from '@mui/icons-material/School';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import BalanceIcon from '@mui/icons-material/Balance';
-import MemoryIcon from '@mui/icons-material/Memory';
-import ThoughtExperimentCard from './ThoughtExperimentCard';
-import { postsApi } from '../../../services/socialApi';
-import {
-  INTENT_COLORS, INTENT_LABELS, INTENT_GRADIENT_MAP,
-  GRADIENTS, RADIUS, EASINGS, socialTokens,
-} from '../../../theme/socialTokens';
+import React, { useState, useCallback, useEffect } from 'react';
 // ─── Keyframes ───────────────────────────────────────────────────────────────
 
 const crossFadeIn = keyframes`

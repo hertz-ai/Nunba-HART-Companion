@@ -380,9 +380,12 @@ class TestSTTLoader(unittest.TestCase):
             self.assertTrue(self.loader.download(self._stt_entry()))
 
     def test_download_cuda_install_fails(self):
+        # install_cuda_torch was renamed install_gpu_torch when ROCm /
+        # Metal variants landed — the old name was CUDA-specific,
+        # which wasn't accurate anymore.
         with patch('tts.package_installer.has_nvidia_gpu', return_value=True), \
              patch('tts.package_installer.is_cuda_torch', return_value=False), \
-             patch('tts.package_installer.install_cuda_torch', return_value=(False, 'err')):
+             patch('tts.package_installer.install_gpu_torch', return_value=(False, 'err')):
             self.assertFalse(self.loader.download(self._stt_entry()))
 
     def test_download_exception_returns_false(self):
@@ -398,21 +401,37 @@ class TestVLMLoader(unittest.TestCase):
 
     def setUp(self):
         from models.orchestrator import VLMLoader
+        self.VLMLoader = VLMLoader
         self.loader = VLMLoader()
 
     def _vlm_entry(self):
         return _make_entry(id='vlm-minicpm', name='MiniCPM', model_type='vlm')
 
+    # VLMLoader.load() calls self._get_service() which eagerly imports
+    # hart_intelligence_entry — that pulls in HARTOS's Redis client,
+    # channel registry, and model_bus_service, none of which we want to
+    # exercise in a unit test.  Patch _get_service directly at the
+    # VLMLoader class level so the tests stay fast + hermetic and don't
+    # depend on whether 'integrations' has been previously populated in
+    # sys.modules by another test.
+
     def test_load_success(self):
-        with patch('integrations.vision.vision_service.VisionService', return_value=MagicMock()):
+        mock_svc = MagicMock()
+        with patch.object(self.VLMLoader, '_get_service', return_value=mock_svc):
             self.assertTrue(self.loader.load(self._vlm_entry(), 'gpu'))
+        mock_svc.start.assert_called_once()
 
     def test_load_import_error_returns_false(self):
-        with patch('integrations.vision.vision_service.VisionService', side_effect=ImportError("no module")):
+        # _get_service returning None is how load() reports
+        # "VisionService unavailable" — canonical path when the
+        # integrations.vision package fails to import.
+        with patch.object(self.VLMLoader, '_get_service', return_value=None):
             self.assertFalse(self.loader.load(self._vlm_entry(), 'cpu'))
 
     def test_load_exception_returns_false(self):
-        with patch('integrations.vision.vision_service.VisionService', side_effect=RuntimeError("fail")):
+        mock_svc = MagicMock()
+        mock_svc.start.side_effect = RuntimeError("fail")
+        with patch.object(self.VLMLoader, '_get_service', return_value=mock_svc):
             self.assertFalse(self.loader.load(self._vlm_entry(), 'gpu'))
 
     def test_download_default_returns_false(self):

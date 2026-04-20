@@ -1,5 +1,28 @@
-import React, {useState, useRef, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useInView} from '../../../hooks/useAnimations';
+import {postsApi, resonanceApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
+import {useRoleAccess} from '../../RoleGuard';
+import BoostButton from '../shared/BoostButton';
+import LevelBadge from '../shared/LevelBadge';
+import ShareDialog from '../shared/ShareDialog';
+import UserChip from '../shared/UserChip';
+
+import BoltIcon from '@mui/icons-material/Bolt';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import ShareIcon from '@mui/icons-material/Share';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import StarIcon from '@mui/icons-material/Star';
 import {
   Card,
   CardContent,
@@ -12,30 +35,9 @@ import {
   Snackbar,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import ShareIcon from '@mui/icons-material/Share';
-import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import BoltIcon from '@mui/icons-material/Bolt';
-import CampaignIcon from '@mui/icons-material/Campaign';
-import StarIcon from '@mui/icons-material/Star';
-import UserChip from '../shared/UserChip';
-import LevelBadge from '../shared/LevelBadge';
-import BoostButton from '../shared/BoostButton';
-import ShareDialog from '../shared/ShareDialog';
-import {postsApi, resonanceApi} from '../../../services/socialApi';
-import {useRoleAccess} from '../../RoleGuard';
-import {useInView} from '../../../hooks/useAnimations';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
+import React, {useState, useRef, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 /* ── Premium keyframes ── */
 const shimmerSweep = keyframes`

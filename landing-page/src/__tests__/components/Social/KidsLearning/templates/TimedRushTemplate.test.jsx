@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen, fireEvent} from '@testing-library/react';
-import {renderWithProviders} from '../../../../testHelpers';
 import TimedRushTemplate from '../../../../../components/Social/KidsLearning/templates/TimedRushTemplate';
+import {renderWithProviders} from '../../../../testHelpers';
+
+import {screen, fireEvent} from '@testing-library/react';
+import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks

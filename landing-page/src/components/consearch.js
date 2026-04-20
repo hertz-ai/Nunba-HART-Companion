@@ -1,24 +1,24 @@
-import React, {Component} from 'react';
-import {Link} from 'react-router-dom';
-
-import {ScrollTo} from 'react-scroll-to';
-// Layouts
-import HeaderMulti from '../pages/Layouts/header-multi';
-import HeaderNano from '../pages/Layouts/header';
 import FooterLight from '../pages/Layouts/footer-light';
-
-// Shared
+import HeaderNano from '../pages/Layouts/header';
+import HeaderMulti from '../pages/Layouts/header-multi';
 import AboutUs from '../pages/SubPages/Multipurpose/about-us';
-import Features from '../pages/SubPages/Multipurpose/features';
-import Services from '../pages/SubPages/Multipurpose/services';
-import Cta from '../pages/SubPages/Multipurpose/cta';
-import Testimonial from '../pages/SubPages/Multipurpose/testimonial';
-import Team from '../pages/SubPages/Multipurpose/team';
 import Client from '../pages/SubPages/Multipurpose/client';
 import Contact from '../pages/SubPages/Multipurpose/contact';
+import Cta from '../pages/SubPages/Multipurpose/cta';
+import Features from '../pages/SubPages/Multipurpose/features';
+import Services from '../pages/SubPages/Multipurpose/services';
+import Team from '../pages/SubPages/Multipurpose/team';
+import Testimonial from '../pages/SubPages/Multipurpose/testimonial';
+
+import React, {Component} from 'react';
+import ModalVideo from 'react-modal-video';
+import {Link} from 'react-router-dom';
+import {ScrollTo} from 'react-scroll-to';
+// Layouts
+
+// Shared
 
 // Modal Video
-import ModalVideo from 'react-modal-video';
 import '../../node_modules/react-modal-video/scss/modal-video.scss';
 import '../css/pe-icon-7.css';
 import '../css/style.css';
@@ -26,13 +26,15 @@ import '../css/style.css.map';
 import '../_helper.scss';
 import '../css/bootstrap.min.css';
 
-//Material UI
+// Material UI
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import {useState, useEffect} from 'react';
 import Box from '@mui/material/Box';
 import {styled} from '@mui/material/styles';
+
 import human_computer from '../images/human_computer.png';
+
 import Container from '@mui/material/Container';
 import {green, purple} from '@mui/material/colors';
 import Button from '@mui/material/Button';
@@ -40,16 +42,17 @@ import Button from '@mui/material/Button';
 import Demo from './demo';
 import '../css/cortext.css';
 import DemoVideo from './demoVideo';
-
 import Spacer from './Spacer';
-import MetaTags from 'react-meta-tags';
 
+import MetaTags from 'react-meta-tags';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
+
 import DemoConsearch from './demoConsearch';
+
 import {logger} from '../utils/logger';
 
 const styles = {
@@ -147,7 +150,7 @@ function Consearch() {
   };
 
   function routeToContactUs() {
-    //document.querySelector("#mySidenav > li:nth-child(8) > a").click();
+    // document.querySelector("#mySidenav > li:nth-child(8) > a").click();
     document
       .querySelector(
         '#root > div > header > div.navbar-wrapper.navbar-fixed > div > div > div.navbar-nav-wrapper > ul > li:nth-child(10) > a'
@@ -170,8 +173,8 @@ function Consearch() {
   // <h1>{activePage}</h1>;
 
   function scrollNavigation() {
-    var doc = document.documentElement;
-    var top = (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
+    const doc = document.documentElement;
+    const top = (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
     if (top > 80) {
       document.getElementById('nav-bar').classList.add('nav-sticky');
       logger.log('>80');

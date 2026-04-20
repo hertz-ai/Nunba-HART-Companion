@@ -1,11 +1,13 @@
 import React from 'react';
+
 import './TeacherHome.css';
 import Card from './Card';
+
 import CreateCourse from '../../images/Teacher/bookPhoto.jpeg';
+import reviwPhoto from '../../images/Teacher/reviwPhoto.jpeg';
+import schedulePhoto from '../../images/Teacher/schedulePhoto.jpeg';
 import taskPhoto from '../../images/Teacher/taskPhoto.jpeg';
 import upLoadPhoto from '../../images/Teacher/uploadPhoto.jpeg';
-import schedulePhoto from '../../images/Teacher/schedulePhoto.jpeg';
-import reviwPhoto from '../../images/Teacher/reviwPhoto.jpeg';
 
 function Actions() {
   return (

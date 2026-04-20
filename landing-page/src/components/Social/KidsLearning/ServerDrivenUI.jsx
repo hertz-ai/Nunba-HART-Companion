@@ -9,15 +9,6 @@
  *   components/shared/LiquidUI/ServerDrivenUI.jsx
  */
 
-import React from 'react';
-import SharedServerDrivenUI, {
-  RenderNode as SharedRenderNode,
-  resolvePath,
-  makeResolveStyle,
-  interpolateTemplate,
-  getMuiIcon,
-  buildStylePresets,
-} from '../../shared/LiquidUI/ServerDrivenUI';
 import {
   kidsColors,
   kidsSpacing,
@@ -26,6 +17,17 @@ import {
   kidsFontWeights,
   kidsShadows,
 } from './kidsTheme';
+
+import SharedServerDrivenUI, {
+  RenderNode as SharedRenderNode,
+  resolvePath,
+  makeResolveStyle,
+  interpolateTemplate,
+  getMuiIcon,
+  buildStylePresets,
+} from '../../shared/LiquidUI/ServerDrivenUI';
+
+import React from 'react';
 
 // ── Build kids tokens matching the themeTokens shape ────────────────────────
 

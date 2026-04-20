@@ -21,6 +21,16 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+# ── Layer 1: synthetic CUDA fixtures for GPU-path coverage on CPU runners ──
+# Re-export synthetic_cuda / synthetic_cuda_* fixtures from conftest_cuda_mock
+# so any test can request them without extra imports.
+from tests.conftest_cuda_mock import (  # noqa: E402,F401  (pytest fixture re-export)
+    synthetic_cuda,
+    synthetic_cuda_high,
+    synthetic_cuda_low,
+    synthetic_cuda_mid,
+    synthetic_cuda_oom,
+)
 
 # ---------------------------------------------------------------------------
 # Temp directory for config files (llama_config, etc.)

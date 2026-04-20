@@ -1,5 +1,5 @@
-import React, {useEffect, useRef} from 'react';
 import {Box, Slider, Typography} from '@mui/material';
+import React, {useEffect, useRef} from 'react';
 
 const RADIUS_MARKS = [
   {value: 100, label: '100m'},

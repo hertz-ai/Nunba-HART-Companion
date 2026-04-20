@@ -1,5 +1,14 @@
-import React, {useState, useMemo} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {getTimeSuggestions, getDailyContent} from './autopilotStore';
+
+import {
+  GRADIENTS,
+  EASINGS,
+  RADIUS,
+  socialTokens,
+} from '../../../theme/socialTokens';
+
+import AutoModeIcon from '@mui/icons-material/AutoMode';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   Box,
   Typography,
@@ -9,15 +18,10 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
-import AutoModeIcon from '@mui/icons-material/AutoMode';
-import {
-  GRADIENTS,
-  EASINGS,
-  RADIUS,
-  socialTokens,
-} from '../../../theme/socialTokens';
-import {getTimeSuggestions, getDailyContent} from './autopilotStore';
+import React, {useState, useMemo} from 'react';
+import {useNavigate} from 'react-router-dom';
+
+
 
 const DISMISS_KEY = 'nunba_autopilot_banner_dismissed';
 

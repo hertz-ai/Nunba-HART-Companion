@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
-import hamburger from '../../images/Teacher/hamburger.png';
+
 import close from '../../images/Teacher/close.png';
+import hamburger from '../../images/Teacher/hamburger.png';
 import logo from '../../images/Teacher/logo.gif';
 import './TeacherHome.css';
 import {logger} from '../../utils/logger';

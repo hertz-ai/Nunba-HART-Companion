@@ -1,5 +1,5 @@
-import React, {useState, useCallback} from 'react';
 import Box from '@mui/material/Box';
+import React, {useState, useCallback} from 'react';
 
 /**
  * GameItemImage - Renders either a cached image blob or an emoji fallback.

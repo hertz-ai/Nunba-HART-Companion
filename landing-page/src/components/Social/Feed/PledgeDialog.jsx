@@ -11,22 +11,23 @@
  *  - Central: sees node capacity info
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { trackerApi, computeApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import { useRoleAccess } from '../../RoleGuard';
+
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import CloudIcon from '@mui/icons-material/Cloud';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import MemoryIcon from '@mui/icons-material/Memory';
+import PaymentIcon from '@mui/icons-material/Payment';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Typography, Button, TextField, IconButton,
   CircularProgress, Skeleton, useTheme, useMediaQuery, keyframes,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
-import MemoryIcon from '@mui/icons-material/Memory';
-import CloudIcon from '@mui/icons-material/Cloud';
-import PaymentIcon from '@mui/icons-material/Payment';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { useRoleAccess } from '../../RoleGuard';
-import { trackerApi, computeApi } from '../../../services/socialApi';
-import { socialTokens, RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import React, { useState, useEffect, useMemo } from 'react';
 
 // ---- Keyframes ----
 

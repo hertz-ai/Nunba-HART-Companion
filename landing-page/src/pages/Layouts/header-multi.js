@@ -1,16 +1,20 @@
+import ScrollspyNav from './Scrollspy';
+
+import logo_dark from '../../images/logo-dark.png';
+import logo_light from '../../images/logo-light.png';
+import {logger} from '../../utils/logger';
+
+import Snackbar from '@mui/material/Snackbar';
+import {withStyles} from '@mui/material/styles';
 import React, {Component} from 'react';
 import {Link} from 'react-router-dom';
-import ScrollspyNav from './Scrollspy';
 import {Modal, ModalHeader, ModalBody} from 'reactstrap';
 
-import logo_light from '../../images/logo-light.png';
-import logo_dark from '../../images/logo-dark.png';
 import '../../css/materialdesignicons.min.css';
 import '../../utils/responsiveSubMenu.js';
 import {SEND_EMAIL_URL} from '../../config/apiBase';
-import Snackbar from '@mui/material/Snackbar';
-import {withStyles} from '@mui/material/styles';
-import {logger} from '../../utils/logger';
+
+
 
 const styles = {
   root: {
@@ -70,12 +74,12 @@ class HeaderMulti extends Component {
     event.preventDefault();
     logger.log('Posting Email to hertz API...');
     logger.log('toaster -> ' + this.state.open);
-    var userName = document.getElementById('name').value;
-    var email = document.getElementById('email').value;
-    var phoneNumber = document.getElementById('phoneNumber').value;
-    var company = document.getElementById('company').value;
-    var question = document.getElementById('comments').value;
-    var userDetails = {
+    const userName = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const phoneNumber = document.getElementById('phoneNumber').value;
+    const company = document.getElementById('company').value;
+    const question = document.getElementById('comments').value;
+    const userDetails = {
       userName: userName,
       email: email,
       'phon  eNumber': phoneNumber,
@@ -110,8 +114,8 @@ class HeaderMulti extends Component {
     // });
     const {classes} = this.props;
     window.onload = function () {
-      var toolTip = document.createElement('div');
-      //toolTip.innerHTML = "someData";
+      const toolTip = document.createElement('div');
+      // toolTip.innerHTML = "someData";
       toolTip.addEventListener('click', myfunction);
       document.body.appendChild(toolTip);
 

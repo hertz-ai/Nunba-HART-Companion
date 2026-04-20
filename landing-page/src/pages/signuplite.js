@@ -1,16 +1,16 @@
-import React, {useEffect, useState} from 'react';
-import {Link} from 'react-router-dom';
-import VerifiedIcon from '@mui/icons-material/Verified';
-import Snackbar from '@mui/material/Snackbar';
-import SnackbarContent from '@mui/material/SnackbarContent';
-import {useNavigate} from 'react-router-dom';
-import ReactGA from 'react-ga';
 import Footer from '../components/footer';
 import NabBarLite from '../components/navbarlite';
-
-import Alert from '@mui/material/Alert';
 import {mailerApi} from '../services/socialApi';
 import {logger} from '../utils/logger';
+
+import VerifiedIcon from '@mui/icons-material/Verified';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import SnackbarContent from '@mui/material/SnackbarContent';
+import React, {useEffect, useState} from 'react';
+import ReactGA from 'react-ga';
+import {useNavigate} from 'react-router-dom';
+import {Link} from 'react-router-dom';
 
 export default function SignupLite() {
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ export default function SignupLite() {
 
   const [userType, SetUserType] = useState('Business');
   const [NumberOfStudent, setNumberofStudent] = useState();
-  const [otpSent, setOtpSent] = useState(false); //for otp sent or not
+  const [otpSent, setOtpSent] = useState(false); // for otp sent or not
   const [otp, setOtp] = useState();
   const [ErrorMessage, setErrorMessage] = useState();
   const [isOtpSent, setIsOtpSent] = useState();

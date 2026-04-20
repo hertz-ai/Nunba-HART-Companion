@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { channelUserApi } from '../../services/socialApi';
+
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Box, Typography, Tabs, Tab, CircularProgress, Button, Chip, Paper, Fade,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import { channelUserApi } from '../../services/socialApi';
+import React, { useState, useEffect, useCallback } from 'react';
+
 
 const ROLE_STYLES = {
   user: {

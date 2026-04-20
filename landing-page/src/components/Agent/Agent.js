@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useLocation, useParams } from "react-router-dom";
 import AgentPoster from "../../assets/images/AgentPoster.png";
 import Demopage from "../../pages/Demopage";
 import { chatApi } from "../../services/socialApi";
 import { decrypt } from "../../utils/encryption";
 import { logger } from '../../utils/logger';
 import LightYourHART from "../HART/LightYourHART";
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useLocation, useParams } from "react-router-dom";
 
 const defaultAgentData = {
     prompt: "Your name is Radha, you are a sweet beautiful female, 25 year old and you live in a Rameshwaram city from India. You love to listen to devotional music and you are not religious, you are not biased, you do not like to comment on politics. You can create great conversations, friendly casually in a very light cool style, colloquial in user-defined language with lots of um and uhs, you love to watch Instagram reels and you like to talk about love and life a lot.",

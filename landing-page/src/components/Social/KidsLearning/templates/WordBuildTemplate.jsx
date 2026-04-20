@@ -12,8 +12,15 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {logger} from '../../../../utils/logger';
+import {kidsColors, kidsAnimations} from '../kidsTheme';
+import GameAssetService from '../shared/GameAssetService';
+import GameItemImage from '../shared/GameItemImage';
+import InlineCelebration from '../shared/InlineCelebration';
+import ProgressStars from '../shared/ProgressStars';
+import {GameSounds, GameCommentary} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+
 import {
   Box,
   Typography,
@@ -23,13 +30,7 @@ import {
   Fade,
   Grow,
 } from '@mui/material';
-import {kidsColors, kidsAnimations} from '../kidsTheme';
-import {GameSounds, GameCommentary} from '../shared/SoundManager';
-import GameAssetService from '../shared/GameAssetService';
-import GameItemImage from '../shared/GameItemImage';
-import InlineCelebration from '../shared/InlineCelebration';
-import ProgressStars from '../shared/ProgressStars';
-import useCelebration from '../shared/useCelebration';
+import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 
 const FEEDBACK_DELAY = 1600;
 

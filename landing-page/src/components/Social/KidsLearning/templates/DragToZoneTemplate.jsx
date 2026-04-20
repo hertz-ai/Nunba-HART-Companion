@@ -11,17 +11,18 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {logger} from '../../../../utils/logger';
-import {Box, Typography, Card, Fade, Grow} from '@mui/material';
 import {kidsColors, kidsAnimations} from '../kidsTheme';
-import {GameSounds, GameCommentary} from '../shared/SoundManager';
-import InlineCelebration from '../shared/InlineCelebration';
-import GameLivesBar from '../shared/GameLivesBar';
-import KidsCharacter from '../shared/KidsCharacter';
-import VisualHint from '../shared/VisualHint';
 import {getEmojiForText} from '../shared/emojiMap';
+import GameLivesBar from '../shared/GameLivesBar';
+import InlineCelebration from '../shared/InlineCelebration';
+import KidsCharacter from '../shared/KidsCharacter';
+import {GameSounds, GameCommentary} from '../shared/SoundManager';
 import useCelebration from '../shared/useCelebration';
+import VisualHint from '../shared/VisualHint';
+
+import {Box, Typography, Card, Fade, Grow} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 
 // Shuffle helper
 function shuffle(arr) {

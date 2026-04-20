@@ -1,5 +1,15 @@
-import React, {useState, useMemo, useEffect, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {kidsColors, kidsRadius, kidsShadows} from './data/kidsTheme';
+
+import {useReducedMotion} from '../../../hooks/useAnimations';
+
+import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SearchIcon from '@mui/icons-material/Search';
+import ShareIcon from '@mui/icons-material/Share';
+import SortIcon from '@mui/icons-material/Sort';
 import {
   Box,
   Typography,
@@ -19,17 +29,10 @@ import {
   Fade,
   Tooltip,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SearchIcon from '@mui/icons-material/Search';
-import AddIcon from '@mui/icons-material/Add';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import ShareIcon from '@mui/icons-material/Share';
-import SortIcon from '@mui/icons-material/Sort';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import React, {useState, useMemo, useEffect, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
 
-import {kidsColors, kidsRadius, kidsShadows} from './data/kidsTheme';
-import {useReducedMotion} from '../../../hooks/useAnimations';
+
 
 /* ---- localStorage key ---- */
 const STORAGE_KEY = 'hevolve_kids_custom_games';

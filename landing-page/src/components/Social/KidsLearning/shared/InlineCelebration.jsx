@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Box, Typography } from '@mui/material';
 import { kidsColors } from '../data/kidsTheme';
+
+import { Box, Typography } from '@mui/material';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 
 /**
  * InlineCelebration — per-game micro-celebration registry.

@@ -1,4 +1,9 @@
-import React, {useState} from 'react';
+import {RADIUS, GRADIENTS, socialTokens} from '../../../theme/socialTokens';
+import {animFadeInUp, animFadeInScale} from '../../../utils/animations';
+
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import GroupIcon from '@mui/icons-material/Group';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {
   Box,
   Typography,
@@ -13,11 +18,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import GroupIcon from '@mui/icons-material/Group';
-import {RADIUS, GRADIENTS, socialTokens} from '../../../theme/socialTokens';
-import {animFadeInUp, animFadeInScale} from '../../../utils/animations';
+import React, {useState} from 'react';
 
 /**
  * AdultLobby — Adult-themed multiplayer lobby with MUI dark styling.

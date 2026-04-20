@@ -12,9 +12,10 @@
  *   streak:      number
  */
 
-import React from 'react';
-import {Box, Typography} from '@mui/material';
 import {kidsColors} from '../kidsTheme';
+
+import {Box, Typography} from '@mui/material';
+import React from 'react';
 
 // SVG Heart icon
 function HeartIcon({filled = true, cracking = false, size = 20}) {

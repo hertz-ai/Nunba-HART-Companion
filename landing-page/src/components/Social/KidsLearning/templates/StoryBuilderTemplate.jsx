@@ -14,15 +14,16 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {logger} from '../../../../utils/logger';
-import {Box, Typography, Button, Card, Fade, Grow} from '@mui/material';
 import {kidsColors, kidsAnimations} from '../kidsTheme';
-import {GameSounds} from '../shared/SoundManager';
-import TTSManager from '../shared/TTSManager';
 import InlineCelebration from '../shared/InlineCelebration';
 import ProgressStars from '../shared/ProgressStars';
+import {GameSounds} from '../shared/SoundManager';
+import TTSManager from '../shared/TTSManager';
 import useCelebration from '../shared/useCelebration';
+
+import {Box, Typography, Button, Card, Fade, Grow} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 
 const TYPEWRITER_SPEED = 35; // ms per character
 const CHOICE_COLORS = [

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- End-to-end staging: docker-compose flow probes 8 session-added endpoints including MCP auth gate, HF supply-chain, admin diag — catches runtime regressions CI mocks miss.
+
 ## [0.1.0] - 2026-04-12
 
 ### Changed

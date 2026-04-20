@@ -1,20 +1,20 @@
 import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
-import FinalGif from '../Gif/FinalGif.png';
-import Ramesh from '../assets/images/client/Ramesh.jpg';
 import Garv from '../assets/images/client/Garv.jpg';
-import Sahil from '../assets/images/client/Sahil.png';
-import Rajesh from '../assets/images/client/Rajesh.png';
 import Monisha from '../assets/images/client/Monisha.png';
-
+import Rajesh from '../assets/images/client/Rajesh.png';
+import Ramesh from '../assets/images/client/Ramesh.jpg';
+import Sahil from '../assets/images/client/Sahil.png';
 import Footer from '../components/footer';
 
-import {FiCheckCircle} from 'react-icons/fi';
 
-import ModalVideo from 'react-modal-video';
 import '../../node_modules/react-modal-video/css/modal-video.css';
 import Navbar from '../components/navbar';
+import FinalGif from '../Gif/FinalGif.png';
+
+import {FiCheckCircle} from 'react-icons/fi';
+import ModalVideo from 'react-modal-video';
 
 export default function AboutUs() {
   useEffect(() => {

@@ -1,9 +1,9 @@
-import React from 'react';
-import {Link} from 'react-router-dom';
 import HevolveLogo from '../data/logo.gif';
-import {FiLinkedin, FiFacebook, FiInstagram, FiTwitter} from 'react-icons/fi';
-import {FcReddit} from 'react-icons/fc';
 
+import React from 'react';
+import {FcReddit} from 'react-icons/fc';
+import {FiLinkedin, FiFacebook, FiInstagram, FiTwitter} from 'react-icons/fi';
+import {Link} from 'react-router-dom';
 import {Link as ScrollLink} from 'react-scroll';
 import {animateScroll as scrollLibrary} from 'react-scroll';
 

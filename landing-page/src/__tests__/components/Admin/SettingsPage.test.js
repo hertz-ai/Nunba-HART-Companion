@@ -2,6 +2,7 @@ jest.setTimeout(30000);
 
 import React from 'react';
 import {screen, waitFor} from '@testing-library/react';
+
 import {renderWithProviders} from '../../testHelpers';
 import SettingsPage from '../../../components/Admin/SettingsPage';
 

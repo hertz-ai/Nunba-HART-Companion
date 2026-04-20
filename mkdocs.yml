@@ -43,7 +43,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Downloads: downloads.md
+  - Downloads:
+    - Nunba Companion: downloads.md
+    - HARTOS (ISOs / Docker / APK): hartos/downloads.md
   - Getting Started:
     - Overview: getting-started/overview.md
     - Prerequisites: getting-started/prerequisites.md

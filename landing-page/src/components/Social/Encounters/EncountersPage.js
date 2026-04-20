@@ -1,25 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { encountersApi } from '../../../services/socialApi';
+import { socialTokens } from '../../../theme/socialTokens';
+import { animFadeInUp, animFadeInScale } from '../../../utils/animations';
+import EmptyState from '../shared/EmptyState';
+import EncounterCard from '../shared/EncounterCard';
+import LocationSettingsToggle from '../shared/LocationSettingsToggle';
+import MissedConnectionCard from '../shared/MissedConnectionCard';
+import MissedConnectionDetail from '../shared/MissedConnectionDetail';
+import MissedConnectionForm from '../shared/MissedConnectionForm';
+import MissedConnectionMapView from '../shared/MissedConnectionMapView';
+import ProximityBanner from '../shared/ProximityBanner';
+import ProximityMatchCard from '../shared/ProximityMatchCard';
+import useLocationPing from '../shared/useLocationPing';
+
+import AddIcon from '@mui/icons-material/Add';
+import MapIcon from '@mui/icons-material/Map';
+import ListIcon from '@mui/icons-material/ViewList';
 import {
   Tabs, Tab, Box, Typography, CircularProgress, Chip, Avatar,
   Fab, ToggleButtonGroup, ToggleButton,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import ListIcon from '@mui/icons-material/ViewList';
-import MapIcon from '@mui/icons-material/Map';
-import EncounterCard from '../shared/EncounterCard';
-import EmptyState from '../shared/EmptyState';
-import LocationSettingsToggle from '../shared/LocationSettingsToggle';
-import ProximityBanner from '../shared/ProximityBanner';
-import ProximityMatchCard from '../shared/ProximityMatchCard';
-import MissedConnectionCard from '../shared/MissedConnectionCard';
-import MissedConnectionMapView from '../shared/MissedConnectionMapView';
-import MissedConnectionForm from '../shared/MissedConnectionForm';
-import MissedConnectionDetail from '../shared/MissedConnectionDetail';
-import useLocationPing from '../shared/useLocationPing';
-import { encountersApi } from '../../../services/socialApi';
-import { socialTokens } from '../../../theme/socialTokens';
-import { animFadeInUp, animFadeInScale } from '../../../utils/animations';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function EncountersPage() {
   const navigate = useNavigate();

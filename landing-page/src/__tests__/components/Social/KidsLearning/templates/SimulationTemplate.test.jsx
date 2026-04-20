@@ -1,6 +1,7 @@
+import {renderWithProviders} from '../../../../testHelpers';
+
 import React from 'react';
 import {act} from 'react-dom/test-utils';
-import {renderWithProviders} from '../../../../testHelpers';
 
 jest.mock(
   '../../../../../components/Social/KidsLearning/shared/SoundManager',

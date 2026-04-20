@@ -15,8 +15,19 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {logger} from '../../../../utils/logger';
+import {kidsColors, kidsAnimations, numPadColors} from '../kidsTheme';
+import {getEmojiForText} from '../shared/emojiMap';
+import GameAssetService from '../shared/GameAssetService';
+import GameItemImage from '../shared/GameItemImage';
+import GameLivesBar from '../shared/GameLivesBar';
+import InlineCelebration from '../shared/InlineCelebration';
+import KidsCharacter from '../shared/KidsCharacter';
+import {GameSounds, GameCommentary} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+import VisualHint from '../shared/VisualHint';
+
+import BackspaceOutlinedIcon from '@mui/icons-material/BackspaceOutlined';
 import {
   Box,
   Typography,
@@ -26,17 +37,7 @@ import {
   Grow,
   IconButton,
 } from '@mui/material';
-import BackspaceOutlinedIcon from '@mui/icons-material/BackspaceOutlined';
-import {kidsColors, kidsAnimations, numPadColors} from '../kidsTheme';
-import {GameSounds, GameCommentary} from '../shared/SoundManager';
-import GameAssetService from '../shared/GameAssetService';
-import GameItemImage from '../shared/GameItemImage';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
-import GameLivesBar from '../shared/GameLivesBar';
-import KidsCharacter from '../shared/KidsCharacter';
-import VisualHint from '../shared/VisualHint';
-import {getEmojiForText} from '../shared/emojiMap';
+import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 
 const FEEDBACK_DELAY = 1800;
 const NUM_PAD = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];

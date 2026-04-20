@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# Nunba-HART Companion -- STAGING full-stack E2E profile
+# ---------------------------------------------------------------------------
+# Purpose: spin up the real process graph (Flask + llama.cpp + WAMP router)
+# so CI can exercise cross-process flows that unit-test `test_client()` mocks
+# cannot -- e.g. MCP bearer auth, TTS SSE push, HF supply-chain gate.
+#
+# Usage (local or CI):
+#   docker compose -f docker-compose.staging.yml up -d
+#   ./scripts/staging_e2e_probe.sh
+#   docker compose -f docker-compose.staging.yml down -v
+#
+# Boot order: llama + crossbar come up first, nunba depends_on them healthy.
+# No GPU assumed -- NUNBA_DISABLE_TTS=1 and TinyLlama 1.1B keep runtime
+# under 2GB so this fits GHA's 7GB runner comfortably.
+# ---------------------------------------------------------------------------
+version: "3.9"
+
+networks:
+  nunba-net:
+    driver: bridge
+
+volumes:
+  llama-models:
+  nunba-data:
+
+services:
+  # ---- llama.cpp OpenAI-compatible server on :8080 ------------------------
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: nunba-staging-llama
+    networks: [nunba-net]
+    ports: ["8080:8080"]
+    volumes:
+      - llama-models:/models
+    # TinyLlama 1.1B Q4_K_M -- ~670MB, CPU-runnable, enough for route smoke.
+    # Pulled on first boot via HF mirror; cached in named volume afterward.
+    command: >
+      -hf TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF:Q4_K_M
+      --host 0.0.0.0
+      --port 8080
+      --ctx-size 2048
+      --n-gpu-layers 0
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  # ---- Crossbar.io WAMP router on :8088 -----------------------------------
+  # Explicit config mount because `CROSSBAR_WEB_PORT` is NOT a standard env
+  # var the crossbario/crossbar image honours — the image reads
+  # /node/.crossbar/config.json unconditionally, which ships listening on
+  # 8080.  The 3m40s healthcheck hang on prior CI runs was because the
+  # container bound to 8080 while we probed 8088 → 20 retries × 10s + 30s
+  # start-period = failure.  Mounting our own config that explicitly
+  # binds to 8088 + realm `realm1` + anonymous role fixes both the port
+  # AND the handshake (without a realm/role, WAMP CONNECT fails).
+  crossbar:
+    image: crossbario/crossbar:latest
+    container_name: nunba-staging-crossbar
+    networks: [nunba-net]
+    ports: ["8088:8088"]
+    volumes:
+      - ./deploy/staging/crossbar_config.json:/node/.crossbar/config.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.settimeout(2); s.connect((\"127.0.0.1\",8088))'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ---- Nunba Flask app on :5000 -------------------------------------------
+  nunba:
+    image: python:3.12-slim
+    container_name: nunba-staging-app
+    networks: [nunba-net]
+    ports: ["5000:5000"]
+    working_dir: /app
+    volumes:
+      - .:/app
+      - nunba-data:/root/Documents/Nunba
+    environment:
+      - NUNBA_CI=1
+      - NUNBA_DISABLE_TTS=1          # no GPU, no Piper/XTTS download
+      - NUNBA_DISABLE_VLM=1           # skip MiniCPM sidecar
+      - NUNBA_LLAMA_URL=http://llama:8080
+      - NUNBA_CROSSBAR_URL=ws://crossbar:8088/ws
+      - NUNBA_MCP_BEARER=staging-e2e-token-do-not-use-in-prod
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      llama: { condition: service_healthy }
+      crossbar: { condition: service_healthy }
+    command: >
+      bash -c "
+        pip install --no-cache-dir -r requirements.txt &&
+        python main.py --port 5000 --background
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s

@@ -1,5 +1,29 @@
 /* eslint-disable no-unused-vars */
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import {useNunbaTheme} from '../../../contexts/ThemeContext';
+import {themeApi} from '../../../services/socialApi';
+import {
+  THEME_PRESETS,
+  DEFAULT_THEME_CONFIG,
+  mergeThemeConfig,
+} from '../../../theme/themePresets';
+
+import {
+  Palette,
+  Check,
+  FormatSize,
+  Contrast,
+  AutoAwesome,
+  ColorLens,
+  Animation,
+  Tune,
+  RestartAlt,
+  ExpandMore,
+  ExpandLess,
+  BlurOn,
+  Gradient,
+  WaterDrop,
+  Save,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -20,31 +44,8 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import {
-  Palette,
-  Check,
-  FormatSize,
-  Contrast,
-  AutoAwesome,
-  ColorLens,
-  Animation,
-  Tune,
-  RestartAlt,
-  ExpandMore,
-  ExpandLess,
-  BlurOn,
-  Gradient,
-  WaterDrop,
-  Save,
-} from '@mui/icons-material';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {HexColorPicker, HexColorInput} from 'react-colorful';
-import {useNunbaTheme} from '../../../contexts/ThemeContext';
-import {themeApi} from '../../../services/socialApi';
-import {
-  THEME_PRESETS,
-  DEFAULT_THEME_CONFIG,
-  mergeThemeConfig,
-} from '../../../theme/themePresets';
 
 const glass = {
   bgcolor: 'rgba(255,255,255,0.04)',

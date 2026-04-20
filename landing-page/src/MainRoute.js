@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+
 import PageSkeleton from "./components/shared/PageSkeleton";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 
@@ -122,6 +123,7 @@ const MindstoryPage = lazyRetry(() => import('./components/Social/Mindstory/Mind
 
 // Auth guards
 import RoleGuard from './components/RoleGuard';
+
 import { Box, Typography, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
 
@@ -153,7 +155,8 @@ const AdminContentTasks = lazyRetry(() => import('./components/Admin/ContentTask
 const AdminNetworkNodes = lazyRetry(() => import('./pages/admin/NetworkNodesPage'));
 const AdminModelManagement = lazyRetry(() => import('./pages/admin/ModelManagementPage'));
 const AdminProviderManagement = lazyRetry(() => import('./pages/admin/ProviderManagementPage'));
-const AdminTaskLedger = lazyRetry(() => import('./pages/Admin/TaskLedgerPage'));
+const AdminTaskLedger = lazyRetry(() => import('./pages/admin/TaskLedgerPage'));
+const AdminClaudeCodeIntegration = lazyRetry(() => import('./pages/admin/ClaudeCodeIntegrationPage'));
 
 function MainRoutes() {
   return (
@@ -560,6 +563,7 @@ function MainRoutes() {
         <Route path="/admin/models" element={<Suspense fallback={<PageSkeleton dark />}><AdminLayout><RoleGuard minRole="guest" fallback="/social"><AdminModelManagement /></RoleGuard></AdminLayout></Suspense>} />
         <Route path="/admin/providers" element={<Suspense fallback={<PageSkeleton dark />}><AdminLayout><RoleGuard minRole="guest" fallback="/social"><AdminProviderManagement /></RoleGuard></AdminLayout></Suspense>} />
         <Route path="/admin/task-ledger" element={<Suspense fallback={<PageSkeleton dark />}><AdminLayout><RoleGuard minRole="guest" fallback="/social"><AdminTaskLedger /></RoleGuard></AdminLayout></Suspense>} />
+        <Route path="/admin/integrations/claude-code" element={<Suspense fallback={<PageSkeleton dark />}><AdminLayout><RoleGuard minRole="guest" fallback="/social"><AdminClaudeCodeIntegration /></RoleGuard></AdminLayout></Suspense>} />
 
         {/* 404 catch-all */}
         <Route path="*" element={<NotFoundPage />} />

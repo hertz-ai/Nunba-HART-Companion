@@ -6,18 +6,19 @@
  * Reuses msgAppear keyframe from ThoughtExperimentTracker.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { trackerApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS, EASINGS, DURATIONS, SHADOWS } from '../../../theme/socialTokens';
+
+import CloseIcon from '@mui/icons-material/Close';
+import PersonIcon from '@mui/icons-material/Person';
+import SendIcon from '@mui/icons-material/Send';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import {
   Box, Typography, Paper, TextField, IconButton, Avatar,
   useTheme, useMediaQuery, keyframes, CircularProgress,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
-import SendIcon from '@mui/icons-material/Send';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import PersonIcon from '@mui/icons-material/Person';
-import { trackerApi } from '../../../services/socialApi';
-import { socialTokens, RADIUS, EASINGS, DURATIONS, SHADOWS } from '../../../theme/socialTokens';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // ---- Keyframes ----
 

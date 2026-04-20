@@ -1,13 +1,15 @@
-import React, {useEffect, useState} from 'react';
-import {Link, useNavigate, useLocation} from 'react-router-dom';
-import {v4 as uuidv4} from 'uuid';
-import {mailerApi} from '../services/socialApi';
-import ReactGA from 'react-ga';
-import {FiCheckCircle} from 'react-icons/fi';
-import {AiOutlineClose} from 'react-icons/ai';
 import Footer from '../components/footer';
 import Navbar from '../components/navbar';
+import {mailerApi} from '../services/socialApi';
 import {logger} from '../utils/logger';
+
+import React, {useEffect, useState} from 'react';
+import ReactGA from 'react-ga';
+import {AiOutlineClose} from 'react-icons/ai';
+import {FiCheckCircle} from 'react-icons/fi';
+import {Link, useNavigate, useLocation} from 'react-router-dom';
+import {v4 as uuidv4} from 'uuid';
+
 
 export default function SpeechPricing() {
   const navigate = useNavigate();

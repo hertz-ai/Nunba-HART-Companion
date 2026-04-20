@@ -23,16 +23,18 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {Box, Typography, Button, Card, Fade, Grow, IconButton, Chip} from '@mui/material';
+import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
+import {kidsColors} from '../kidsTheme';
+import InlineCelebration from '../shared/InlineCelebration';
+import {GameSounds} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+
+import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
-import AutoStoriesIcon from '@mui/icons-material/AutoStories';
-import {kidsColors} from '../kidsTheme';
-import {GameSounds} from '../shared/SoundManager';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
-import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
+import {Box, Typography, Button, Card, Fade, Grow, IconButton, Chip} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+
 
 const SCENE_TRANSITION_DELAY = 600;
 const CHOICE_COLORS = ['#6C63FF', '#FF6B6B', '#4ECDC4'];

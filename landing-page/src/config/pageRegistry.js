@@ -12,19 +12,19 @@
  *   2. Mirror the id + route + label here
  *   3. (Optional) add an MUI icon via @mui/icons-material
  */
-import ForumIcon from '@mui/icons-material/Forum';
-import ChatIcon from '@mui/icons-material/Chat';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import SchoolIcon from '@mui/icons-material/School';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import ExtensionIcon from '@mui/icons-material/Extension';
-import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
-import MemoryIcon from '@mui/icons-material/Memory';
-import HubIcon from '@mui/icons-material/Hub';
-import CloudIcon from '@mui/icons-material/Cloud';
-import PeopleIcon from '@mui/icons-material/People';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ChatIcon from '@mui/icons-material/Chat';
+import CloudIcon from '@mui/icons-material/Cloud';
+import ExtensionIcon from '@mui/icons-material/Extension';
+import ForumIcon from '@mui/icons-material/Forum';
+import HubIcon from '@mui/icons-material/Hub';
+import MemoryIcon from '@mui/icons-material/Memory';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import PeopleIcon from '@mui/icons-material/People';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import SchoolIcon from '@mui/icons-material/School';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 
 /** Map of MUI icon names (matches backend `icon` field) → component. */
 export const ICON_MAP = {

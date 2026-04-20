@@ -1,10 +1,12 @@
 /* eslint-disable no-unused-vars */
+import AgentPoster from '../../assets/images/AgentPoster.png';
+import HARTSpeechPlayer from '../../components/HART/HARTSpeechPlayer';
+import OtpAuthModal from '../OtpAuthModal';
+
+import {ChevronRight, Menu, Star, Plus, X} from 'lucide-react';
 import React from 'react';
 import {Link as RouterLink, useNavigate} from 'react-router-dom';
-import {ChevronRight, Menu, Star, Plus, X} from 'lucide-react';
-import AgentPoster from '../../assets/images/AgentPoster.png';
-import OtpAuthModal from '../OtpAuthModal';
-import HARTSpeechPlayer from '../../components/HART/HARTSpeechPlayer';
+
 
 /**
  * AgentSidebar — desktop sticky sidebar + mobile hamburger menu.

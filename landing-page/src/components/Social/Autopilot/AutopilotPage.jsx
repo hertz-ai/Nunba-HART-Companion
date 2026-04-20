@@ -1,5 +1,34 @@
-import React, {useState, useEffect, useMemo} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {
+  getAutopilotConfig,
+  saveAutopilotConfig,
+  detectPatterns,
+  getTimeSuggestions,
+  getDailyContent,
+  ACTION_ROUTES,
+  dispatchAgent,
+} from './autopilotStore';
+
+import {
+  GRADIENTS,
+  EASINGS,
+  RADIUS,
+  SHADOWS,
+  socialTokens,
+} from '../../../theme/socialTokens';
+
+import ArticleIcon from '@mui/icons-material/Article';
+import AutoModeIcon from '@mui/icons-material/AutoMode';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import GroupIcon from '@mui/icons-material/Group';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import PaletteIcon from '@mui/icons-material/Palette';
+import SchoolIcon from '@mui/icons-material/School';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import TuneIcon from '@mui/icons-material/Tune';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Box,
   Typography,
@@ -12,35 +41,9 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import AutoModeIcon from '@mui/icons-material/AutoMode';
-import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import TuneIcon from '@mui/icons-material/Tune';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import {
-  GRADIENTS,
-  EASINGS,
-  RADIUS,
-  SHADOWS,
-  socialTokens,
-} from '../../../theme/socialTokens';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import SchoolIcon from '@mui/icons-material/School';
-import ArticleIcon from '@mui/icons-material/Article';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import GroupIcon from '@mui/icons-material/Group';
-import PaletteIcon from '@mui/icons-material/Palette';
-import {
-  getAutopilotConfig,
-  saveAutopilotConfig,
-  detectPatterns,
-  getTimeSuggestions,
-  getDailyContent,
-  ACTION_ROUTES,
-  dispatchAgent,
-} from './autopilotStore';
+import React, {useState, useEffect, useMemo} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 /* ── Keyframes ── */
 const shimmer = keyframes`

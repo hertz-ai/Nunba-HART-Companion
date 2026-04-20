@@ -19,6 +19,7 @@ from models.orchestrator import (
     TTSLoader,
     VLMLoader,
     _entry_to_preset,
+    _levenshtein,
     _register_loaders,
     get_orchestrator,
 )
@@ -332,6 +333,124 @@ class TestTTSLoader:
             loader.load(entry, 'gpu')
         mock_engine._can_run_backend.assert_called_with('chatterbox-turbo')
 
+    # ── validate() — L1.2 capability probe ──────────────────────────
+    def _mock_handshake_modules(self, handshake_result, engine=None):
+        """Wire mocked tts.tts_engine and tts.tts_handshake into sys.modules.
+
+        Returns (mock_tts_engine, mock_handshake) so assertions can
+        introspect invalidate() calls and run_handshake() call args.
+        """
+        mock_tts_engine = MagicMock()
+        mock_tts_engine.get_tts_engine = MagicMock(return_value=engine or MagicMock())
+        mock_handshake = MagicMock()
+        mock_handshake.run_handshake = MagicMock(return_value=handshake_result)
+        mock_handshake.invalidate = MagicMock()
+        return (
+            mock_tts_engine,
+            mock_handshake,
+            {
+                'tts.tts_engine': mock_tts_engine,
+                'tts.tts_handshake': mock_handshake,
+            },
+        )
+
+    def test_validate_success_passes_bytes_and_duration(self):
+        """A successful handshake → (True, 'synthesized NB, Ns')."""
+        loader = TTSLoader()
+        entry = _make_entry(id='tts-piper', model_type='tts')
+        result = SimpleNamespace(ok=True, n_bytes=24_576, duration_s=1.23, err='')
+        _, mock_hs, modules = self._mock_handshake_modules(result)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is True
+        assert '24576' in reason
+        assert '1.23' in reason
+        mock_hs.run_handshake.assert_called_once()
+        # The probe MUST use the canonical handshake — broadcast=False
+        # so no SSE event fires, play_audio=False so install machine
+        # doesn't beep, lang='en' per probe contract.
+        kwargs = mock_hs.run_handshake.call_args.kwargs
+        assert kwargs.get('lang') == 'en'
+        assert kwargs.get('broadcast') is False
+        assert kwargs.get('play_audio') is False
+
+    def test_validate_failure_surfaces_handshake_err(self):
+        """A failed handshake → (False, 'handshake failed: <err>')."""
+        loader = TTSLoader()
+        entry = _make_entry(id='tts-f5-tts', model_type='tts')
+        result = SimpleNamespace(
+            ok=False, n_bytes=0, duration_s=0.0,
+            err='synthesis produced no audio',
+        )
+        _, _, modules = self._mock_handshake_modules(result)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'synthesis produced no audio' in reason
+
+    def test_validate_invalidates_cache_before_run(self):
+        """Install-validation must clear any stale handshake cache first,
+        so a pre-install negative verdict doesn't spuriously fail the
+        freshly-loaded backend's probe.
+        """
+        loader = TTSLoader()
+        entry = _make_entry(id='tts-chatterbox-turbo', model_type='tts')
+        result = SimpleNamespace(ok=True, n_bytes=12_345, duration_s=0.6, err='')
+        _, mock_hs, modules = self._mock_handshake_modules(result)
+        with patch.dict('sys.modules', modules):
+            loader.validate(entry)
+        mock_hs.invalidate.assert_called_once_with('chatterbox-turbo')
+
+    def test_validate_returns_false_on_import_failure(self):
+        """tts.tts_handshake missing → (False, 'TTS imports failed: ...')."""
+        loader = TTSLoader()
+        entry = _make_entry(id='tts-piper', model_type='tts')
+        # Block the import entirely.
+        import builtins
+        real_import = builtins.__import__
+
+        def _broken(name, *a, **kw):
+            if name == 'tts.tts_handshake':
+                raise ImportError('module missing')
+            return real_import(name, *a, **kw)
+
+        with patch.object(builtins, '__import__', _broken):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'TTS imports failed' in reason
+
+    def test_validate_returns_false_on_handshake_raising(self):
+        """run_handshake raising → (False, 'run_handshake raised: ...')."""
+        loader = TTSLoader()
+        entry = _make_entry(id='tts-f5-tts', model_type='tts')
+        mock_tts_engine = MagicMock()
+        mock_tts_engine.get_tts_engine = MagicMock(return_value=MagicMock())
+        mock_hs = MagicMock()
+        mock_hs.run_handshake = MagicMock(side_effect=RuntimeError('boom'))
+        mock_hs.invalidate = MagicMock()
+        modules = {
+            'tts.tts_engine': mock_tts_engine,
+            'tts.tts_handshake': mock_hs,
+        }
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'run_handshake raised' in reason
+        assert 'boom' in reason
+
+    def test_validate_uses_backend_name_without_tts_prefix(self):
+        """The handshake gets the stripped backend name, matching the
+        ENGINE_REGISTRY keys (e.g. 'piper', not 'tts-piper')."""
+        loader = TTSLoader()
+        entry = _make_entry(id='tts-indic-parler', model_type='tts')
+        result = SimpleNamespace(ok=True, n_bytes=15_000, duration_s=0.8, err='')
+        _, mock_hs, modules = self._mock_handshake_modules(result)
+        with patch.dict('sys.modules', modules):
+            loader.validate(entry)
+        args, kwargs = mock_hs.run_handshake.call_args
+        # backend is the 2nd positional arg to run_handshake(engine, backend, ...)
+        assert args[1] == 'indic-parler'
+
 
 # ===========================================================================
 # 5. STTLoader
@@ -377,6 +496,294 @@ class TestSTTLoader:
             result = loader.download(entry)
         assert result is False
 
+    # ── validate() — L1.3 round-trip STT probe ───────────────────────
+    def _stub_validate_env(self, *, transcript_json='', transcribe_raises=None,
+                           synth_return='path', synth_raises=None,
+                           greetings=None):
+        """Wire mocked core.constants, tts.tts_engine, and whisper_tool into
+        sys.modules so STTLoader.validate exercises the real round-trip
+        logic (Levenshtein + punctuation normalization) against a
+        controllable TTS+STT surface.
+
+        ``synth_return`` controls what ``engine.synthesize`` returns:
+            - 'path': returns the wav_path argument (default — file exists)
+            - None:   simulates a synth that produced no audio
+            - 'missing': returns a path that doesn't exist on disk
+        ``transcript_json`` is the raw JSON string whisper_transcribe
+        returns, OR an Exception instance if ``transcribe_raises`` is set.
+        """
+        import os
+
+        # Mocked TTS engine that actually creates the wav file on synth
+        # so the `os.path.exists` gate in validate() passes.
+        engine = MagicMock()
+        def _fake_synth(text, output_path, language=None, **kw):
+            if synth_raises:
+                raise synth_raises
+            if synth_return == 'path':
+                # Touch the file so os.path.exists returns True
+                with open(output_path, 'wb') as f:
+                    f.write(b'RIFF\x00\x00\x00\x00WAVE')
+                return output_path
+            if synth_return == 'missing':
+                # Return a path that doesn't exist
+                return os.path.join(
+                    os.path.dirname(output_path), 'does_not_exist.wav'
+                )
+            return None  # synth_return == 'none' / None
+        engine.synthesize = MagicMock(side_effect=_fake_synth)
+
+        mock_tts_engine = MagicMock()
+        mock_tts_engine.get_tts_engine = MagicMock(return_value=engine)
+
+        mock_whisper_tool = MagicMock()
+        if transcribe_raises:
+            mock_whisper_tool.whisper_transcribe = MagicMock(
+                side_effect=transcribe_raises
+            )
+        else:
+            mock_whisper_tool.whisper_transcribe = MagicMock(
+                return_value=transcript_json
+            )
+
+        mock_core_constants = MagicMock()
+        mock_core_constants.GREETINGS = greetings or {
+            'en': "Hey, I'm Nunba. Can you hear me?",
+        }
+
+        return engine, mock_whisper_tool, {
+            'tts.tts_engine': mock_tts_engine,
+            'integrations.service_tools.whisper_tool': mock_whisper_tool,
+            'core.constants': mock_core_constants,
+        }
+
+    def test_validate_exact_match_passes(self):
+        """Byte-identical transcript → (True, ratio 0.00)."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        transcript = json.dumps({
+            'text': "Hey, I'm Nunba. Can you hear me?",
+            'language': 'en',
+        })
+        _, _, modules = self._stub_validate_env(transcript_json=transcript)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is True
+        assert 'Lev=0/' in reason
+        assert 'ratio 0.00' in reason
+
+    def test_validate_whisper_punctuation_drift_still_passes(self):
+        """Whisper drops the '?' and the apostrophe — that's within tolerance."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        transcript = json.dumps({
+            'text': 'Hey Im Nunba Can you hear me',
+            'language': 'en',
+        })
+        _, _, modules = self._stub_validate_env(transcript_json=transcript)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is True, reason
+        # After normalisation, exp="hey im nunba can you hear me",
+        # act="hey im nunba can you hear me" → Lev=0 (punctuation is stripped).
+        assert 'Lev=0/' in reason
+
+    def test_validate_minor_word_substitution_passes(self):
+        """Whisper mis-hears 'Nunba' → 'Namba' — 2 edits out of ~26 chars."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        transcript = json.dumps({
+            'text': "Hey, I'm Namba. Can you hear me?",
+            'language': 'en',
+        })
+        _, _, modules = self._stub_validate_env(transcript_json=transcript)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is True, reason
+        # 2 substitutions (u→a, n→m): ratio ≈ 2/27 ≈ 0.07
+        assert 'Lev=2/' in reason
+
+    def test_validate_over_threshold_fails(self):
+        """Transcript is unrelated gibberish → ratio > 0.4 → fail."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        transcript = json.dumps({
+            'text': 'The quick brown fox jumps over a lazy dog',
+            'language': 'en',
+        })
+        _, _, modules = self._stub_validate_env(transcript_json=transcript)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'ratio' in reason
+        # The reported ratio should exceed 0.4
+        import re
+        m = re.search(r'ratio (\d+\.\d+)', reason)
+        assert m and float(m.group(1)) > 0.4
+
+    def test_validate_empty_transcript_fails(self):
+        """Whisper returns empty text → hard fail, not soft-pass."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        transcript = json.dumps({'text': '', 'language': 'en'})
+        _, _, modules = self._stub_validate_env(transcript_json=transcript)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'empty transcript' in reason
+
+    def test_validate_whisper_error_payload_fails(self):
+        """Whisper returns {'error': '...'} → hard fail with that message."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        transcript = json.dumps({'error': 'model file missing'})
+        _, _, modules = self._stub_validate_env(transcript_json=transcript)
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'model file missing' in reason
+
+    def test_validate_transcribe_raises_fails(self):
+        """whisper_transcribe blowing up → (False, 'whisper_transcribe raised: ...')."""
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        _, _, modules = self._stub_validate_env(
+            transcribe_raises=RuntimeError('ctranslate2 segfault'),
+        )
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is False
+        assert 'whisper_transcribe raised' in reason
+        assert 'ctranslate2 segfault' in reason
+
+    def test_validate_soft_pass_when_tts_unavailable(self):
+        """TTS module missing → STT probe soft-passes (True), not fails."""
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        # Stub core.constants + whisper_tool, leave tts.tts_engine unset.
+        mock_whisper_tool = MagicMock()
+        mock_core_constants = MagicMock()
+        mock_core_constants.GREETINGS = {'en': "Hey, I'm Nunba. Can you hear me?"}
+
+        import builtins
+        real_import = builtins.__import__
+
+        def _broken(name, *a, **kw):
+            if name == 'tts.tts_engine':
+                raise ImportError('tts package missing')
+            return real_import(name, *a, **kw)
+
+        modules = {
+            'integrations.service_tools.whisper_tool': mock_whisper_tool,
+            'core.constants': mock_core_constants,
+        }
+        with patch.dict('sys.modules', modules), \
+             patch.object(builtins, '__import__', _broken):
+            ok, reason = loader.validate(entry)
+        assert ok is True
+        assert 'soft-pass' in reason
+        assert 'TTS module unavailable' in reason
+
+    def test_validate_soft_pass_when_synth_returns_none(self):
+        """engine.synthesize → None (no audio): soft-pass, not hard fail."""
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        _, _, modules = self._stub_validate_env(
+            synth_return=None, transcript_json='{}',
+        )
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is True
+        assert 'soft-pass' in reason
+
+    def test_validate_soft_pass_when_synth_raises(self):
+        """engine.synthesize raising: soft-pass (TTS engine broken, not STT)."""
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        _, _, modules = self._stub_validate_env(
+            synth_raises=RuntimeError('piper binary missing'),
+            transcript_json='{}',
+        )
+        with patch.dict('sys.modules', modules):
+            ok, reason = loader.validate(entry)
+        assert ok is True
+        assert 'soft-pass' in reason
+        assert 'piper binary missing' in reason
+
+    def test_validate_cleans_up_tempfile(self):
+        """The tempfile synth wrote is deleted regardless of pass/fail."""
+        import json
+        loader = STTLoader()
+        entry = _make_entry(id='stt-whisper', model_type='stt')
+        # Capture the path that synthesize was called with.
+        captured = {}
+        engine = MagicMock()
+        def _synth(text, output_path, language=None, **kw):
+            captured['path'] = output_path
+            with open(output_path, 'wb') as f:
+                f.write(b'RIFF')
+            return output_path
+        engine.synthesize = MagicMock(side_effect=_synth)
+
+        mock_tts_engine = MagicMock(get_tts_engine=MagicMock(return_value=engine))
+        mock_whisper_tool = MagicMock(
+            whisper_transcribe=MagicMock(
+                return_value=json.dumps({'text': "Hey, I'm Nunba. Can you hear me?"})
+            ),
+        )
+        mock_core_constants = MagicMock(
+            GREETINGS={'en': "Hey, I'm Nunba. Can you hear me?"},
+        )
+        modules = {
+            'tts.tts_engine': mock_tts_engine,
+            'integrations.service_tools.whisper_tool': mock_whisper_tool,
+            'core.constants': mock_core_constants,
+        }
+        with patch.dict('sys.modules', modules):
+            loader.validate(entry)
+
+        import os
+        assert captured.get('path')
+        assert not os.path.exists(captured['path']), (
+            'probe tempfile should be cleaned up after validate()'
+        )
+
+
+# ── _levenshtein helper (L1.3) ───────────────────────────────────────
+
+class TestLevenshtein:
+    def test_equal_strings_zero_distance(self):
+        assert _levenshtein('hello', 'hello') == 0
+
+    def test_empty_both_zero(self):
+        assert _levenshtein('', '') == 0
+
+    def test_empty_one_returns_other_length(self):
+        assert _levenshtein('', 'kitten') == 6
+        assert _levenshtein('sitting', '') == 7
+
+    def test_single_substitution(self):
+        assert _levenshtein('cat', 'car') == 1
+
+    def test_single_insertion(self):
+        assert _levenshtein('cat', 'cart') == 1
+
+    def test_single_deletion(self):
+        assert _levenshtein('cart', 'cat') == 1
+
+    def test_classic_kitten_sitting(self):
+        # The canonical textbook example — 3 edits.
+        assert _levenshtein('kitten', 'sitting') == 3
+
+    def test_order_independent(self):
+        assert _levenshtein('abc', 'xyz') == _levenshtein('xyz', 'abc')
+
 
 # ===========================================================================
 # 6. VLMLoader
@@ -387,13 +794,16 @@ class TestVLMLoader:
         assert issubclass(VLMLoader, ModelLoader)
 
     def test_load_success(self):
+        # VLMLoader.load() invokes self._get_service() which imports
+        # hart_intelligence_entry — that pulls HARTOS Redis + channel
+        # registry which we don't want to exercise here.  Patch
+        # _get_service at the VLMLoader class level so the unit test
+        # stays hermetic regardless of prior sys.modules mutations.
+        from unittest.mock import patch as _patch
         loader = VLMLoader()
         entry = _make_entry(id='vlm-minicpm')
         mock_vision = MagicMock()
-        with patch.dict('sys.modules', {
-            'integrations.vision': MagicMock(),
-            'integrations.vision.vision_service': mock_vision,
-        }):
+        with _patch.object(VLMLoader, '_get_service', return_value=mock_vision):
             result = loader.load(entry, 'gpu')
         assert result is True
 

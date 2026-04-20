@@ -1,18 +1,22 @@
-import React from 'react';
-import Button from '@mui/material/Button';
-import Grid from '@mui/material/Grid';
-import Typography from '@mui/material/Typography';
-import Link from '@mui/material/Link';
-import Container from '@mui/material/Container';
-import HeaderNano from '../pages/Layouts/header';
-import FooterLight from '../pages/Layouts/footer-light';
 import Spacer from './Spacer';
+
+import FooterLight from '../pages/Layouts/footer-light';
+import HeaderNano from '../pages/Layouts/header';
 import Partners from '../pages/SubPages/Multipurpose/partners';
 
-//color button styles - starts
-import {withStyles} from '@mui/material/styles';
+import Button from '@mui/material/Button';
 import {purple} from '@mui/material/colors';
-//color button styles - ends
+import Container from '@mui/material/Container';
+import Grid from '@mui/material/Grid';
+import Link from '@mui/material/Link';
+
+
+
+// color button styles - starts
+import {withStyles} from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import React from 'react';
+// color button styles - ends
 
 // Note: @global ul styles were removed (makeStyles migration) - use CSS if needed
 

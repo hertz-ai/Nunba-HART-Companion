@@ -1,6 +1,5 @@
-import React from 'react';
-import {render} from '@testing-library/react';
-import {BrowserRouter} from 'react-router-dom';
+import RealSocialContext from '../contexts/SocialContext';
+
 import {
   ThemeProvider as MuiThemeProvider,
   createTheme,
@@ -9,8 +8,11 @@ import {
   ThemeProvider as StylesThemeProvider,
   StylesProvider,
 } from '@mui/styles';
+import {render} from '@testing-library/react';
+import React from 'react';
 import {HelmetProvider} from 'react-helmet-async';
-import RealSocialContext from '../contexts/SocialContext';
+import {BrowserRouter} from 'react-router-dom';
+
 
 const theme = createTheme({
   palette: {

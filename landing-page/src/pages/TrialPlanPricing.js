@@ -1,9 +1,10 @@
+import Footer from '../components/footer';
+import Navbar from '../components/navbar';
+import TrialPlan from '../components/TrialPlan';
+
 import React, {useEffect, useState} from 'react';
 import {Link} from 'react-router-dom';
 
-import TrialPlan from '../components/TrialPlan';
-import Footer from '../components/footer';
-import Navbar from '../components/navbar';
 
 export default function TrialPlanPricing() {
   const [hevolvedroid, setIshevolvedroid] = useState(true);

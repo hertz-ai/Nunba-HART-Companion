@@ -10,8 +10,9 @@
  * - Opt out with { cache: false } in request config
  */
 
-import axios from 'axios';
 import {apiCache} from './apiCache';
+
+import axios from 'axios';
 
 export function createApiClient(
   baseURL,

@@ -2,28 +2,8 @@ import React, {useState} from 'react';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import FormControl from '@mui/material/FormControl';
-import Form from '@mui/material/FormGroup';
-import FormLabel from '@mui/material/FormLabel';
-import Paper from '@mui/material/Paper';
-import {withStyles, useTheme} from '@mui/material/styles';
-import Container from '@mui/material/Container';
-import Typography from '@mui/material/Typography';
-import Grid from '@mui/material/Grid';
-import TextField from '@mui/material/TextField';
-import {green, purple} from '@mui/material/colors';
-import Button from '@mui/material/Button';
-import {Autocomplete} from '@mui/lab';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
-import Box from '@mui/material/Box';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 // get our fontawesome imports
-import {faUserPlus, faPaperPlane} from '@fortawesome/free-solid-svg-icons';
 // import {faUserPlus, faSearch} from '@fortawesome/fontawesome-free';
-import Alert from '@mui/lab/Alert';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import DynamicElementHandler from './DynamicElementHandler';
 import {logger} from '../utils/logger';
@@ -45,10 +25,29 @@ import Header from './TeacherLanding/Header';
 import './TeacherLanding/TeacherHome.css';
 import {QUES_ANS3_URL, QUES_ANS_URL} from '../config/apiBase';
 import {mailerApi} from '../services/socialApi';
-
-import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
-import {DatePicker} from '@mui/x-date-pickers/DatePicker';
+import {faUserPlus, faPaperPlane} from '@fortawesome/free-solid-svg-icons';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import {Autocomplete} from '@mui/lab';
+import Alert from '@mui/lab/Alert';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import {green, purple} from '@mui/material/colors';
+import Container from '@mui/material/Container';
+import FormControl from '@mui/material/FormControl';
+import Form from '@mui/material/FormGroup';
+import FormLabel from '@mui/material/FormLabel';
+import Grid from '@mui/material/Grid';
+import Link from '@mui/material/Link';
+import Paper from '@mui/material/Paper';
+import {withStyles, useTheme} from '@mui/material/styles';
+import TextField from '@mui/material/TextField';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
 import {AdapterDateFns} from '@mui/x-date-pickers/AdapterDateFns';
+import {DatePicker} from '@mui/x-date-pickers/DatePicker';
+import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
 import {useNavigate} from 'react-router-dom';
 
 const sxStyles = {
@@ -128,7 +127,7 @@ function BasicDatePicker() {
 const initialFValues = {
   schedule_date: new Date(),
 };
-//####
+// ####
 export default function CreateAssessment() {
   const navigate = useNavigate();
   const [schedule_date, setSchedule_date] = React.useState(
@@ -150,7 +149,7 @@ export default function CreateAssessment() {
     ],
   });
   const validate = (fieldValues = values) => {
-    let temp = {...errors};
+    const temp = {...errors};
     if ('schedule_date' in fieldValues)
       temp.schedule_date = fieldValues.schedule_date
         ? ''
@@ -231,8 +230,8 @@ export default function CreateAssessment() {
       });
   };
   React.useEffect(() => {
-    let access_token = localStorage.getItem('hevolve_access_token');
-    //TODO - verify the access token
+    const access_token = localStorage.getItem('hevolve_access_token');
+    // TODO - verify the access token
     if (access_token != null) {
       if (access_token.trim().length == 0) {
         navigate('/teacher/signin');
@@ -242,7 +241,7 @@ export default function CreateAssessment() {
     }
     fetchCourse();
 
-    //TODO - endpoints in config file
+    // TODO - endpoints in config file
     mailerApi
       .allAssessments({limit: 100})
       .then((data) => setassessments_list(data));
@@ -314,10 +313,10 @@ export default function CreateAssessment() {
     logger.log('updateForm() !');
     const formData = new FormData(event.target);
     logger.log(formData);
-    var temp_dict = {};
-    var assessment_dict = {};
+    const temp_dict = {};
+    const assessment_dict = {};
     logger.log(formData.entries());
-    for (let [key, value] of formData.entries()) {
+    for (const [key, value] of formData.entries()) {
       logger.log(key, value);
       if (key == 'book_name') {
         temp_dict['book_name'] = value;
@@ -351,8 +350,8 @@ export default function CreateAssessment() {
 
   const updateDatabase = (temp_dict) => {
     logger.log('updateDatabase()');
-    let dicti = JSON.stringify(temp_dict);
-    let create_QA_url = QUES_ANS3_URL;
+    const dicti = JSON.stringify(temp_dict);
+    const create_QA_url = QUES_ANS3_URL;
     fetch(create_QA_url, {
       method: 'POST',
       mode: 'no-cors',
@@ -386,7 +385,7 @@ export default function CreateAssessment() {
       .catch((error) => {
         if (error.name === 'AbortError') {
           logger.log('Request timed out after 100 seconds.');
-          let create_QA_url = QUES_ANS_URL;
+          const create_QA_url = QUES_ANS_URL;
           fetch(create_QA_url, {
             method: 'POST',
             mode: 'cors',

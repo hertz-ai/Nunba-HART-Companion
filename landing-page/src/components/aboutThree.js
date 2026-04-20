@@ -1,16 +1,15 @@
-import React, {useState} from 'react';
-import {Link} from 'react-router-dom';
 
 import india from '../assets/images/flags/india.png';
 import russia from '../assets/images/flags/russia.png';
 import spain from '../assets/images/flags/spain.png';
 import usa from '../assets/images/flags/usa.png';
-import video from '../assets/Video/SecondVideo.mp4';
 import thumbnailImage from '../assets/images/Thumbnail.jpg';
+import video from '../assets/Video/SecondVideo.mp4';
 
+import React, {useState} from 'react';
 import {FiCheckCircle} from 'react-icons/fi';
-
 import ModalVideo from 'react-modal-video';
+import {Link} from 'react-router-dom';
 import '../../node_modules/react-modal-video/css/modal-video.css';
 
 export default function AboutThree() {

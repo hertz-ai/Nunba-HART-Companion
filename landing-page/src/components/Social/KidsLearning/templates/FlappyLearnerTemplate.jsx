@@ -12,7 +12,7 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React from 'react';
+import {kidsColors} from '../kidsTheme';
 import CanvasGameBridge from '../shared/CanvasGameBridge';
 import ParticlePool from '../shared/CanvasParticles';
 import {
@@ -22,7 +22,8 @@ import {
   hitTestRect,
 } from '../shared/CanvasSprites';
 import {GameSounds} from '../shared/SoundManager';
-import {kidsColors} from '../kidsTheme';
+
+import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Constants

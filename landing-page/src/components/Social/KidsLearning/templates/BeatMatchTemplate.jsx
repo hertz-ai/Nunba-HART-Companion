@@ -22,16 +22,18 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {Box, Typography, Button, Card, Fade, Grow, IconButton} from '@mui/material';
+import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import {kidsColors} from '../kidsTheme';
+import InlineCelebration from '../shared/InlineCelebration';
+import {GameSounds} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+
 import MicIcon from '@mui/icons-material/Mic';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import ReplayIcon from '@mui/icons-material/Replay';
-import {kidsColors} from '../kidsTheme';
-import {GameSounds} from '../shared/SoundManager';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
-import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import {Box, Typography, Button, Card, Fade, Grow, IconButton} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+
 
 const FEEDBACK_DELAY = 1800;
 const BEAT_TOLERANCE_MS = 250; // How close the user's beat needs to be

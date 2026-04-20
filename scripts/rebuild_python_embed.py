@@ -6,10 +6,11 @@ All .pyd extensions compiled for cp310 fail to load on the 3.12 runtime -> torch
 (and everything else with C extensions) is broken in the bundled Nunba app.
 
 Usage:
-    python rebuild_python_embed.py
+    python rebuild_python_embed.py              # default: delete backup on success
+    python rebuild_python_embed.py --keep-backup  # preserve backup (paranoid mode)
 
 This script:
-1. Backs up python-embed -> python-embed-310-backup
+1. Backs up python-embed -> python-embed-310-backup (transient; deleted on success)
 2. Downloads Python 3.12 embeddable zip from python.org
 3. Extracts to python-embed/
 4. Installs pip via get-pip.py
@@ -17,8 +18,10 @@ This script:
 6. Installs HevolveAI (Embodied Continual Learner With Hiveintelligence) — must come BEFORE hart-backend
 7. Installs hart-backend (HARTOS)
 8. Verifies torch loads correctly
+9. Deletes the backup (Step 1's snapshot) unless --keep-backup is passed
 """
 
+import argparse
 import os
 import shutil
 import subprocess
@@ -68,6 +71,21 @@ def run(cmd, **kwargs):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Rebuild python-embed for cx_Freeze runtime parity"
+    )
+    parser.add_argument(
+        "--keep-backup",
+        action="store_true",
+        help=(
+            "Preserve python-embed-310-backup/ after a successful rebuild "
+            "(~1.4GB).  Default: delete once step 8 verifies the new "
+            "python-embed loads torch.  Use this flag only if you plan to "
+            "inspect the old tree for diffing."
+        ),
+    )
+    args = parser.parse_args()
+
     # Deps come from deps.py; fall back to requirements file if it exists
     embed_deps = get_embed_install_list(include_torch=False)
     print(f"  deps.py: {len(embed_deps)} embed deps + torch (separate)")
@@ -237,14 +255,21 @@ _home = os.path.expanduser("~")
 _nunba_sp = os.path.join(_home, ".nunba", "site-packages")
 _inject_path(_nunba_sp, front=True)
 
+# CUDA torch may live on D: when C: is too small (2.5GB install).
+# install_gpu_torch() falls back to D: on ENOSPC.
+_nunba_sp_d = os.path.join("D:\\\\", ".nunba", "site-packages")
+_inject_path(_nunba_sp_d, front=True)
+
 if sys.platform == "win32":
-    _torch_lib = os.path.join(_nunba_sp, "torch", "lib")
-    if os.path.isdir(_torch_lib):
-        try:
-            os.add_dll_directory(_torch_lib)
-        except (OSError, AttributeError):
-            pass
-        os.environ["PATH"] = _torch_lib + os.pathsep + os.environ.get("PATH", "")
+    for _sp in [_nunba_sp, _nunba_sp_d]:
+        _torch_lib = os.path.join(_sp, "torch", "lib")
+        if os.path.isdir(_torch_lib):
+            try:
+                os.add_dll_directory(_torch_lib)
+            except (OSError, AttributeError):
+                pass
+            os.environ["PATH"] = _torch_lib + os.pathsep + os.environ.get("PATH", "")
+            break  # first found wins
 
 # cx_Freeze lib/ — only present inside frozen Nunba build
 _self = os.path.dirname(os.path.abspath(__file__))
@@ -305,9 +330,27 @@ _inject_path(_lib_dir, front=False)
     result = run([python_exe, "--version"], capture_output=True, text=True)
     print(f"  Python: {result.stdout.strip()}")
 
+    # Step 9 — delete the transient backup unless the user opted to keep it.
+    # Step 8 already verified torch loads, so the backup has done its job
+    # (rollback target in case download/install broke anything).  Leaving
+    # it around silently costs ~1.4GB per rebuild.
+    step("9. Cleaning up python-embed-310-backup")
+    if os.path.isdir(BACKUP_DIR):
+        if args.keep_backup:
+            print(f"  --keep-backup set: preserving {BACKUP_DIR}")
+        else:
+            try:
+                shutil.rmtree(BACKUP_DIR)
+                print(f"  Deleted {BACKUP_DIR} (torch load verified; backup no longer needed)")
+            except Exception as _cleanup_err:
+                print(f"  WARN: could not delete backup ({_cleanup_err}); safe to rm manually")
+    else:
+        print(f"  {BACKUP_DIR} not present (skipped)")
+
     step("DONE")
     print("  python-embed rebuilt with Python 3.12")
-    print("  Old version backed up at: python-embed-310-backup/")
+    if args.keep_backup and os.path.isdir(BACKUP_DIR):
+        print("  Old version preserved at: python-embed-310-backup/ (--keep-backup)")
     print("  Next: rebuild the frozen exe with setup_freeze_nunba.py")
 
 

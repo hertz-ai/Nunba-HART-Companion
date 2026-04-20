@@ -1,9 +1,10 @@
-import React from 'react';
-import {Link} from 'react-router-dom';
 
 import Portrait2 from '../../Gif/Portrait2.gif';
+
+import React from 'react';
 import {FiCheckCircle} from 'react-icons/fi';
 import {MdKeyboardArrowRight} from 'react-icons/md';
+import {Link} from 'react-router-dom';
 
 export default function AboutTwo() {
   return (

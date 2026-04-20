@@ -25,7 +25,7 @@ const PendingPaymentPage = () => {
 
   useEffect(() => {
     if (hevolvedroid) {
-      var myVariable = {
+      const myVariable = {
         HEVOLVEAIPLUS_PLAN_NAME: plan_name,
         PAYMENT_STATUS: status,
         TRANSACTION_ID: transaction_id,

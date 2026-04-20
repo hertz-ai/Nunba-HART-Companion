@@ -28,6 +28,7 @@ import autobahn from 'autobahn';
 import { classifyError, getBackoff, makeMsgId } from '../utils/chatRetry';
 import VoiceVisualizer from '../components/VoiceVisualizer';
 import { decrypt, encrypt } from '../utils/encryption';
+import { getStableDeviceId } from '../utils/deviceId';
 import { logger } from '../utils/logger';
 
 // NewHome is only loaded when user is not logged in (landing page)
@@ -54,6 +55,7 @@ import realtimeService from '../services/realtimeService';
 import {useTTS} from '../hooks/useTTS';
 
 // ── Extracted sub-components ──
+import GpuTierBadge from '../components/chat/GpuTierBadge';
 import AgentSidebar from './chat/AgentSidebar';
 import PdfViewer from './chat/PdfViewer';
 import ChatInputBar from './chat/ChatInputBar';
@@ -164,16 +166,24 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
     (async () => {
       try {
         logger.log('[GUEST] Token missing — auto-refreshing with stored name:', guestName);
-        const deviceId = localStorage.getItem('device_id') || guestUserId;
+        // Hardware-derived device_id via /status so the backend can
+        // return our EXISTING guest User (idempotent) instead of
+        // minting a new user_id — preserves prompt_id→chat linkage
+        // in localStorage.  See HARTOS guest_register idempotent fix.
+        const deviceId = await getStableDeviceId();
         const res = await authApi.guestRegister({
           guest_name: guestName,
           device_id: deviceId,
         });
-        const { user, token: newToken } = res.data;
+        const { user, token: newToken, existing } = res.data;
         localStorage.setItem('access_token', newToken);
         localStorage.setItem('guest_user_id', user.id);
         localStorage.setItem('social_user_id', user.id);
-        logger.log('[GUEST] Token refreshed successfully');
+        logger.log(
+          existing
+            ? '[GUEST] Token refreshed — same user, chat preserved'
+            : '[GUEST] New guest user created (first-time device)',
+        );
       } catch {
         logger.log('[GUEST] Auto-refresh failed — will show login modal on next action');
       }
@@ -763,6 +773,46 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
             setCurrentAgent(savedAgent);
             const savedMessages = loadMessagesFromStorage(savedAgent.prompt_id || savedAgent.id);
             if (savedMessages.length > 0) setMessages(savedMessages);
+          } else {
+            // Orphan-chat recovery: savedAgentId is valid but the
+            // agent isn't in allAgents (server sync failed, backend
+            // minted a new guest user before the idempotent fix, or
+            // the agent was deleted server-side).  If we still have
+            // localStorage chat for it, synthesize a ghost agent so
+            // the user can see their conversation and decide whether
+            // to keep going or switch.  The stored chat payload has
+            // agentName metadata — use that for the label.
+            try {
+              const stored = localStorage.getItem(`chat_messages_${savedAgentId}`);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                const orphanMessages = Array.isArray(parsed?.messages) ? parsed.messages : [];
+                if (orphanMessages.length > 0) {
+                  const ghost = {
+                    prompt_id: Number(savedAgentId),
+                    id: `orphan_${savedAgentId}`,
+                    name: parsed.agentName || 'Previous Session',
+                    type: 'orphan',
+                    _isOrphan: true,
+                    lastUpdated: parsed.lastUpdated,
+                  };
+                  logger.log(
+                    `Recovered orphan chat for agent ${savedAgentId} ` +
+                    `("${ghost.name}", ${orphanMessages.length} messages)`
+                  );
+                  allAgents.push(ghost);
+                  setAllAgents([...allAgents]);
+                  setCurrentAgent(ghost);
+                  setMessages(orphanMessages);
+                  // Skip the "default agent" fallback below so we
+                  // don't clobber the ghost we just restored.
+                  return;
+                }
+              }
+            } catch (orphanErr) {
+              console.warn('Orphan chat recovery failed:', orphanErr.message);
+            }
+            logger.log(`Saved agent ${savedAgentId} not found and no orphan chat — falling back to default`);
           }
         }
 
@@ -1948,7 +1998,14 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       }
     });
 
-    // Setup progress — TTS engine install, model downloads
+    // Setup progress — TTS engine install, model downloads.
+    // isComplete here only means "install job ended" — it is NOT a
+    // "Ready" banner gate.  The banner only turns green when a
+    // tts_handshake event with status='ready' arrives (see below).
+    // If we keyed the banner off setup_progress text like we used
+    // to, the Indic Parler "installed" message flipped the banner
+    // green BEFORE verification ran — and then the engine crashed
+    // silently on first use (2026-04-18 sympy ModuleNotFoundError).
     const unsubSetup = realtimeService.on('setup_progress', (data) => {
       if (data.type !== 'setup_progress') return;
       setMessages((prev) => {
@@ -1960,7 +2017,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           updated[existingIdx] = {
             ...updated[existingIdx],
             steps: [...updated[existingIdx].steps, data],
-            isComplete: data.message?.includes('ready to use') || data.message?.includes('Ready'),
+            isComplete: Boolean(data.complete),
           };
           return updated;
         }
@@ -1969,9 +2026,75 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           jobType: data.job_type,
           steps: [data],
           isComplete: false,
+          handshake: { status: 'pending' },
           timestamp: new Date(),
         }];
       });
+    });
+
+    // TTS handshake — authoritative voice-ready signal.  Fires
+    // AFTER the backend produces real audio bytes for the localized
+    // greeting phrase (GREETINGS dict in core.constants).  Only this
+    // event is allowed to flip the banner to green.
+    const unsubHandshake = realtimeService.on('tts_handshake', (data) => {
+      if (data.type !== 'tts_handshake') return;
+      // Attach to the matching setup card (by engine name) if one
+      // exists; otherwise create a floating handshake card so the
+      // verdict still reaches the user on a re-run that skipped install.
+      const jobType = `tts_setup_${data.engine}`;
+      setMessages((prev) => {
+        const existingIdx = prev.findIndex(
+          (m) => m.type === 'setup_progress' && m.jobType === jobType
+        );
+        const handshake = {
+          status: data.status,
+          engine: data.engine,
+          lang: data.lang,
+          err: data.err || '',
+          fallbacks: Array.isArray(data.fallbacks) ? data.fallbacks : [],
+        };
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            handshake,
+            // A verified 'ready' is terminal — mark complete so the
+            // progress bar fills.  A 'failed' is also terminal.
+            isComplete: data.status === 'ready' || data.status === 'failed',
+          };
+          return updated;
+        }
+        return [...prev, {
+          type: 'setup_progress',
+          jobType,
+          steps: [],
+          isComplete: handshake.status === 'ready' || handshake.status === 'failed',
+          handshake,
+          timestamp: new Date(),
+        }];
+      });
+      // Play the greeting the user just heard the engine synth —
+      // inline b64 payload means zero extra fetch.  The engine also
+      // played locally on the server host; in dev mode the server
+      // and user share a machine, so this guards against double
+      // playback by skipping when audio_b64 is empty.
+      if (data.status === 'ready' && data.audio_b64) {
+        try {
+          const bin = window.atob(data.audio_b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.play().catch(() => {
+            // Autoplay blocked — attach a one-shot click resumer.
+            const resume = () => { audio.play().catch(() => {}); document.removeEventListener('click', resume); };
+            document.addEventListener('click', resume, { once: true });
+          });
+        } catch (e) {
+          console.warn('[tts_handshake] playback decode failed', e);
+        }
+      }
     });
 
     // Capability updates — "I can see/talk/hear" when models load
@@ -1983,7 +2106,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       }
     });
 
-    return () => { unsubTts(); unsubSetup(); unsubCapability(); };
+    return () => { unsubTts(); unsubSetup(); unsubHandshake(); unsubCapability(); };
   }, []);
 
   useEffect(() => {
@@ -2940,6 +3063,13 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
       image_url: userImage || null,
       file_url: fileUrl || null,
       preferred_lang: localStorage.getItem('hart_language') || 'en',
+      // User tier ladder: 'local_only' | 'auto' | 'hive_preferred' (from
+      // the intelligence toggle on this page).  Forwarded through
+      // /chat → hevolve_chat → HARTOS adapter → HARTOS dispatcher so
+      // `hive_preferred` can consult the MoE HiveMind (hevolveai
+      // `hive_mind.fuse_thoughts`) instead of the single expert model.
+      // Default 'auto' preserves today's behavior end-to-end.
+      intelligence_preference: intelligencePreference,
     });
 
     // Clear form data
@@ -4038,6 +4168,12 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
                   : 'md:w-full'
               } overflow-x-clip overflow-y-auto pt-2 md:pt-0`}
             >
+              {/* Chat header bar — GPU tier badge surfaces the speculation-capability
+                  boundary (see components/chat/GpuTierBadge.jsx for the product-owner +
+                  accessibility rationale). Right-aligned; no layout shift when hidden. */}
+              <div className="flex justify-end items-center px-3 pt-2">
+                <GpuTierBadge />
+              </div>
               {messages.length === 0 ? (
                 <>
                   {guestNameConflict && (

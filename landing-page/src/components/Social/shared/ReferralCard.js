@@ -1,4 +1,6 @@
-import React, {useState} from 'react';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PeopleIcon from '@mui/icons-material/People';
 import {
   Card,
   CardContent,
@@ -8,9 +10,7 @@ import {
   Tooltip,
   Chip,
 } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import PeopleIcon from '@mui/icons-material/People';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import React, {useState} from 'react';
 
 export default function ReferralCard({code, stats = {}}) {
   const [copied, setCopied] = useState(false);

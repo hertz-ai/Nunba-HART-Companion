@@ -1,7 +1,8 @@
-import React, {useRef, useEffect, useCallback} from 'react';
-import Box from '@mui/material/Box';
-import {kidsColors} from '../kidsTheme';
 import {useReducedMotion} from '../../../../hooks/useAnimations';
+import {kidsColors} from '../kidsTheme';
+
+import Box from '@mui/material/Box';
+import React, {useRef, useEffect, useCallback} from 'react';
 
 /**
  * CanvasGameBridge

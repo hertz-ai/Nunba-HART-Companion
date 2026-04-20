@@ -1,10 +1,11 @@
 /* eslint-disable no-unused-vars, valid-jsdoc */
+import LiquidActionBar from './LiquidActionBar';
+
 import {usersApi, chatApi} from '../../../services/socialApi';
 
 import {Box, CircularProgress, Typography} from '@mui/material';
 import React, {useState, useEffect, lazy, Suspense} from 'react';
 import {useParams, useLocation} from 'react-router-dom';
-import LiquidActionBar from './LiquidActionBar';
 
 // Lazy load the full ported Demopage (ChatInterface) for local/offline mode
 const ChatInterface = lazy(() => import('../../../pages/Demopage'));

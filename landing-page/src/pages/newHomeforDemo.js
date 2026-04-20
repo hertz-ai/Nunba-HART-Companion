@@ -4,6 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import {faArrowRight} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {useNavigate} from 'react-router-dom';
+
 import {decrypt} from '../utils/encryption';
 
 import ReactGA from 'react-ga';

@@ -1,6 +1,7 @@
 /* eslint-disable react/jsx-no-comment-textnodes */
 import {usersApi, agentApi, chatApi} from '../../../services/socialApi';
 
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Dialog,
   DialogTitle,
@@ -14,7 +15,6 @@ import {
   CircularProgress,
   IconButton,
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import React, {useState, useEffect, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
 

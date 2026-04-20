@@ -1,15 +1,15 @@
-import React, {useState, useMemo, useEffect, useCallback} from 'react';
-import {Box, Typography, Button} from '@mui/material';
 import {RADIUS} from '../../../../theme/socialTokens';
-import {Client} from 'boardgame.io/react';
-import {Local} from 'boardgame.io/multiplayer';
-
-import TicTacToeGame, {TicTacToeBoard} from '../board-games/TicTacToe';
-import ConnectFourGame, {ConnectFourBoard} from '../board-games/ConnectFour';
-import CheckersGame, {CheckersBoard} from '../board-games/Checkers';
-import ReversiGame, {ReversiBoard} from '../board-games/Reversi';
-import MancalaGame, {MancalaBoard} from '../board-games/Mancala';
 import {buildSoloBotsMap, DIFFICULTY} from '../../../../utils/gameAI';
+import CheckersGame, {CheckersBoard} from '../board-games/Checkers';
+import ConnectFourGame, {ConnectFourBoard} from '../board-games/ConnectFour';
+import MancalaGame, {MancalaBoard} from '../board-games/Mancala';
+import ReversiGame, {ReversiBoard} from '../board-games/Reversi';
+import TicTacToeGame, {TicTacToeBoard} from '../board-games/TicTacToe';
+
+import {Box, Typography, Button} from '@mui/material';
+import {Local} from 'boardgame.io/multiplayer';
+import {Client} from 'boardgame.io/react';
+import React, {useState, useMemo, useEffect, useCallback} from 'react';
 
 const BOARD_REGISTRY = {
   tictactoe: {game: TicTacToeGame, board: TicTacToeBoard},

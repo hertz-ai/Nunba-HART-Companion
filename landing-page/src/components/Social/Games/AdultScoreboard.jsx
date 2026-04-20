@@ -1,8 +1,9 @@
-import React from 'react';
-import {Box, Typography, Avatar, Button, useTheme} from '@mui/material';
-import {alpha} from '@mui/material/styles';
 import {RADIUS, GRADIENTS, socialTokens} from '../../../theme/socialTokens';
 import {animFadeInScale, animFadeInUp} from '../../../utils/animations';
+
+import {Box, Typography, Avatar, Button, useTheme} from '@mui/material';
+import {alpha} from '@mui/material/styles';
+import React from 'react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../../testHelpers';
 import MemoryFlipTemplate from '../../../../../components/Social/KidsLearning/templates/MemoryFlipTemplate';
+import {renderWithProviders} from '../../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks

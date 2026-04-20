@@ -31,9 +31,9 @@
  */
 
 import ENGLISH_GAMES_EXTRA from './englishGamesExtra';
-import MATH_GAMES_EXTRA from './mathGamesExtra';
-import LIFE_SKILLS_GAMES_EXTRA from './lifeSkillsGamesExtra';
 import INTERACTIVE_GAMES from './interactiveGames';
+import LIFE_SKILLS_GAMES_EXTRA from './lifeSkillsGamesExtra';
+import MATH_GAMES_EXTRA from './mathGamesExtra';
 import VOICE_GAMES from './voiceGames';
 
 // ============================================================================

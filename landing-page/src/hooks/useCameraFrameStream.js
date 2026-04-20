@@ -134,13 +134,16 @@ export default function useCameraFrameStream({
 
         ws.onopen = () => {
           try {
-            // Register (user_id + channel) before sending frames so the
-            // server routes them to the right FrameStore slot.
-            ws.send(JSON.stringify({
-              type: 'register',
-              user_id: String(userId),
-              channel,
-            }));
+            // VisionService _ws_handler protocol (integrations/vision/
+            // vision_service.py:564):
+            //   1. digit string → identifies user_id
+            //   2. 'video_start' (camera) or 'screen_start' (screen)
+            //   3. binary JPEG frames
+            //   4. 'video_stop' to end
+            // Prior JSON register was silently ignored — frames arrived
+            // with user_id=None so put_frame was never called.
+            ws.send(String(userId));
+            ws.send(channel === 'screen' ? 'screen_start' : 'video_start');
           } catch { /* ignore */ }
         };
 

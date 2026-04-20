@@ -1,16 +1,18 @@
+import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import InfoIcon from '@mui/icons-material/Info';
+import {Snackbar, Box, Typography, IconButton} from '@mui/material';
 import React, {
   createContext,
   useContext,
   useState,
   useCallback,
   useRef,
+  useEffect,
 } from 'react';
-import {Snackbar, Box, Typography, IconButton} from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import InfoIcon from '@mui/icons-material/Info';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
+import {subscribeTtsLangEvents} from '../../services/realtimeService';
 
 const ToastContext = createContext();
 
@@ -77,6 +79,32 @@ export function ToastProvider({children}) {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 300);
   }, []);
+
+  // Subscribe to TTS lang-mismatch / lang-unsupported events so users
+  // learn WHY their Tamil voice became English Piper mumbling — was
+  // silent before (data-scientist finding).  Mount-once; unmount cleans
+  // up the realtimeService listener + worker message handler.
+  useEffect(() => {
+    const unsub = subscribeTtsLangEvents((payload) => {
+      if (!payload) return;
+      const {kind, requested_lang, active_backend} = payload;
+      if (kind === 'unsupported') {
+        showToast('info', {
+          title: 'Voice unavailable',
+          message: `No voice fits on this device for language "${requested_lang}" — switching to text only.`,
+          duration: 7000,
+        });
+      } else {
+        // mismatch: backend isn't in preferred ladder for this lang
+        showToast('info', {
+          title: 'Voice changed',
+          message: `"${requested_lang}" is using ${active_backend} (not the preferred voice).`,
+          duration: 5000,
+        });
+      }
+    });
+    return unsub;
+  }, [showToast]);
 
   return (
     <ToastContext.Provider value={{showToast, dismissToast}}>

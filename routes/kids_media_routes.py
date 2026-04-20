@@ -23,6 +23,21 @@ from flask import jsonify, request, send_file
 
 logger = logging.getLogger(__name__)
 
+# Module-level handles for the two things tests want to substitute via
+# `patch.object(routes.kids_media_routes, 'adapter'|'req', <mock>)`
+# OR `patch('routes.kids_media_routes.req.get', <mock>)`.
+#
+# `req` is eagerly bound to the requests module so the dotted-attribute
+# patch form works (you can't `patch.attr` on a None placeholder).
+# requests is a leaf dep with no circular risk at this module's import.
+#
+# `adapter` stays None by default — routes.hartos_backend_adapter pulls
+# in HARTOS integrations and can cause circular-import timing issues if
+# imported here; the function body lazy-imports on first real call.
+import requests as req  # noqa: E402
+
+adapter = None  # type: ignore[assignment]
+
 # Lazy imports to avoid circular deps at module level
 _tts_synthesize = None
 _tts_available = False
@@ -47,13 +62,27 @@ _SPEED_MIN, _SPEED_MAX = 0.25, 4.0
 
 
 def _cleanup_jobs():
-    """Remove completed/failed jobs older than TTL."""
+    """Remove completed/failed jobs older than TTL.
+
+    Uses a bounded lock acquire (5s) rather than `with _jobs_lock:` so a
+    misbehaving background-job thread can never wedge a Flask request
+    thread indefinitely.  If the lock is contended we simply skip this
+    pass — cleanup is best-effort; the NEXT request will retry and jobs
+    just stay in memory a bit longer.  Prevents pytest-timeout hangs
+    when a test leaves a job thread alive across the fixture boundary.
+    """
     now = time.time()
-    with _jobs_lock:
+    acquired = _jobs_lock.acquire(timeout=5.0)
+    if not acquired:
+        logger.debug("_cleanup_jobs: _jobs_lock contended, skipping pass")
+        return
+    try:
         expired = [k for k, v in _async_jobs.items()
                    if now - v.get('created', 0) > _JOB_TTL]
         for k in expired:
             del _async_jobs[k]
+    finally:
+        _jobs_lock.release()
 
 
 def _get_user_id_from_request():
@@ -145,8 +174,13 @@ def _generate_image_via_agent(prompt, user_id, style='cartoon'):
     This ensures guardrails, logging, and cultural wisdom apply.
     """
     try:
-        import routes.hartos_backend_adapter as adapter
-        result = adapter.chat(
+        # Honour module-level `adapter` override (tests do
+        # `patch.object(routes.kids_media_routes, 'adapter', <mock>)`);
+        # fall back to the real lazy import in production.
+        _adapter = adapter
+        if _adapter is None:
+            import routes.hartos_backend_adapter as _adapter
+        result = _adapter.chat(
             text=f"Generate a children's educational illustration: {prompt}. Style: {style}. Return only the image URL.",
             user_id=user_id or 'system',
             media_request=True,
@@ -174,7 +208,8 @@ def _generate_image_via_agent(prompt, user_id, style='cartoon'):
 
 def _download_and_cache(url, cache_path, timeout=30):
     """Download a URL and save to disk cache."""
-    import requests as req
+    # `req` is the module-level requests binding — tests patch it (or
+    # its .get) to substitute a mock client.
     try:
         resp = req.get(url, timeout=timeout, stream=True)
         resp.raise_for_status()

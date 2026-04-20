@@ -1,5 +1,15 @@
-import React, {useState, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import kidsLearningStore from './data/kidsLearningStore';
+import {kidsColors, kidsRadius, kidsShadows} from './data/kidsTheme';
+import {createGameAndWait} from './kidsLearningApi';
+
+import {useReducedMotion} from '../../../hooks/useAnimations';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import BoltIcon from '@mui/icons-material/Bolt';
+import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import {
   Box,
   Typography,
@@ -13,17 +23,10 @@ import {
   ToggleButtonGroup,
   Fade,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
-import BoltIcon from '@mui/icons-material/Bolt';
+import React, {useState, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
 
-import {kidsColors, kidsRadius, kidsShadows} from './data/kidsTheme';
-import {createGameAndWait} from './kidsLearningApi';
-import kidsLearningStore from './data/kidsLearningStore';
-import {useReducedMotion} from '../../../hooks/useAnimations';
+
 
 /* ---- Inject CSS keyframes ---- */
 const CREATOR_ANIM_ID = 'kids-creator-keyframes';

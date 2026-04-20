@@ -153,22 +153,28 @@ describe('ChatMessageList', () => {
     expect(bubble).toBeInTheDocument();
   });
 
-  // ── maxWidth 75% ─────────────────────────────────────────────────────────
+  // ── maxWidth constraint on bubbles ───────────────────────────────────────
+  //
+  // Bubble maxWidth widened from 75% to 100% when the chat container
+  // migrated to its own flex column that already constrains the horizontal
+  // band (container-level layout does the 75% now, bubbles fill it fully).
+  // Tests reflect the new layout — assert 100% so a future revert to
+  // bubble-level 75% would trip this gate.
 
-  it('applies maxWidth 75% on user message bubble', () => {
+  it('applies maxWidth 100% on user message bubble', () => {
     const {container} = renderList({
       messages: [{type: 'user', content: 'Test'}],
     });
     const bubble = container.querySelector('.rounded-lg.p-6');
-    expect(bubble).toHaveStyle({maxWidth: '75%'});
+    expect(bubble).toHaveStyle({maxWidth: '100%'});
   });
 
-  it('applies maxWidth 75% on assistant message bubble', () => {
+  it('applies maxWidth 100% on assistant message bubble', () => {
     const {container} = renderList({
       messages: [{type: 'assistant', content: 'Reply'}],
     });
     const bubble = container.querySelector('.rounded-lg.p-6');
-    expect(bubble).toHaveStyle({maxWidth: '75%'});
+    expect(bubble).toHaveStyle({maxWidth: '100%'});
   });
 
   // ── thinking_container type ──────────────────────────────────────────────

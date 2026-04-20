@@ -19,8 +19,24 @@ import logging
 import sys
 import time
 
+import pytest
+
 from llama.llama_config import LlamaConfig
 from llama.llama_installer import MODEL_PRESETS, LlamaInstaller, install_on_first_run
+
+# This file is a MANUAL CLI runner (invoked via `python test_llama_installer.py
+# --install`), not a unit-test suite. The `def test_*` functions inside actually
+# clone + build llama.cpp from source / download multi-GB model weights /
+# start real HTTP servers — they cannot complete inside the 60s pytest-timeout
+# budget and they must not run on hosted CI runners (no GPU, no bandwidth
+# budget). Module-level skip prevents pytest auto-collection from deadlocking
+# the quality workflow; the functions remain callable from the __main__ block
+# for local developer use.
+pytestmark = pytest.mark.skip(
+    reason="Manual CLI runner, not a pytest test — runs real llama.cpp install "
+           "+ multi-GB model download + HTTP server. Invoke via `python "
+           "tests/test_llama_installer.py --install` locally."
+)
 
 # Setup logging
 logging.basicConfig(

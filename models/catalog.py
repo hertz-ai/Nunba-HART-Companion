@@ -110,9 +110,12 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
     """Register music (ACE Step 1.5) and video (LTX2) generation models."""
     added = 0
 
-    if not catalog.get('audio_gen-acestep-1.5'):
+    # Use canonical ID 'audio_gen-acestep' matching HARTOS service_tool_map +
+    # fallback populator.  Avoids duplicate catalog entry (task #278).
+    _existing = catalog.get('audio_gen-acestep')
+    if not _existing:
         catalog.register(ModelEntry(
-            id='audio_gen-acestep-1.5',
+            id='audio_gen-acestep',
             name='ACE Step 1.5 (Music Generation)',
             model_type=ModelType.AUDIO_GEN,
             source='huggingface',
@@ -134,6 +137,30 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
             auto_load=False,
         ), persist=False)
         added += 1
+    else:
+        # HARTOS's fallback populator (model_catalog.py:660) registers
+        # audio_gen-acestep with a narrower surface:
+        #   tags=['local', 'audio_gen']                (no music/generative)
+        #   supports_cpu = (vram < 5)  →  False for 6.0GB VRAM
+        #   idle_timeout_s = 600
+        # Nunba is the desktop shell that surfaces these models to end
+        # users, so the user-facing surface is OWNED here. Merge the
+        # Nunba-canonical values onto the existing entry instead of
+        # overwriting it wholesale (preserves whatever HARTOS added that
+        # we don't have an opinion on, e.g. capabilities.music_gen flag).
+        _tags = list(_existing.tags or [])
+        for _t in ('local', 'music', 'generative'):
+            if _t not in _tags:
+                _tags.append(_t)
+        _existing.tags = _tags
+        # supports_cpu=True → acestep can degrade to CPU via torch_to_cpu
+        # offload; HARTOS's heuristic `vram<5` is too strict for our use
+        # case (we explicitly set supports_cpu_offload=True).
+        _existing.supports_cpu = True
+        # idle_timeout_s=300 → matches the 5-minute eviction budget Nunba
+        # docs advertise for media-gen models; HARTOS's 600s is an LLM
+        # default that leaves acestep resident too long on low-VRAM desks.
+        _existing.idle_timeout_s = 300
 
     if not catalog.get('video_gen-ltx2'):
         catalog.register(ModelEntry(
@@ -178,6 +205,27 @@ def _register_nunba_populators(catalog: ModelCatalog):
     _populators_registered = True
 
 
+def _enforce_nunba_business_rules(catalog: ModelCatalog) -> None:
+    """Apply Nunba-owned business rules AFTER all populators have run.
+
+    HARTOS is upstream; its populators (e.g. MakeItTalk TTS, the 11
+    sherpa/faster-whisper STT variants) don't know Nunba's local-first
+    tagging convention and ship entries without ``'local'`` in their
+    tag list. Nunba is the desktop shell that surfaces these models to
+    end users, so the user-facing taxonomy is OWNED here — we normalise
+    in a single pass over every entry rather than force every HARTOS
+    populator to import Nunba conventions.
+
+    The invariant is enforced as a test (`test_has_local_tag`) against
+    every entry the catalog exposes.
+    """
+    for entry in catalog.list_all():
+        tags = list(entry.tags or [])
+        if 'local' not in tags:
+            tags.append('local')
+            entry.tags = tags
+
+
 def get_catalog() -> ModelCatalog:
     """Get or create the global ModelCatalog singleton.
 
@@ -187,6 +235,7 @@ def get_catalog() -> ModelCatalog:
     """
     if _hartos_mod._catalog_instance is not None:
         _register_nunba_populators(_hartos_mod._catalog_instance)
+        _enforce_nunba_business_rules(_hartos_mod._catalog_instance)
         return _hartos_mod._catalog_instance
 
     with _hartos_mod._catalog_lock:
@@ -201,7 +250,9 @@ def get_catalog() -> ModelCatalog:
                         fn(inst)
                     except Exception:
                         pass
+            _enforce_nunba_business_rules(inst)
             _hartos_mod._catalog_instance = inst
         else:
             _register_nunba_populators(_hartos_mod._catalog_instance)
+            _enforce_nunba_business_rules(_hartos_mod._catalog_instance)
     return _hartos_mod._catalog_instance

@@ -1,7 +1,53 @@
-import React from 'react';
-import {useNavigate, useLocation} from 'react-router-dom';
+import {logActivity} from './Autopilot/autopilotStore';
+import {
+  NunbaChatProvider,
+  NunbaChatPill,
+  NunbaChatPanel,
+} from './shared/NunbaChat';
+
+import {useSocial} from '../../contexts/SocialContext';
+import {useNunbaTheme} from '../../contexts/ThemeContext';
+import {usePageObserver} from '../../hooks/useAgentObserver';
 import {prefetchRoute} from '../../services/routePrefetcher';
+import {evolutionApi} from '../../services/socialApi';
+import {
+  GRADIENTS,
+  EASINGS,
+  RADIUS,
+  socialTokens,
+} from '../../theme/socialTokens';
+import {useRoleAccess} from '../RoleGuard';
 import ErrorBoundary from '../shared/ErrorBoundary';
+
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import ExploreIcon from '@mui/icons-material/Explore';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ChildCareIcon from '@mui/icons-material/ChildCare';
+import ScienceIcon from '@mui/icons-material/Science';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import BackupIcon from '@mui/icons-material/Backup';
+import PaletteIcon from '@mui/icons-material/Palette';
+import AutoModeIcon from '@mui/icons-material/AutoMode';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import MemoryIcon from '@mui/icons-material/Memory';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import BuildIcon from '@mui/icons-material/Build';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import CableIcon from '@mui/icons-material/Cable';
+import HiveIcon from '@mui/icons-material/Hive';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import CodeIcon from '@mui/icons-material/Code';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import FlagIcon from '@mui/icons-material/Flag';
+import GroupIcon from '@mui/icons-material/Group';
+import HomeIcon from '@mui/icons-material/Home';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import PublicIcon from '@mui/icons-material/Public';
+import SearchIcon from '@mui/icons-material/Search';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Drawer,
   List,
@@ -23,53 +69,9 @@ import {
   keyframes,
   useTheme,
 } from '@mui/material';
-import HomeIcon from '@mui/icons-material/Home';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import GroupIcon from '@mui/icons-material/Group';
-import SearchIcon from '@mui/icons-material/Search';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import CodeIcon from '@mui/icons-material/Code';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import FlagIcon from '@mui/icons-material/Flag';
-import PublicIcon from '@mui/icons-material/Public';
-import ExploreIcon from '@mui/icons-material/Explore';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import ChildCareIcon from '@mui/icons-material/ChildCare';
-import ScienceIcon from '@mui/icons-material/Science';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import BackupIcon from '@mui/icons-material/Backup';
-import PaletteIcon from '@mui/icons-material/Palette';
-import AutoModeIcon from '@mui/icons-material/AutoMode';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import MemoryIcon from '@mui/icons-material/Memory';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
-import BuildIcon from '@mui/icons-material/Build';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import CableIcon from '@mui/icons-material/Cable';
-import HiveIcon from '@mui/icons-material/Hive';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import {alpha} from '@mui/material/styles';
-import {useSocial} from '../../contexts/SocialContext';
-import {useRoleAccess} from '../RoleGuard';
-import {useNunbaTheme} from '../../contexts/ThemeContext';
-import {logActivity} from './Autopilot/autopilotStore';
-import {
-  GRADIENTS,
-  EASINGS,
-  RADIUS,
-  socialTokens,
-} from '../../theme/socialTokens';
-import {usePageObserver} from '../../hooks/useAgentObserver';
-import {
-  NunbaChatProvider,
-  NunbaChatPill,
-  NunbaChatPanel,
-} from './shared/NunbaChat';
-import {evolutionApi} from '../../services/socialApi';
+import React from 'react';
+import {useNavigate, useLocation} from 'react-router-dom';
 
 const DRAWER_WIDTH = 260;
 

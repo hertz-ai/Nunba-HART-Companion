@@ -30,11 +30,7 @@
  * Ported from React Native DynamicTemplateEngine.js.
  */
 
-import React, {useState, useCallback, useRef, useEffect, Suspense} from 'react';
-import {Box, Typography, CircularProgress, LinearProgress} from '@mui/material';
-import ServerDrivenUI from './ServerDrivenUI';
 import DynamicGameRenderer from './DynamicGameRenderer';
-import FeedbackOverlay from './shared/FeedbackOverlay';
 import {getTemplateComponent} from './gameRegistry';
 import {
   kidsColors,
@@ -42,6 +38,11 @@ import {
   kidsFontSizes,
   kidsFontWeights,
 } from './kidsTheme';
+import ServerDrivenUI from './ServerDrivenUI';
+import FeedbackOverlay from './shared/FeedbackOverlay';
+
+import {Box, Typography, CircularProgress, LinearProgress} from '@mui/material';
+import React, {useState, useCallback, useRef, useEffect, Suspense} from 'react';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 

@@ -98,6 +98,62 @@ def get_status() -> dict:
         return _state.to_dict()
 
 
+def _create_plan(language: str, gpu_info: dict) -> dict:
+    """Build the per-model-type bootstrap plan for ``language``.
+
+    Pure-ish function (calls ``get_orchestrator()``, otherwise no side
+    effects): returns ``{ModelType: BootstrapStep}``.  Extracted from
+    ``_bootstrap_worker`` so it can be unit-tested in isolation — the
+    worker then just uses the returned plan to drive execution.
+
+    For each model_type in BOOTSTRAP_ORDER:
+      - Optional types (VLM, AUDIO_GEN, VIDEO_GEN) with <6GB free VRAM
+        are marked skipped up-front (avoids probing hardware we know
+        won't accommodate them).
+      - TTS / LLM / STT are language-routed via orchestrator.select_best;
+        other types (VLM, AUDIO_GEN, VIDEO_GEN) don't filter by language.
+      - If an entry is already loaded, status='ready' + device captured.
+        Otherwise status='selecting' pending execution.
+      - No compatible model → status='skipped'.
+    """
+    from models.orchestrator import get_orchestrator
+    orch = get_orchestrator()
+    if orch is None:
+        return {}
+
+    plan = {}
+    for model_type in BOOTSTRAP_ORDER:
+        step = BootstrapStep(model_type=model_type)
+
+        # Skip optional types with low VRAM
+        if model_type in OPTIONAL_TYPES and gpu_info.get('free_gb', 0) < 6.0:
+            step.status = 'skipped'
+            step.detail = 'Insufficient VRAM for optional model'
+            plan[model_type] = step
+            continue
+
+        lang = language if model_type in (ModelType.TTS, ModelType.LLM, ModelType.STT) else None
+        entry = orch.select_best(model_type, language=lang)
+
+        if entry:
+            step.model_id = entry.id
+            step.model_name = entry.name
+            step.vram_gb = entry.vram_gb
+            if entry.loaded:
+                step.status = 'ready'
+                step.detail = f'Already running: {entry.name} ({entry.device})'
+                step.run_mode = entry.device
+            else:
+                step.status = 'selecting'
+                step.detail = f'Selected: {entry.name}'
+        else:
+            step.status = 'skipped'
+            step.detail = 'No compatible model found'
+
+        plan[model_type] = step
+    return plan
+
+
 def _refresh_steps_from_orchestrator() -> None:
     """Update step statuses from the live orchestrator (called under _lock)."""
     try:
@@ -182,41 +238,7 @@ def _bootstrap_worker(language: str) -> None:
 
         # ── Phase 2: Plan — ask orchestrator what it would select ──
         _update(phase='planning')
-        from models.orchestrator import get_orchestrator
-        orch = get_orchestrator()
-
-        plan = {}
-        for model_type in BOOTSTRAP_ORDER:
-            step = BootstrapStep(model_type=model_type)
-
-            # Skip optional types with low VRAM
-            if model_type in OPTIONAL_TYPES and gpu_info.get('free_gb', 0) < 6.0:
-                step.status = 'skipped'
-                step.detail = 'Insufficient VRAM for optional model'
-                plan[model_type] = step
-                continue
-
-            lang = language if model_type in (ModelType.TTS, ModelType.LLM, ModelType.STT) else None
-            # select_best already prefers loaded models (+1000 score),
-            # checks compute budget, and routes by language
-            entry = orch.select_best(model_type, language=lang)
-
-            if entry:
-                step.model_id = entry.id
-                step.model_name = entry.name
-                step.vram_gb = entry.vram_gb
-                if entry.loaded:
-                    step.status = 'ready'
-                    step.detail = f'Already running: {entry.name} ({entry.device})'
-                    step.run_mode = entry.device
-                else:
-                    step.status = 'selecting'
-                    step.detail = f'Selected: {entry.name}'
-            else:
-                step.status = 'skipped'
-                step.detail = 'No compatible model found'
-
-            plan[model_type] = step
+        plan = _create_plan(language, gpu_info)
 
         with _lock:
             _state.steps = plan

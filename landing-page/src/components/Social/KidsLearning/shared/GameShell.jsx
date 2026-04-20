@@ -1,5 +1,18 @@
-import React, {useState, useCallback, useEffect} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {GameSounds} from './SoundManager';
+
+import {useReducedMotion} from '../../../../hooks/useAnimations';
+import {logger} from '../../../../utils/logger';
+import kidsLearningStore from '../data/kidsLearningStore';
+import {kidsColors, kidsRadius, kidsShadows} from '../data/kidsTheme';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import ReplayIcon from '@mui/icons-material/Replay';
+import ShareIcon from '@mui/icons-material/Share';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import {
   Box,
   Typography,
@@ -8,19 +21,8 @@ import {
   Button,
   Fade,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import ShareIcon from '@mui/icons-material/Share';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import ReplayIcon from '@mui/icons-material/Replay';
-import {kidsColors, kidsRadius, kidsShadows} from '../data/kidsTheme';
-import kidsLearningStore from '../data/kidsLearningStore';
-import {GameSounds} from './SoundManager';
-import {useReducedMotion} from '../../../../hooks/useAnimations';
-import {logger} from '../../../../utils/logger';
+import React, {useState, useCallback, useEffect} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 /* ---- CSS keyframes injected once ---- */
 const SHELL_ANIM_ID = 'kids-shell-keyframes';

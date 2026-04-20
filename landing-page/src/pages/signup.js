@@ -1,13 +1,15 @@
-import React, {useEffect, useState} from 'react';
-import {Link} from 'react-router-dom';
+import {mailerApi} from '../services/socialApi';
+
 import VerifiedIcon from '@mui/icons-material/Verified';
-import {useSpring} from 'react-spring';
+import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
 import SnackbarContent from '@mui/material/SnackbarContent';
-import {useNavigate} from 'react-router-dom';
+import React, {useEffect, useState} from 'react';
 import ReactGA from 'react-ga';
-import Alert from '@mui/material/Alert';
-import {mailerApi} from '../services/socialApi';
+import {Link} from 'react-router-dom';
+import {useNavigate} from 'react-router-dom';
+import {useSpring} from 'react-spring';
+
 
 export default function Signup() {
   const navigate = useNavigate();

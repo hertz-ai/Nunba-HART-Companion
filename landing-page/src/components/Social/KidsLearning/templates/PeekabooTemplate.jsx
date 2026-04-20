@@ -21,16 +21,18 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {Box, Typography, Button, Fade, Grow, IconButton} from '@mui/material';
+import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
+import {kidsColors} from '../kidsTheme';
+import InlineCelebration from '../shared/InlineCelebration';
+import {GameSounds} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+
 import MicIcon from '@mui/icons-material/Mic';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import {kidsColors} from '../kidsTheme';
-import {GameSounds} from '../shared/SoundManager';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
-import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
-import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import {Box, Typography, Button, Fade, Grow, IconButton} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+
 
 const FEEDBACK_DELAY = 1400;
 const PEEK_THRESHOLD = 0.35; // Amplitude to trigger reveal

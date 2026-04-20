@@ -1,15 +1,16 @@
-import React, {useState, useEffect} from 'react';
 
-import ReactGA from 'react-ga';
-import NabBarLite from '../components/navbarlite';
-import BrandLogo from '../components/brandLogo';
-import AboutThree from '../components/aboutThree';
-import Features from '../components/features';
 import AboutOne from '../components/aboutOne';
+import AboutThree from '../components/aboutThree';
 import AboutTwo from '../components/aboutTwo';
 import AiFeatures from '../components/aiFeatures';
+import BrandLogo from '../components/brandLogo';
 import Clients from '../components/clients';
+import Features from '../components/features';
 import FooterLite from '../components/footerlite';
+import NabBarLite from '../components/navbarlite';
+
+import React, {useState, useEffect} from 'react';
+import ReactGA from 'react-ga';
 
 export default function Institution() {
   const [hevolvedroid, setIshevolvedroid] = useState(true);

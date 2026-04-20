@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../testHelpers';
 import StarRating from '../../../../components/Social/shared/StarRating';
+import {renderWithProviders} from '../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 // StarRating component renders ratings for 4 dimensions: skill, usefulness, reliability, creativity
 // It expects a `values` object with these keys (0-5 scale each)

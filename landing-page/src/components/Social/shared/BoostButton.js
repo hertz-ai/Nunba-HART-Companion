@@ -1,4 +1,6 @@
-import React, {useState} from 'react';
+import {resonanceApi} from '../../../services/socialApi';
+
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import {
   IconButton,
   Tooltip,
@@ -13,8 +15,8 @@ import {
   keyframes,
   useTheme,
 } from '@mui/material';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import {resonanceApi} from '../../../services/socialApi';
+import React, {useState} from 'react';
+
 
 // Pulse animation for the boost button on hover
 const pulse = keyframes`

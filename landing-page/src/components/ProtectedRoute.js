@@ -1,6 +1,7 @@
+import {useAuth} from '../auth/AuthContext';
+
 import React, {useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {useAuth} from '../auth/AuthContext';
 
 const ProtectedRoute = ({children}) => {
   const {token} = useAuth();

@@ -1,5 +1,7 @@
-import React, {useState, useEffect} from 'react';
-import {useParams} from 'react-router-dom';
+import {evolutionApi} from '../../../services/socialApi';
+import EvolutionTimeline from '../shared/EvolutionTimeline';
+
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import {
   Box,
   Typography,
@@ -11,9 +13,9 @@ import {
   LinearProgress,
   Divider,
 } from '@mui/material';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import EvolutionTimeline from '../shared/EvolutionTimeline';
-import {evolutionApi} from '../../../services/socialApi';
+import React, {useState, useEffect} from 'react';
+import {useParams} from 'react-router-dom';
+
 
 export default function AgentEvolutionPage() {
   const {agentId} = useParams();

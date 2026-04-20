@@ -4,8 +4,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import {faArrowRight} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {useNavigate} from 'react-router-dom';
-
 import ReactGA from 'react-ga';
+
 import Navbar from '../components/navbar';
 import BrandLogo from '../components/brandLogo';
 import AboutThree from '../components/aboutThree';
@@ -14,6 +14,7 @@ import AboutTwo from '../components/aboutTwo';
 import AiFeatures from '../components/aiFeatures';
 import Clients from '../components/clients';
 import Footer from '../components/footer';
+
 import Signup from './signup';
 
 const Features = lazy(() => import('../components/features'));

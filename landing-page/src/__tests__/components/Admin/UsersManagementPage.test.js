@@ -1,12 +1,18 @@
 import React from 'react';
 import {screen, fireEvent, waitFor} from '@testing-library/react';
+
 import {renderWithProviders, mockUsers} from '../../testHelpers';
 import UsersManagementPage from '../../../components/Admin/UsersManagementPage';
 
-// Mock the admin API
+// Mock the admin API.  Note: banning/unbanning now lives on adminApi
+// (banUser / unbanUser) — it used to sit on moderationApi.ban/unban
+// but was moved when social-moderation and user-admin were split into
+// separate surfaces. Mock both paths so either source wiring passes.
 jest.mock('../../../services/socialApi', () => ({
   adminApi: {
     users: jest.fn(),
+    banUser: jest.fn(),
+    unbanUser: jest.fn(),
   },
   moderationApi: {
     ban: jest.fn(),
@@ -112,7 +118,7 @@ describe('UsersManagementPage Component', () => {
     });
 
     test('calls ban API when Ban button clicked', async () => {
-      moderationApi.ban.mockResolvedValue({success: true});
+      adminApi.banUser.mockResolvedValue({success: true});
 
       renderWithProviders(<UsersManagementPage />);
 
@@ -124,12 +130,12 @@ describe('UsersManagementPage Component', () => {
       fireEvent.click(banButtons[0]);
 
       await waitFor(() => {
-        expect(moderationApi.ban).toHaveBeenCalled();
+        expect(adminApi.banUser).toHaveBeenCalled();
       });
     });
 
     test('calls unban API when Unban button clicked', async () => {
-      moderationApi.unban.mockResolvedValue({success: true});
+      adminApi.unbanUser.mockResolvedValue({success: true});
 
       renderWithProviders(<UsersManagementPage />);
 
@@ -141,7 +147,7 @@ describe('UsersManagementPage Component', () => {
       fireEvent.click(unbanButtons[0]);
 
       await waitFor(() => {
-        expect(moderationApi.unban).toHaveBeenCalled();
+        expect(adminApi.unbanUser).toHaveBeenCalled();
       });
     });
   });

@@ -1,5 +1,5 @@
-import React from 'react';
 import {Box, Typography, useTheme} from '@mui/material';
+import React from 'react';
 
 const AXES = [
   {key: 'skill', label: 'Skill'},

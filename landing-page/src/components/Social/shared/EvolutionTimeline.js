@@ -1,5 +1,5 @@
-import React from 'react';
 import {Box, Typography, useTheme} from '@mui/material';
+import React from 'react';
 
 const STAGES = [
   {key: 'seed', label: 'Seed', icon: '\u{1F331}', color: '#8BC34A'},

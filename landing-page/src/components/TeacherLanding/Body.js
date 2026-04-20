@@ -1,6 +1,7 @@
-import React from 'react';
 import Actions from './Actions';
 import Welcome from './Welcome';
+
+import React from 'react';
 import './TeacherHome.css';
 
 function Body() {

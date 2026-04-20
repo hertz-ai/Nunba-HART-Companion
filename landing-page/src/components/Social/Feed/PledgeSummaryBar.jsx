@@ -8,20 +8,24 @@
  * Fits in ~48px height below the hypothesis box.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import PledgeDialog from './PledgeDialog';
+
+import { trackerApi } from '../../../services/socialApi';
+import { RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import { useRoleAccess } from '../../RoleGuard';
+
+import AddIcon from '@mui/icons-material/Add';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloudIcon from '@mui/icons-material/Cloud';
+import MemoryIcon from '@mui/icons-material/Memory';
+import PaymentIcon from '@mui/icons-material/Payment';
 import {
   Box, Typography, Avatar, AvatarGroup, ButtonBase, Tooltip, keyframes, useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import MemoryIcon from '@mui/icons-material/Memory';
-import CloudIcon from '@mui/icons-material/Cloud';
-import PaymentIcon from '@mui/icons-material/Payment';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AddIcon from '@mui/icons-material/Add';
-import { useRoleAccess } from '../../RoleGuard';
-import { trackerApi } from '../../../services/socialApi';
-import { RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
-import PledgeDialog from './PledgeDialog';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+
 
 // ---- Keyframes ----
 

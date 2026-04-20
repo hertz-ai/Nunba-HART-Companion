@@ -1,4 +1,3 @@
-import {createTheme, responsiveFontSizes, alpha} from '@mui/material/styles';
 import {
   GRADIENTS,
   EASINGS,
@@ -8,6 +7,8 @@ import {
   SPACING,
   INTENT_COLORS,
 } from './theme/socialTokens';
+
+import {createTheme, responsiveFontSizes, alpha} from '@mui/material/styles';
 
 // ── Easing Curves (exported for direct use in components) ─────────────────────
 

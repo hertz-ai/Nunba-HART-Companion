@@ -15,24 +15,25 @@
  *   - Non-pledgers see resource summary + blurred agent activity
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { trackerApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS, EASINGS } from '../../../theme/socialTokens';
+import { useRoleAccess } from '../../RoleGuard';
+
+import BoltIcon from '@mui/icons-material/Bolt';
+import CloudIcon from '@mui/icons-material/Cloud';
+import LockIcon from '@mui/icons-material/Lock';
+import MemoryIcon from '@mui/icons-material/Memory';
+import PaymentIcon from '@mui/icons-material/Payment';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   Box, Typography, Paper, Skeleton,
   Divider, Tooltip, Chip, useTheme, keyframes,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import MemoryIcon from '@mui/icons-material/Memory';
-import CloudIcon from '@mui/icons-material/Cloud';
-import PaymentIcon from '@mui/icons-material/Payment';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import BoltIcon from '@mui/icons-material/Bolt';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import LockIcon from '@mui/icons-material/Lock';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { useRoleAccess } from '../../RoleGuard';
-import { trackerApi } from '../../../services/socialApi';
-import { socialTokens, RADIUS, EASINGS } from '../../../theme/socialTokens';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // ---- Keyframes ----
 

@@ -1,6 +1,7 @@
-import React, {useEffect, useState} from 'react';
 import microSoftLogo from '../../data/microSoftLogo.png';
 import nvidiainception from '../../data/nvidiainception.png';
+
+import React, {useEffect, useState} from 'react';
 
 const AnimatedText = () => {
   const [displayText, setDisplayText] = useState('NVIDIA');

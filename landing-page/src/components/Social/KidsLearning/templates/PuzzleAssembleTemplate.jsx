@@ -17,14 +17,15 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {logger} from '../../../../utils/logger';
-import {Box, Typography, Card, LinearProgress, Fade, Grow} from '@mui/material';
 import {kidsColors, kidsAnimations} from '../kidsTheme';
-import {GameSounds, GameCommentary} from '../shared/SoundManager';
 import InlineCelebration from '../shared/InlineCelebration';
 import ProgressStars from '../shared/ProgressStars';
+import {GameSounds, GameCommentary} from '../shared/SoundManager';
 import useCelebration from '../shared/useCelebration';
+
+import {Box, Typography, Card, LinearProgress, Fade, Grow} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 
 const PIECE_COLORS = [
   kidsColors.blue,

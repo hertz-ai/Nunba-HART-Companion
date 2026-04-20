@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Tooltip } from '@mui/material';
 import { channelUserApi } from '../../services/socialApi';
+
+import { Box, Tooltip } from '@mui/material';
+import React, { useState, useEffect } from 'react';
 
 const STATUS_COLORS = {
   online: '#00e89d',

@@ -1,8 +1,10 @@
-import React, {useEffect, useState, useMemo} from 'react';
-import {Box, Typography, Fade} from '@mui/material';
-import StarIcon from '@mui/icons-material/Star';
-import {kidsColors} from '../data/kidsTheme';
 import {useReducedMotion} from '../../../../hooks/useAnimations';
+import {kidsColors} from '../data/kidsTheme';
+
+import StarIcon from '@mui/icons-material/Star';
+import {Box, Typography, Fade} from '@mui/material';
+import React, {useEffect, useState, useMemo} from 'react';
+
 
 /**
  * CelebrationOverlay

@@ -1,14 +1,16 @@
 import React, {useEffect, useState} from 'react';
 import Container from '@mui/material/Container';
+
 import '../../css/header.css';
 import './header.scss';
 import Spacer from '../../components/Spacer';
-import PupitLogo from '../../images/PupitLogoBlack.png';
-import {Modal, ModalHeader, ModalBody} from 'reactstrap';
-import Snackbar from '@mui/material/Snackbar';
 import {SEND_EMAIL_URL} from '../../config/apiBase';
-import {SnackbarContent} from '@mui/material';
+import PupitLogo from '../../images/PupitLogoBlack.png';
 import {logger} from '../../utils/logger';
+
+import {SnackbarContent} from '@mui/material';
+import Snackbar from '@mui/material/Snackbar';
+import {Modal, ModalHeader, ModalBody} from 'reactstrap';
 
 const Header = ({fixed}) => {
   const [modal, toggleModal] = useState(false);
@@ -27,12 +29,12 @@ const Header = ({fixed}) => {
   function sendUserInfo(event) {
     event.preventDefault();
     logger.log('Posting Email to hertz API...');
-    var userName = document.getElementById('name').value;
-    var email = document.getElementById('email').value;
-    var phoneNumber = document.getElementById('phoneNumber').value;
-    var company = document.getElementById('company').value;
-    var question = document.getElementById('comments').value;
-    var userDetails = {
+    const userName = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const phoneNumber = document.getElementById('phoneNumber').value;
+    const company = document.getElementById('company').value;
+    const question = document.getElementById('comments').value;
+    const userDetails = {
       userName: userName,
       email: email,
       phoneNumber: phoneNumber,
@@ -102,18 +104,18 @@ const Header = ({fixed}) => {
           document.getElementById('navbar').style.padding = '0px 0px';
           document.getElementById('navbar').style.backgroundColor = '#ffffffdd';
         }
-        //document.getElementById("navbar").style.backgroundColor="rgba(255,255,255,0.9)";
-        //document.getElementById("logo").style.fontSize = "25px";
+        // document.getElementById("navbar").style.backgroundColor="rgba(255,255,255,0.9)";
+        // document.getElementById("logo").style.fontSize = "25px";
       } else {
         if (document.getElementById('navbar') != null) {
           document.getElementById('navbar').style.padding = '10px 5px';
           document.getElementById('navbar').style.backgroundColor =
             'rgba(255,255,255,0.7)';
         }
-        //document.getElementById("navbar-header-id").style.setProperty("background-color", "#ffffff00", "important");
-        //document.getElementById("navbar").style.setProperty("background-color", "#ffffff00", "important");
-        //document.getElementsByTagName("header")[0].style.setProperty("background-color", "#ffffff00", "important");
-        //document.getElementById("logo").style.fontSize = "35px";
+        // document.getElementById("navbar-header-id").style.setProperty("background-color", "#ffffff00", "important");
+        // document.getElementById("navbar").style.setProperty("background-color", "#ffffff00", "important");
+        // document.getElementsByTagName("header")[0].style.setProperty("background-color", "#ffffff00", "important");
+        // document.getElementById("logo").style.fontSize = "35px";
       }
     });
   }, []);

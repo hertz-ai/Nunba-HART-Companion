@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from 'react';
+
 import Card from './PupitCard';
+
 import './Pupit.css';
 import {mailerApi} from '../services/socialApi';
 import {logger} from '../utils/logger';

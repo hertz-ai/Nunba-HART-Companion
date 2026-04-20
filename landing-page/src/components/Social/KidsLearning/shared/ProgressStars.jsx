@@ -1,8 +1,10 @@
-import React, {useEffect, useMemo, useRef} from 'react';
-import {Box, Typography} from '@mui/material';
-import StarIcon from '@mui/icons-material/Star';
-import {kidsColors} from '../data/kidsTheme';
 import {useReducedMotion} from '../../../../hooks/useAnimations';
+import {kidsColors} from '../data/kidsTheme';
+
+import StarIcon from '@mui/icons-material/Star';
+import {Box, Typography} from '@mui/material';
+import React, {useEffect, useMemo, useRef} from 'react';
+
 
 /**
  * ProgressStars

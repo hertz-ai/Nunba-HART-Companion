@@ -1,5 +1,10 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {regionsApi} from '../../../services/socialApi';
+import RegionBadge from '../shared/RegionBadge';
+
+import NearMeIcon from '@mui/icons-material/NearMe';
+import PeopleIcon from '@mui/icons-material/People';
+import PublicIcon from '@mui/icons-material/Public';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Typography,
   Box,
@@ -15,12 +20,9 @@ import {
   InputAdornment,
   Divider,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import PeopleIcon from '@mui/icons-material/People';
-import PublicIcon from '@mui/icons-material/Public';
-import NearMeIcon from '@mui/icons-material/NearMe';
-import {regionsApi} from '../../../services/socialApi';
-import RegionBadge from '../shared/RegionBadge';
+import React, {useState, useEffect, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 const TYPE_FILTERS = [
   'all',

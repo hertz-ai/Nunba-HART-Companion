@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen, waitFor} from '@testing-library/react';
-import {renderWithProviders} from '../../testHelpers';
 import AgentSyncPage from '../../../components/Admin/AgentSyncPage';
+import {renderWithProviders} from '../../testHelpers';
+
+import {screen, waitFor} from '@testing-library/react';
+import React from 'react';
 
 // Mock the admin API
 jest.mock('../../../services/socialApi', () => ({

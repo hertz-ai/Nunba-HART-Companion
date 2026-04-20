@@ -1,20 +1,23 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { API_BASE_URL } from '../../config/apiBase';
+import { NUNBA_CAMERA_CONSENT } from '../../constants/events';
+import realtimeService from '../../services/realtimeService';
+
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import ErrorIcon from '@mui/icons-material/Error';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import InfoIcon from '@mui/icons-material/Info';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Box, Typography, Button, IconButton, LinearProgress, TextField,
   Fade, Grow, Chip, Rating,
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import CloseIcon from '@mui/icons-material/Close';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
-import InfoIcon from '@mui/icons-material/Info';
-import { API_BASE_URL } from '../../config/apiBase';
-import realtimeService from '../../services/realtimeService';
+import DOMPurify from 'dompurify';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const MAX_OVERLAYS = 3;
 const AUTO_DISMISS_MS = 15000;
@@ -208,6 +211,23 @@ function ApprovalOverlay({ data, onDismiss }) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agent_id: data.agent_id, action: data.action, decision }),
     }).catch(() => {});
+
+    // Camera consent → NunbaChatProvider listens for this event and
+    // mounts useCameraFrameStream, which opens WS to VisionService
+    // :5460 and pipes JPEG frames at ~1fps.  The server protocol is
+    // (user_id digit, 'video_start', binary frames) — not JSON.
+    const _action = String(data.action || '').toLowerCase();
+    if (_action.includes('camera') || _action.includes('video')) {
+      try {
+        window.dispatchEvent(new CustomEvent(NUNBA_CAMERA_CONSENT, {
+          detail: {
+            approved: decision === 'approve',
+            user_id: data.user_id || data.agent_id,
+          },
+        }));
+      } catch { /* CustomEvent unavailable (older WebView) */ }
+    }
+
     onDismiss();
   };
   return (
@@ -262,7 +282,7 @@ function MarkdownOverlay({ data }) {
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
     .replace(/\n/g, '<br/>');
-  return <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />;
 }
 
 function MediaOverlay({ data }) {

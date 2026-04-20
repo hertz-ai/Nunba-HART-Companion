@@ -15,10 +15,11 @@
  *   await GameSounds.speakText('Hello!');
  */
 
-import {logger} from '../../../../utils/logger';
 import AudioChannelManager from './AudioChannelManager';
-import TTSManager from './TTSManager';
 import MediaCacheManager from './MediaCacheManager';
+import TTSManager from './TTSManager';
+
+import {logger} from '../../../../utils/logger';
 
 // ── Accessibility / Reduced Motion ───────────────────────────────────────────
 

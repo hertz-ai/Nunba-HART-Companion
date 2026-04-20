@@ -1,5 +1,15 @@
 /* eslint-disable no-unused-vars */
-import React, {useState, useEffect, useCallback} from 'react';
+import {syncApi} from '../../../services/socialApi';
+
+import {
+  CloudUpload,
+  CloudDownload,
+  DevicesOther,
+  Delete,
+  ContentCopy,
+  CheckCircle,
+  Warning,
+} from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -17,16 +27,8 @@ import {
   Paper,
   LinearProgress,
 } from '@mui/material';
-import {
-  CloudUpload,
-  CloudDownload,
-  DevicesOther,
-  Delete,
-  ContentCopy,
-  CheckCircle,
-  Warning,
-} from '@mui/icons-material';
-import {syncApi} from '../../../services/socialApi';
+import React, {useState, useEffect, useCallback} from 'react';
+
 
 const glass = {
   bgcolor: 'rgba(255,255,255,0.04)',

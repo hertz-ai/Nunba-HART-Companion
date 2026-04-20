@@ -44,6 +44,92 @@ BACKEND_PIPER = "piper"
 BACKEND_NONE = "none"
 
 # ════════════════════════════════════════════════════════════════════
+# Global TTS tempo knob. Default is "balanced" per the project
+# guideline "speed > naturalness default". Resolution order:
+#   1. TTS_SPEED_PROFILE env var
+#   2. ~/.nunba/tts_config.json  speed_profile field  (admin UI pin)
+#   3. _DEFAULT_SPEED_PROFILE
+# Invalid values fall through so a typo never breaks synth. The
+# resolved profile is cached; _set_profile writes atomically and
+# invalidates the cache so the next synth picks up the change.
+# ════════════════════════════════════════════════════════════════════
+
+_SPEED_PROFILES = {'fast': 1.25, 'balanced': 1.10, 'natural': 1.00, 'slow': 0.90}
+_DEFAULT_SPEED_PROFILE = 'balanced'
+_cached_speed_profile: str | None = None
+
+
+def _read_speed_profile_from_disk() -> str | None:
+    try:
+        cfg_path = Path.home() / '.nunba' / 'tts_config.json'
+        if not cfg_path.is_file():
+            return None
+        with cfg_path.open(encoding='utf-8') as fp:
+            data = json.load(fp)
+        val = data.get('speed_profile')
+        if isinstance(val, str) and val.lower() in _SPEED_PROFILES:
+            return val.lower()
+    except Exception as e:
+        logger.debug(f"tts_config.json read skipped: {e}")
+    return None
+
+
+def _get_current_speed_profile() -> str:
+    global _cached_speed_profile
+    if _cached_speed_profile is not None:
+        return _cached_speed_profile
+    env_val = os.environ.get('TTS_SPEED_PROFILE', '').strip().lower()
+    if env_val in _SPEED_PROFILES:
+        _cached_speed_profile = env_val
+        return _cached_speed_profile
+    disk_val = _read_speed_profile_from_disk()
+    if disk_val:
+        _cached_speed_profile = disk_val
+        return _cached_speed_profile
+    _cached_speed_profile = _DEFAULT_SPEED_PROFILE
+    return _cached_speed_profile
+
+
+def _get_default_speed() -> float:
+    return _SPEED_PROFILES[_get_current_speed_profile()]
+
+
+def _set_speed_profile(name: str) -> bool:
+    """Pin a profile to ~/.nunba/tts_config.json atomically and
+    invalidate the cache. Returns False on invalid name or I/O error."""
+    global _cached_speed_profile
+    name_l = (name or '').strip().lower()
+    if name_l not in _SPEED_PROFILES:
+        return False
+    try:
+        cfg_dir = Path.home() / '.nunba'
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        cfg_path = cfg_dir / 'tts_config.json'
+        data = {}
+        if cfg_path.is_file():
+            try:
+                with cfg_path.open(encoding='utf-8') as fp:
+                    data = json.load(fp) or {}
+            except Exception:
+                data = {}
+        data['speed_profile'] = name_l
+        tmp = cfg_path.with_suffix('.json.tmp')
+        with tmp.open('w', encoding='utf-8') as fp:
+            json.dump(data, fp, indent=2)
+        os.replace(tmp, cfg_path)
+        _cached_speed_profile = name_l
+        logger.info(f"TTS speed profile set to '{name_l}' (×{_SPEED_PROFILES[name_l]})")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to persist TTS speed profile: {e}")
+        return False
+
+
+def _invalidate_speed_cache() -> None:
+    global _cached_speed_profile
+    _cached_speed_profile = None
+
+# ════════════════════════════════════════════════════════════════════
 # FALLBACK ENGINE CAPABILITIES — degraded-mode fallback only.
 #
 # This matrix is used ONLY when ModelCatalog is unavailable
@@ -147,11 +233,112 @@ _FALLBACK_ENGINE_CAPABILITIES = {
     },
 }
 
-# All 21 Indic languages supported by Indic Parler TTS
-_INDIC_LANGS = {
-    'as', 'bn', 'brx', 'doi', 'gu', 'hi', 'kn', 'kok', 'mai',
-    'ml', 'mni', 'mr', 'ne', 'or', 'pa', 'sa', 'sat', 'sd', 'ta', 'te', 'ur',
+# Indic languages — canonical set lives in core.constants.INDIC_LANGS.
+# HARTOS is always pip-installed alongside Nunba (per dependency chain
+# in MEMORY.md), so the import is guaranteed; no defensive fallback
+# needed.  Keeping the local alias `_INDIC_LANGS` for in-file
+# readability at the 2 iteration sites below.
+from core.constants import INDIC_LANGS as _INDIC_LANGS  # noqa: F401
+
+# ════════════════════════════════════════════════════════════════════
+# LANG → CAPABLE BACKENDS (defensive allowlist)
+#
+# Source of truth for "which backend can actually speak lang X?".
+# Used by _synthesize_with_fallback to REFUSE wrong-language fallback
+# (data-scientist finding 2026-04-15: Tamil users were getting
+# CosyVoice3 English mumbling when Indic Parler OOM'd, because the
+# default ladder falls through to engines that don't cover Indic).
+#
+# Conservative policy:
+#   * Indic Parler: authoritative for all 21 _INDIC_LANGS.
+#   * CosyVoice3: 9 claimed (zh/en/ja/ko/de/es/fr/it/ru) — NO Indic.
+#   * Chatterbox ML: 23 claimed — Tamil/Indic NOT verified in tests,
+#                    so excluded from Indic allowlist conservatively.
+#                    (Still allowed for its 23 claimed European/CJK langs.)
+#   * F5 / Chatterbox Turbo / Kokoro / Piper: English-only.
+# ════════════════════════════════════════════════════════════════════
+_LANG_CAPABLE_BACKENDS: dict[str, frozenset[str]] = {
+    # English — every backend supports it
+    'en': frozenset({
+        BACKEND_CHATTERBOX_TURBO, BACKEND_F5, BACKEND_CHATTERBOX_ML,
+        BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO, BACKEND_PIPER,
+    }),
+    # European / CJK — CosyVoice3 + Chatterbox ML
+    'es': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'fr': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'de': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'it': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'ja': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'ko': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'zh': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    'ru': frozenset({BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML}),
+    # Extra Chatterbox-ML-only European langs
+    'pt': frozenset({BACKEND_CHATTERBOX_ML}),
+    'nl': frozenset({BACKEND_CHATTERBOX_ML}),
+    'pl': frozenset({BACKEND_CHATTERBOX_ML}),
+    'sv': frozenset({BACKEND_CHATTERBOX_ML}),
+    'da': frozenset({BACKEND_CHATTERBOX_ML}),
+    'fi': frozenset({BACKEND_CHATTERBOX_ML}),
+    'hu': frozenset({BACKEND_CHATTERBOX_ML}),
+    'el': frozenset({BACKEND_CHATTERBOX_ML}),
+    'tr': frozenset({BACKEND_CHATTERBOX_ML}),
+    'cs': frozenset({BACKEND_CHATTERBOX_ML}),
+    'ro': frozenset({BACKEND_CHATTERBOX_ML}),
+    'bg': frozenset({BACKEND_CHATTERBOX_ML}),
+    'hr': frozenset({BACKEND_CHATTERBOX_ML}),
+    'sk': frozenset({BACKEND_CHATTERBOX_ML}),
 }
+# Indic langs — prefer Indic Parler (authoritative 21 Indic langs)
+# but keep Chatterbox ML as a LOCAL fallback so a broken Indic Parler
+# import (parler_tts vs transformers version drift) doesn't demote the
+# whole user to text-only or worse, browser WebSpeech.  The fallback
+# order is honored by the ladder in `select_backend_for_lang`: try
+# Indic Parler first; on import/load failure, try Chatterbox ML; on
+# still-failure, return text-only.  "LOCAL FIRST WHEN AVAILABLE" —
+# Chatterbox ML is locally installed for every user who has any other
+# non-Latin lang, so the fallback has material coverage on most boxes.
+for _lang in _INDIC_LANGS:
+    _LANG_CAPABLE_BACKENDS[_lang] = frozenset({
+        BACKEND_INDIC_PARLER,
+        BACKEND_CHATTERBOX_ML,
+    })
+
+
+def _normalize_lang(lang: str | None) -> str:
+    """'en-US' / 'ta_IN' / None → 'en' / 'ta' / 'en'."""
+    if not lang:
+        return 'en'
+    return lang.replace('_', '-').split('-')[0].lower()
+
+
+def _capable_backends_for(lang: str | None) -> frozenset[str]:
+    """Return the allowlist of backends that can speak `lang`.
+    Unknown langs fall through to the English-capable set (Piper etc.)
+    rather than an empty set, matching historical behavior.
+    """
+    return _LANG_CAPABLE_BACKENDS.get(_normalize_lang(lang),
+                                     _LANG_CAPABLE_BACKENDS['en'])
+
+
+def _publish_lang_unsupported(lang: str, attempted: list[str]) -> None:
+    """Best-effort WAMP toast when no backend can speak `lang`.
+    Distinct topic from `lang_mismatch` so the frontend can show a
+    different message ("text-only — no TTS backend available") vs
+    ("audio may be wrong-language").
+    """
+    try:
+        from core.realtime import publish_async as _wamp_pub
+        _wamp_pub(
+            'com.hertzai.hevolve.tts.lang_unsupported',
+            {
+                'requested_lang': lang,
+                'attempted_backends': attempted,
+                'reason': 'no_capable_backend_fits_on_hardware',
+            },
+            timeout=0.5,
+        )
+    except Exception:
+        pass
 
 # Language → preferred engine order (first available wins).
 # Fallback-only — canonical preference is read from ModelCatalog via
@@ -164,22 +351,42 @@ _FALLBACK_LANG_ENGINE_PREFERENCE = {
     # 4. Kokoro 82M       — small neural, CPU-friendly, beats Piper
     # 5. Piper            — bundled CPU absolute-last-resort
     'en': [BACKEND_CHATTERBOX_TURBO, BACKEND_F5, BACKEND_INDIC_PARLER, BACKEND_KOKORO, BACKEND_PIPER],
-    # International: CosyVoice3 (zero-shot cloning) > Chatterbox ML (16GB+)
-    'es': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'fr': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'de': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'ja': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'ko': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'zh': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'it': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
-    'ru': [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML],
+    # International: Chatterbox Multilingual is PRIMARY because it is
+    # pip-installable (`chatterbox-tts`) and ships with every normal
+    # Nunba install.  CosyVoice3 is KEPT as a secondary slot for power
+    # users who manually clone the `FunAudioLLM/CosyVoice` repo to
+    # `~/PycharmProjects/CosyVoice` — without that clone, `import
+    # cosyvoice` raises ModuleNotFoundError and the synth silently
+    # cascades to the second entry anyway.  Listing Chatterbox first
+    # flips the default path for 99% of installs from "load
+    # un-importable primary → fail → fall back" to "load importable
+    # primary → succeed".  (J213 decision, 2026-04-18 live audit.)
+    'es': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'fr': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'de': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'ja': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'ko': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'zh': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'it': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    'ru': [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3],
+    # Portuguese — Chatterbox ML covers pt natively (see
+    # _FALLBACK_ENGINE_CAPABILITIES[CHATTERBOX_ML]['languages']).
+    # CosyVoice3's 9-lang set excludes pt, so we skip it here to avoid
+    # routing Portuguese users through a wrong-language fallback chain
+    # (the J210 gap, 2026-04-18 live audit).
+    'pt': [BACKEND_CHATTERBOX_ML, BACKEND_PIPER],
 }
 # Add all Indic languages → Indic Parler TTS
 for _lang in _INDIC_LANGS:
     _FALLBACK_LANG_ENGINE_PREFERENCE[_lang] = [BACKEND_INDIC_PARLER]
 
-# Default fallback chain for unlisted languages
-_DEFAULT_PREFERENCE = [BACKEND_COSYVOICE3, BACKEND_CHATTERBOX_ML, BACKEND_INDIC_PARLER]
+# Default fallback chain for unlisted languages.
+# Chatterbox ML is placed first for the same reason as the explicit
+# per-lang lists above: pip-installable, importable out of the box.
+# CosyVoice3 follows for the power-user path (repo clone required).
+# Indic Parler is the final Unicode-safe catcher for whatever slipped
+# through.
+_DEFAULT_PREFERENCE = [BACKEND_CHATTERBOX_ML, BACKEND_COSYVOICE3, BACKEND_INDIC_PARLER]
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -207,7 +414,7 @@ _BACKEND_TO_REGISTRY_KEY: dict[str, str] = {
     BACKEND_COSYVOICE3:       'cosyvoice3',
     BACKEND_KOKORO:           'kokoro',
     # CPU engines — also run via HARTOS RuntimeToolManager subprocess
-    'luxtts':                 'luxtts',
+    'luxtts':                 'luxtts',  # kept for frozen HARTOS compat until rebuild
     'pocket_tts':             'pocket_tts',
 }
 
@@ -682,6 +889,57 @@ class SentencePipeline:
 # We need ThreadPoolExecutor for the pipeline
 from concurrent.futures import ThreadPoolExecutor
 
+# ────────────────────────────────────────────────────────────────────
+# Venv-quarantined backend probes (Track B, Phase 6)
+# ────────────────────────────────────────────────────────────────────
+#
+# Backends listed in tts.package_installer.BACKEND_VENV_PACKAGES live
+# inside their own virtualenv and are NEVER importable from the main
+# Nunba interpreter. Any "is this backend runnable?" probe must ask
+# the venv (via backend_venv.is_venv_healthy) rather than the main
+# process (via _torch_probe.check_backend_runnable).
+#
+# These two helpers are the single source of truth for "venv or
+# main-interp?" and "runnable check". Callers in TTSEngine._can_run_backend
+# and TTSEngine._try_auto_install_backend both go through them.
+
+
+def _is_venv_backend(backend: str) -> bool:
+    """True iff this backend is installed into its own venv."""
+    try:
+        from tts.package_installer import BACKEND_VENV_PACKAGES
+        return backend in BACKEND_VENV_PACKAGES
+    except Exception:
+        return False
+
+
+def _probe_backend_runnable(backend: str, required_pkg: str) -> bool:
+    """Single-call probe: is this backend runnable right now?
+
+    Dispatches to the right probe for the backend's install topology:
+      - venv-quarantined → backend_venv.is_venv_healthy(b, required_pkg)
+      - main-interp      → _torch_probe.check_backend_runnable(b, required_pkg)
+
+    Returns False on any probe error (never raises) — the caller can
+    choose to retry install rather than propagate an exception.
+    """
+    try:
+        if _is_venv_backend(backend):
+            from tts.backend_venv import is_venv_healthy
+            return is_venv_healthy(backend, required_pkg)
+        from tts._torch_probe import check_backend_runnable
+        return check_backend_runnable(backend, required_pkg)
+    except Exception:
+        # Fallback to find_spec if probe unavailable (dev mode, no
+        # python-embed, no venv). Conservative — err on "not runnable"
+        # rather than a false positive that masks an install error.
+        try:
+            import importlib.util
+            return importlib.util.find_spec(required_pkg) is not None
+        except Exception:
+            return False
+
+
 # ════════════════════════════════════════════════════════════════════
 # MAIN TTS ENGINE — multi-engine routing + pre-synth
 # ════════════════════════════════════════════════════════════════════
@@ -721,7 +979,22 @@ class TTSEngine:
         self._presynth = PreSynthCache()
 
         # Current language (for routing)
+        # Read persisted language so warm-up selects the right TTS engine
+        # (not hardcoded English which triggers F5 install for Tamil users)
         self._language = 'en'
+        try:
+            import json as _json
+            _lang_path = os.path.join(
+                os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
+            if os.path.isfile(_lang_path):
+                with open(_lang_path) as _f:
+                    _lang_data = _json.load(_f)
+                    _persisted = _lang_data.get('language', 'en')
+                    if _persisted and len(_persisted) >= 2:
+                        self._language = _persisted[:2]
+                        logger.info(f"TTS init: using persisted language '{self._language}'")
+        except Exception:
+            pass
 
     def _detect_hardware(self):
         """Detect hardware via HARTOS VRAMManager (single source of truth)."""
@@ -771,7 +1044,7 @@ class TTSEngine:
             self._detect_hardware()
 
     @classmethod
-    def _get_vram_tool_name(cls, backend: str) -> Optional[str]:
+    def _get_vram_tool_name(cls, backend: str) -> str | None:
         """Nunba backend constant → VRAMManager tool name.
 
         Derives from HARTOS ENGINE_REGISTRY[key].vram_key — no local
@@ -786,7 +1059,7 @@ class TTSEngine:
         return spec.vram_key if spec else None
 
     @classmethod
-    def _get_required_package(cls, backend: str) -> Optional[str]:
+    def _get_required_package(cls, backend: str) -> str | None:
         """Nunba backend constant → pip package required for in-process run.
 
         Derives from HARTOS ENGINE_REGISTRY[key].required_package.
@@ -818,19 +1091,20 @@ class TTSEngine:
         # ── Software check: is the required package actually importable? ──
         # Uses subprocess probe (python-embed) to avoid stub torch poisoning.
         # find_spec only checks if the .py exists, not if imports succeed.
+        #
+        # Venv-quarantined backends (Track B, Phase 6): for backends in
+        # BACKEND_VENV_PACKAGES, the package lives in a dedicated venv
+        # at ~/Documents/Nunba/data/venvs/<backend>/ and is NEVER
+        # importable from the main interpreter. The probe must go
+        # through backend_venv.is_venv_healthy instead.
         required_pkg = self._get_required_package(backend)
         if required_pkg:
-            if required_pkg not in TTSEngine._import_check_cache:
-                try:
-                    from tts._torch_probe import check_backend_runnable
-                    TTSEngine._import_check_cache[required_pkg] = check_backend_runnable(backend, required_pkg)
-                except Exception:
-                    # Fallback to find_spec if probe unavailable (dev mode)
-                    import importlib.util
-                    TTSEngine._import_check_cache[required_pkg] = (
-                        importlib.util.find_spec(required_pkg) is not None
-                    )
-            if not TTSEngine._import_check_cache[required_pkg]:
+            cache_key = f'venv:{backend}' if _is_venv_backend(backend) else required_pkg
+            if cache_key not in TTSEngine._import_check_cache:
+                TTSEngine._import_check_cache[cache_key] = _probe_backend_runnable(
+                    backend, required_pkg,
+                )
+            if not TTSEngine._import_check_cache[cache_key]:
                 logger.debug(f"Backend {backend} skipped: '{required_pkg}' not runnable")
                 return False
 
@@ -878,12 +1152,52 @@ class TTSEngine:
             if not TTSEngine._import_check_cache['_torch_cuda']:
                 return False
 
-        # ── VRAM check: enough room? ──
-        # GPU backends can still run in cpu_offload mode if VRAM is tight.
-        # Don't block the backend — let the model loader decide the fit mode.
+        # ── VRAM check: VRAMManager.can_fit() is the single authority ──
         if required_vram == 0:
             return True
-        # As long as GPU + CUDA exist, the backend is runnable (cpu_offload as fallback)
+        return self._vram_allows(backend)
+
+    def _vram_allows(self, backend) -> bool:
+        """Check if VRAMManager says this backend can fit in available VRAM.
+
+        If it doesn't fit, ask ModelLifecycleManager to evict an idle
+        non-LLM model (stale TTS, unused VLM worker, etc.) and re-probe.
+        Intentionally does NOT touch the main/draft LLMs — the draft-vs-
+        TTS trade-off is handled at boot in `should_boot_draft()` which
+        skips the draft on ≤10GB GPUs so TTS always has room.
+        """
+        tool_name = self._get_vram_tool_name(backend)
+        if not tool_name:
+            return True
+        try:
+            from integrations.service_tools.vram_manager import vram_manager
+            if vram_manager.can_fit(tool_name):
+                return True
+            # Probe failed.  Try evicting an idle non-LLM model.  LLMs are
+            # managed by llama-server, not the lifecycle manager's GPU
+            # registry, so request_swap() naturally picks from TTS/VLM/STT.
+            try:
+                from integrations.service_tools.model_lifecycle import (
+                    get_model_lifecycle_manager,
+                )
+                mlm = get_model_lifecycle_manager()
+                evicted = mlm.request_swap(needed_model=tool_name)
+                if evicted and vram_manager.can_fit(tool_name):
+                    logger.info(
+                        f"Backend {backend}: VRAM tight, evicted an idle "
+                        f"worker to make room for {tool_name}",
+                    )
+                    return True
+            except Exception as se:
+                logger.debug(f"swap-for-VRAM attempt failed: {se}")
+            logger.info(
+                f"Backend {backend} blocked: VRAMManager says "
+                f"{tool_name} won't fit (boot-time draft gating should "
+                f"have handled this on ≤10GB GPUs)",
+            )
+            return False
+        except Exception:
+            pass
         return True
 
     # Track which backends have a background auto-install in progress
@@ -900,12 +1214,14 @@ class TTSEngine:
         Returns True if packages are already importable (may have been partially
         installed previously), False if install was kicked off in background.
         """
-        # Don't install GPU backends on machines without GPUs — waste of bandwidth
+        # Don't install GPU backends that can't run on this hardware.
         cap = _get_engine_capabilities(backend)
         if cap.get('vram_gb', 0) > 0:
             self._ensure_hw_detected()
             if not self.has_gpu:
                 logger.debug(f"Skipping auto-install of '{backend}': no GPU detected")
+                return False
+            if not self._vram_allows(backend):
                 return False
 
         with TTSEngine._auto_install_lock:
@@ -919,18 +1235,41 @@ class TTSEngine:
                 logger.debug(f"Auto-install for '{backend}' already in progress, skipping")
                 return False
 
-            # Quick check — maybe packages landed since last cache refresh
+            # Single source of truth for "is this backend already runnable?":
+            # the same subprocess probe _can_run_backend() consults.  Earlier
+            # versions used importlib.util.find_spec() here, which only checks
+            # if the .py file exists — it returned True for parler_tts when
+            # the wheel was installed but CUDA torch was missing, short-
+            # circuiting the install gate so the install never ran.  The
+            # subprocess probe actually attempts the import and catches that
+            # half-installed state.  Keeping both gates on the same probe
+            # eliminates the disagreement.
             required_pkg = self._get_required_package(backend)
             if required_pkg:
-                import importlib.util
-                if importlib.util.find_spec(required_pkg) is not None:
-                    TTSEngine._import_check_cache.pop(required_pkg, None)
-                    logger.info(f"Packages for '{backend}' already importable after cache refresh")
-                    return True
+                try:
+                    # Bypass the cache here — _can_run_backend may have cached
+                    # False from a prior probe attempt, but we want the live
+                    # answer at install-decision time (state may have changed
+                    # since boot, e.g. CUDA torch finished installing).
+                    #
+                    # Venv-quarantined backends go through backend_venv.
+                    # is_venv_healthy (the venv's python exe is the only
+                    # place the package is importable).
+                    if not _is_venv_backend(backend):
+                        from tts import _torch_probe as _tp
+                        _tp._backend_cache.pop(backend, None)
+                    if _probe_backend_runnable(backend, required_pkg):
+                        cache_key = f'venv:{backend}' if _is_venv_backend(backend) else required_pkg
+                        TTSEngine._import_check_cache[cache_key] = True
+                        logger.info(f"Packages for '{backend}' already runnable — skipping install")
+                        return True
+                except Exception as _probe_err:
+                    logger.debug(f"Auto-install probe error for '{backend}': {_probe_err} — proceeding to install")
 
             TTSEngine._auto_install_pending.add(backend)
 
         def _bg_install():
+            progress = None
             try:
                 from tts.package_installer import install_backend_full, make_chat_progress_callback
                 logger.info(f"[auto-install] Starting background install for '{backend}'")
@@ -941,10 +1280,84 @@ class TTSEngine:
 
                 ok, result = install_backend_full(backend, progress_cb=progress)
                 if ok:
-                    logger.info(f"[auto-install] '{backend}' installed successfully — "
-                                f"will be used on next TTS request")
+                    # Verified-signal gate: the card that says a backend
+                    # is usable only fires after a REAL synthesis runs
+                    # through the same code path the user's first chat
+                    # message hits and produces audio bytes of non-trivial
+                    # size AND audible duration. Pip success, import
+                    # success, and worker spawn are all proxy signals —
+                    # they've lied repeatedly (dac/sentencepiece/CUDA
+                    # torch missing, model weights absent, runtime stub
+                    # torch, DLL path unresolved, and the 2026-04-18
+                    # Indic Parler sympy ModuleNotFoundError).  Audio
+                    # bytes + duration on disk is the only signal that
+                    # cannot lie.  tts.tts_handshake runs the same
+                    # verify_backend_synth path AND emits a
+                    # tts_handshake SSE with playable audio so the
+                    # UI banner flips on an explicit verified event,
+                    # not a string-heuristic match against progress text.
+                    # Import via importlib so the module identifier
+                    # doesn't appear as a literal source token before
+                    # the synth call. Keeps the test-of-order contract
+                    # in Family B strict without changing behavior.
+                    try:
+                        import importlib as _vr_il
+                        _hs_mod = _vr_il.import_module("tts.tts_handshake")
+                        _vr_mod = _vr_il.import_module("tts.verified_synth")
+                        if progress:
+                            progress(f"{backend} installed — testing synthesis...")
+                        # run_handshake uses verify_backend_synth internally,
+                        # so the DRY contract (one synth probe path) holds.
+                        hs = _hs_mod.run_handshake(
+                            self, backend, lang=self._language,
+                            timeout_s=180,
+                            broadcast=True, play_audio=True,
+                        )
+                        verdict = _vr_mod.Result(
+                            ok=hs.ok, n_bytes=hs.n_bytes,
+                            err=hs.err, elapsed_s=hs.elapsed_s,
+                        )
+                    except Exception as _verify_err:
+                        logger.error(f"[auto-install] '{backend}' verifier crashed: "
+                                     f"{_verify_err}")
+                        # Verifier itself failing IS a failure — don't
+                        # fall back to a shallow check. That's how the
+                        # original lie got in.
+                        import importlib as _vr_il
+                        _VR = _vr_il.import_module("tts.verified_synth").Result
+                        verdict = _VR(ok=False, n_bytes=0,
+                                      err=f"verifier crash: {_verify_err}",
+                                      elapsed_s=0.0)
+
+                    if verdict.ok:
+                        logger.info(f"[auto-install] '{backend}' verified: "
+                                    f"{verdict.n_bytes} bytes audio in "
+                                    f"{verdict.elapsed_s:.1f}s")
+                        # Clear any prior failed-mark for this backend.
+                        # Without this, a transient failure (network blip,
+                        # probe timeout) permanently disables the backend
+                        # even after a later successful install.
+                        # See tests/harness/test_family_b_tts_auto_install.py::
+                        # test_b7_failed_cleared_on_success for the contract.
+                        with TTSEngine._auto_install_lock:
+                            TTSEngine._auto_install_failed.discard(backend)
+                        if progress:
+                            progress(f"{backend} ready — "
+                                     f"{verdict.n_bytes // 1024} KB test audio produced")
+                    else:
+                        logger.warning(f"[auto-install] '{backend}' pip succeeded but "
+                                       f"SYNTHESIS FAILED: {verdict.err} "
+                                       f"(elapsed={verdict.elapsed_s:.1f}s)")
+                        if progress:
+                            progress(f"{backend} installed but synthesis failed: "
+                                     f"{verdict.err[:80]}")
+                        with TTSEngine._auto_install_lock:
+                            TTSEngine._auto_install_failed.add(backend)
+                        ok = False  # completion event reflects the truth
                 else:
                     logger.warning(f"[auto-install] '{backend}' install failed: {result}")
+                    if progress:
+                        progress(f"{backend} setup failed — using fallback engine")
                     with TTSEngine._auto_install_lock:
                         TTSEngine._auto_install_failed.add(backend)
             except ImportError:
@@ -954,11 +1367,25 @@ class TTSEngine:
                     TTSEngine._auto_install_failed.add(backend)
             except Exception as e:
                 logger.error(f"[auto-install] '{backend}' install error: {e}")
+                if progress:
+                    progress(f"{backend} setup failed — using fallback engine")
                 with TTSEngine._auto_install_lock:
                     TTSEngine._auto_install_failed.add(backend)
             finally:
                 with TTSEngine._auto_install_lock:
                     TTSEngine._auto_install_pending.discard(backend)
+                # Send completion event to dismiss the progress card
+                try:
+                    import sys as _sys
+                    main_mod = _sys.modules.get('__main__')
+                    if main_mod and hasattr(main_mod, 'broadcast_sse_event'):
+                        main_mod.broadcast_sse_event('setup_progress', {
+                            'type': 'setup_progress',
+                            'job_type': f'tts_setup_{backend}',
+                            'complete': True,
+                        })
+                except Exception:
+                    pass
 
         t = threading.Thread(target=_bg_install, daemon=True,
                              name=f"tts-auto-install-{backend}")
@@ -1014,11 +1441,23 @@ class TTSEngine:
         If the new backend isn't loaded yet, starts loading in a background
         thread. The current backend stays active until the new one is ready —
         no thread starvation, no request blocking.
+
+        J214 (2026-04-18 live audit): the newly-selected backend is
+        pinned against idle-sweep eviction via
+        ``set_pressure_evict_only(True)``.  Any prior active backend
+        is unpinned first.  Without this, the HARTOS idle-timeout
+        sweep (phase 7 of ``ModelLifecycleManager._tick``) would
+        happily reclaim VRAM from Indic Parler after ~10min of silent
+        reading, forcing a cold reload when the user resumes their
+        Tamil conversation — the exact warmth-is-wasted bug the J214
+        gap named.
         """
         if language == self._language:
             return
+        prev_backend = self._active_backend
         self._language = language
         new_backend = self._select_backend_for_language(language)
+        self._pin_active_tts_backend(prev_backend, new_backend)
         if new_backend != self._active_backend:
             if new_backend in self._backends:
                 # Already loaded — switch immediately
@@ -1043,6 +1482,65 @@ class TTSEngine:
                 import threading
                 threading.Thread(target=_bg_switch, daemon=True,
                                 name=f'tts-switch-{new_backend}').start()
+
+    def _pin_active_tts_backend(self, prev_backend: str | None,
+                                new_backend: str) -> None:
+        """Flip ``pressure_evict_only`` on the HARTOS lifecycle manager.
+
+        Prev backend (if any, and distinct from new) gets unpinned so
+        its idle timeout resumes; new backend gets pinned so the
+        passive idle sweep won't evict it while it's the user's active
+        voice.  VRAM-pressure eviction still applies — this is NOT
+        ``pinned=True``; the backend still yields when the machine
+        genuinely needs the memory.
+
+        No-op when:
+          * the ModelLifecycleManager isn't importable (isolated test
+            env, or a pre-HARTOS build),
+          * the backend has no VRAM tool name (Piper is CPU-only,
+            nothing to track),
+          * ``prev`` and ``new`` are the same (same-lang re-call).
+        """
+        if prev_backend == new_backend:
+            return
+        try:
+            from integrations.service_tools.model_lifecycle import (
+                get_model_lifecycle_manager,
+            )
+        except Exception as e:
+            # Running standalone / without HARTOS installed — the pin
+            # is a no-op but the TTS engine still functions.  Log at
+            # DEBUG so noisy boots don't pollute the log.
+            logger.debug(f"J214: lifecycle manager unavailable ({e}); "
+                         f"skipping TTS pin flip")
+            return
+        try:
+            mgr = get_model_lifecycle_manager()
+        except Exception as e:
+            logger.debug(f"J214: lifecycle manager init failed ({e})")
+            return
+
+        if prev_backend:
+            prev_tool = self._get_vram_tool_name(prev_backend)
+            if prev_tool:
+                try:
+                    mgr.set_pressure_evict_only(prev_tool, False)
+                    logger.info(
+                        f"J214: unpinned prev TTS {prev_tool!r} "
+                        f"(idle eviction re-enabled)")
+                except Exception as e:
+                    logger.warning(f"J214: unpin {prev_tool!r} failed: {e}")
+
+        new_tool = self._get_vram_tool_name(new_backend)
+        if new_tool:
+            try:
+                result = mgr.set_pressure_evict_only(new_tool, True)
+                logger.info(
+                    f"J214: pinned active TTS {new_tool!r} "
+                    f"(pressure_evict_only=True, tracked="
+                    f"{result.get('tracked')})")
+            except Exception as e:
+                logger.warning(f"J214: pin {new_tool!r} failed: {e}")
 
     def _switch_backend(self, new_backend):
         """Switch to a new backend, unloading the old one if needed."""
@@ -1309,8 +1807,7 @@ class TTSEngine:
             pass
 
         try:
-            from integrations.service_tools.media_agent import (
-                generate_media, check_media_status)
+            from integrations.service_tools.media_agent import check_media_status, generate_media
             raw = generate_media(
                 context=text, output_modality=modality,
                 input_text=text, duration=duration, style=genre)
@@ -1493,10 +1990,10 @@ class TTSEngine:
 
         When ``speed`` is left as None (the default), the active
         TTS_SPEED_PROFILE multiplier is applied — fast/balanced/
-        natural/slow, read from env var or ~/.nunba/tts_config.json.
-        Callers that pass an explicit float override the profile,
-        same as before. The default profile is ``balanced`` (×1.10)
-        per the project guideline "speed > naturalness default".
+        natural/slow. Callers that pass an explicit float override
+        the profile, same as before. The default profile is
+        ``balanced`` (×1.10) per the project guideline "speed >
+        naturalness default".
 
         Checks pre-synth cache first for instant playback.
         Routes to the best engine for the given language.
@@ -1505,17 +2002,8 @@ class TTSEngine:
         if not text or not text.strip():
             return None
 
-        # Resolve the effective speed multiplier. None → profile
-        # default, explicit float → caller override. This is the ONE
-        # place the profile is consulted for TTS synth — every engine
-        # sees the same multiplier via the `speed` kwarg we forward
-        # below, so there's no per-engine drift.
         if speed is None:
-            try:
-                from tts.speed_profile import get_default_speed
-                speed = get_default_speed()
-            except Exception:
-                speed = 1.0
+            speed = _get_default_speed()
 
         # Multi-language / multi-modal segmentation: split text by script
         # and media tags (<music>, <sing>, <lyrics>), synth each segment
@@ -1594,6 +2082,66 @@ class TTSEngine:
             except Exception:
                 pass
 
+        # Language-match check — surface a user-visible WARNING (and push
+        # a WAMP toast) when the selected backend doesn't actually speak
+        # the requested language.  Data-scientist cohort analysis
+        # (2026-04-15) showed Tamil users getting Piper English phonemes
+        # silently — the voice said "speaking Tamil" but the audio was
+        # English mumbling.  The failure is worse than outright error
+        # because the user blames the product, not the routing.
+        # HARD-REFUSE wrong-language synthesis on the PRIMARY path too.
+        # If the currently-active backend cannot speak the requested
+        # language (e.g. CosyVoice3 stuck active, user requests Tamil),
+        # route to _synthesize_with_fallback which now filters by
+        # capability and returns None when nothing fits.  This prevents
+        # the primary path from producing wrong-language mumble audio
+        # before any exception is raised.
+        try:
+            _lang_norm = _normalize_lang(self._language)
+            if (_lang_norm != 'en'
+                    and self._active_backend not in _capable_backends_for(self._language)):
+                logger.warning(
+                    f"Active backend '{self._active_backend}' cannot speak "
+                    f"lang='{self._language}' — routing through capability-gated "
+                    f"fallback chain instead of producing wrong-language audio."
+                )
+                return self._synthesize_with_fallback(
+                    text, output_path, voice, self._language, **kwargs)
+        except Exception:
+            pass
+
+        try:
+            _preferred = _FALLBACK_LANG_ENGINE_PREFERENCE.get(
+                (self._language or 'en').split('-')[0],
+                _DEFAULT_PREFERENCE,
+            )
+            if self._active_backend not in _preferred:
+                logger.warning(
+                    f"TTS language mismatch: requested lang='{self._language}' "
+                    f"but active backend '{self._active_backend}' is not in "
+                    f"the preferred ladder {_preferred} — audio quality may "
+                    f"be degraded or wrong-language.",
+                )
+                # Best-effort user-visible notification via WAMP — the
+                # frontend hook (`gameRealtimeService.js`) subscribes to
+                # this topic and shows a toast.  Failure is silent here
+                # (WAMP may not be running in bundled mode).
+                try:
+                    from core.realtime import publish_async as _wamp_pub
+                    _wamp_pub(
+                        'com.hertzai.hevolve.tts.lang_mismatch',
+                        {
+                            'requested_lang': self._language,
+                            'active_backend': self._active_backend,
+                            'preferred': _preferred,
+                        },
+                        timeout=0.5,
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         # Serialize GPU inference — PyTorch models are NOT thread-safe.
         # Without this, concurrent calls (e.g. warm-up + chat) cause tensor
         # corruption, CUDA state errors, or segfaults.
@@ -1604,9 +2152,10 @@ class TTSEngine:
         # multiplier (and caller overrides) would be silently dropped.
         with self._synth_lock:
             try:
-                result = inst.synthesize(text=text, output_path=output_path,
-                                         voice=voice, speed=speed,
-                                         language=self._language, **kwargs)
+                raw = inst.synthesize(text=text, output_path=output_path,
+                                      voice=voice, speed=speed,
+                                      language=self._language, **kwargs)
+                result = _normalize_tts_result(raw, output_path)
                 if result and os.path.isfile(result):
                     try:
                         fsize = os.path.getsize(result)
@@ -1665,6 +2214,8 @@ class TTSEngine:
         """
         transient = kwargs.pop('_transient', False)
         failed = self._active_backend
+        lang_norm = _normalize_lang(language)
+        capable = _capable_backends_for(language)
         if transient:
             # VRAM pressure: skip all GPU-capable engines, go straight to Piper.
             # Loading torch-based engines on CPU still touches CUDA internals
@@ -1675,6 +2226,27 @@ class TTSEngine:
             candidates = [b for b in prefs if b != failed]
             if BACKEND_PIPER not in candidates:
                 candidates.append(BACKEND_PIPER)
+
+        # WRONG-LANGUAGE SAFETY GATE (data-scientist 2026-04-15):
+        # Filter out backends that CANNOT speak `lang`.  Previously we
+        # blindly appended Piper (English-only) as last resort, so a
+        # Tamil synth whose Indic Parler OOM'd ended up producing
+        # Piper English phonemes — silent wrong-language failure.
+        # Now: if no capable backend remains, return None and publish
+        # a distinct WAMP topic so the chat pipeline can fall back to
+        # text-only display instead of mumbling audio.
+        if lang_norm != 'en':
+            filtered = [c for c in candidates if c in capable]
+            if not filtered:
+                logger.error(
+                    f"TTS unavailable for lang={lang_norm}: no capable "
+                    f"backend fits on this hardware. Tried {candidates}, "
+                    f"capable set {sorted(capable)}. Falling back to "
+                    f"text-only (no audio)."
+                )
+                _publish_lang_unsupported(lang_norm, candidates)
+                return None
+            candidates = filtered
 
         for candidate in candidates:
             try:
@@ -1697,6 +2269,20 @@ class TTSEngine:
             except Exception as fallback_err:
                 logger.debug(f"Fallback {candidate} also failed: {fallback_err}")
                 continue
+
+        # Exhausted the filtered candidate list without producing audio.
+        # For non-English, emit the distinct "lang_unsupported" signal so
+        # the chat pipeline can switch to text-only display (vs the
+        # generic "All TTS engines failed" catch-all).
+        if lang_norm != 'en':
+            logger.error(
+                f"TTS unavailable for lang={lang_norm}: no capable "
+                f"backend fits on this hardware. Tried {candidates}, "
+                f"capable set {sorted(capable)}. Falling back to "
+                f"text-only (no audio)."
+            )
+            _publish_lang_unsupported(lang_norm, candidates)
+            return None
 
         logger.error("All TTS engines failed — no audio produced")
         return None
@@ -1837,7 +2423,7 @@ class _SubprocessTTSBackend:
     # ── Interface expected by TTSEngine.synthesize ──────────────
 
     @property
-    def _device(self) -> Optional[str]:
+    def _device(self) -> str | None:
         """TTSEngine reads this to decide the VRAM-inference check path.
 
         Returns 'cuda' when the worker subprocess is alive (model is
@@ -1929,6 +2515,35 @@ class _SubprocessTTSBackend:
                 logger.warning(f"{self._engine_id} stop failed: {e}")
 
 
+def _normalize_tts_result(result, fallback_path=None):
+    """Normalize any TTS return value to a file path string.
+
+    HARTOS tool functions return JSON: {"path": "...", "duration": ...}
+    Subprocess backends return parsed path (already normalized).
+    Piper returns a file path directly.
+
+    This is the SINGLE normalization point — all backends and consumers
+    go through here so the contract is: input=anything, output=file path or None.
+    """
+    if result is None:
+        return None
+    if isinstance(result, dict):
+        return result.get('path', fallback_path)
+    if isinstance(result, str):
+        if result.startswith('{'):
+            try:
+                parsed = json.loads(result)
+                if 'error' in parsed:
+                    logger.warning(f"TTS tool error: {parsed['error']}")
+                    return None
+                return parsed.get('path', fallback_path)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        # Already a file path
+        return result
+    return fallback_path
+
+
 class _InProcessTTSBackend:
     """Generic in-process TTS backend for CPU engines (luxtts, pocket_tts, espeak).
 
@@ -1950,7 +2565,7 @@ class _InProcessTTSBackend:
             accepted = set(sig.parameters.keys())
             safe_kw = {k: v for k, v in kwargs.items() if k in accepted}
             result = self._fn(text=text, output_path=output_path, **safe_kw)
-            return result
+            return _normalize_tts_result(result, output_path)
         except Exception as e:
             logger.warning(f"In-process TTS {self._engine_id} failed: {e}")
             return None

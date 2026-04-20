@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../../testHelpers';
 import MatchPairsTemplate from '../../../../../components/Social/KidsLearning/templates/MatchPairsTemplate';
+import {renderWithProviders} from '../../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks

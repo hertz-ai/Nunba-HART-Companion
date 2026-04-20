@@ -8,7 +8,18 @@
  * - Common: contributor count, Spark invested, compute nodes
  */
 
-import React, {useState, useEffect} from 'react';
+import {experimentsApi} from '../../../services/socialApi';
+import {RADIUS} from '../../../theme/socialTokens';
+
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import BuildIcon from '@mui/icons-material/Build';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import MemoryIcon from '@mui/icons-material/Memory';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import {
   Box,
   Typography,
@@ -21,17 +32,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import MemoryIcon from '@mui/icons-material/Memory';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import BuildIcon from '@mui/icons-material/Build';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import {experimentsApi} from '../../../services/socialApi';
-import {RADIUS} from '../../../theme/socialTokens';
+import React, {useState, useEffect} from 'react';
 
 export default function ExperimentMetricsPanel({
   experimentId,

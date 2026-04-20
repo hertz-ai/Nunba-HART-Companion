@@ -1,5 +1,21 @@
-import React, {useState, useEffect} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {getProgress} from './data/kidsLearningStore';
+import {
+  kidsColors,
+  kidsRadius,
+  kidsShadows,
+  CATEGORIES,
+} from './data/kidsTheme';
+
+import {useReducedMotion, useAnimatedMount} from '../../../hooks/useAnimations';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import HistoryIcon from '@mui/icons-material/History';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import SchoolIcon from '@mui/icons-material/School';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Box,
   Typography,
@@ -14,23 +30,10 @@ import {
   Chip,
   Fade,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import SchoolIcon from '@mui/icons-material/School';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import HistoryIcon from '@mui/icons-material/History';
+import React, {useState, useEffect} from 'react';
+import {useNavigate} from 'react-router-dom';
 
-import {
-  kidsColors,
-  kidsRadius,
-  kidsShadows,
-  CATEGORIES,
-} from './data/kidsTheme';
-import {getProgress} from './data/kidsLearningStore';
-import {useReducedMotion, useAnimatedMount} from '../../../hooks/useAnimations';
+
 
 /* Colour lookup */
 const catColorMap = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.color]));

@@ -9,11 +9,11 @@
  *   onAccept   - (request) => void
  *   onDeny     - (request) => void
  */
-import React, { useState } from 'react';
-import { Box, Typography, Button, Avatar, Slide, Paper } from '@mui/material';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CallIcon from '@mui/icons-material/Call';
 import CallEndIcon from '@mui/icons-material/CallEnd';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { Box, Typography, Button, Avatar, Slide, Paper } from '@mui/material';
+import React, { useState } from 'react';
 
 const AgentContactRequest = ({ request, onAccept, onDeny }) => {
   const [responding, setResponding] = useState(false);

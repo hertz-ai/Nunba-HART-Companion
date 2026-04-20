@@ -90,10 +90,21 @@ class TestEmbedDeps:
         from scripts.deps import EMBED_DEPS
         assert 'transformers' in EMBED_DEPS
 
-    def test_chatterbox_tts_is_present(self):
-        """Chatterbox is the primary English TTS — must be in embed deps."""
-        from scripts.deps import EMBED_DEPS
-        assert 'chatterbox-tts' in EMBED_DEPS
+    def test_chatterbox_tts_is_runtime_installed(self):
+        """Chatterbox moved out of EMBED_DEPS on 2026-04-16 because it
+        pins torch==2.6.0 + numpy<1.26, which conflicts with Nunba's
+        own numpy pin (see scripts/deps.py:161).  It's now a RUNTIME
+        pip install via tts/package_installer.py::BACKEND_PACKAGES
+        — fetched on-demand only when a Chatterbox backend is selected,
+        into ~/.nunba/site-packages/ where it can't shadow embed deps.
+        """
+        from tts.package_installer import BACKEND_PACKAGES
+        turbo = BACKEND_PACKAGES.get('chatterbox_turbo', [])
+        ml = BACKEND_PACKAGES.get('chatterbox_multilingual', [])
+        assert any('chatterbox-tts' in p for p in turbo), (
+            "chatterbox-tts missing from chatterbox_turbo runtime install list")
+        assert any('chatterbox-tts' in p for p in ml), (
+            "chatterbox-tts missing from chatterbox_multilingual runtime install list")
 
 
 # ============================================================

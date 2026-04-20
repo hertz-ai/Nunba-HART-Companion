@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../testHelpers';
 import LevelBadge from '../../../../components/Social/shared/LevelBadge';
+import {renderWithProviders} from '../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 describe('LevelBadge Component', () => {
   describe('Rendering', () => {

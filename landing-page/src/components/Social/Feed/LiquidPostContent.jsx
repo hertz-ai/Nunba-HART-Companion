@@ -6,11 +6,12 @@
  *   <LiquidPostContent post={post} sx={{ mt: 1 }} />
  */
 
+import {socialTokens} from '../../../theme/socialTokens';
+import {SocialLiquidUI} from '../../shared/LiquidUI';
+
+import {Box, Typography, useTheme} from '@mui/material';
 import React, {useMemo, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {Box, Typography, useTheme} from '@mui/material';
-import {SocialLiquidUI} from '../../shared/LiquidUI';
-import {socialTokens} from '../../../theme/socialTokens';
 
 /**
  * Determine whether a value is a valid dynamic_layout (non-null object or array).

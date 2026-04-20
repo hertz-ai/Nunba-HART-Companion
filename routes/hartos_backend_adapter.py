@@ -37,9 +37,16 @@ logger = logging.getLogger(__name__)
 # but HTTP proxy to port 6777 is allowed if the service is running externally.
 _BUNDLED_MODE = bool(os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False))
 
-# Enable HARTOS agent engine + tracing by default in Nunba
-# These must be set BEFORE hart_intelligence is imported (line ~117)
-os.environ.setdefault('HEVOLVE_AGENT_ENGINE_ENABLED', 'true')
+# Enable HARTOS tracing by default in Nunba.  AGENT_ENGINE is OPT-IN
+# (2026-04-19 regression fix): having it default-true caused a 244s cold-
+# boot stall in frozen builds because `init_agent_engine` transitively
+# pulls autogen → openai → langchain → transformers → sympy at import time,
+# and that chain races with Nunba's own `hartos-init` thread (below).  Flat
+# desktop users get no benefit from it (it's a hive/central-tier daemon),
+# so default-off is the correct default.  Hive deployments can set the env
+# var explicitly.  Smoking gun: HARTOS commit 41d99d6 ("master key changes
+# with embodied Ai integration", 2026-02-12) added the unconditional
+# init_agent_engine(app) call to init_social.
 os.environ.setdefault('AGENT_LIGHTNING_ENABLED', 'true')
 
 # Configuration
@@ -139,9 +146,10 @@ _hartos_init_lock = _threading.Lock()
 _hartos_initialized = False
 
 
-def _ensure_hartos():
-    """Check if HARTOS is ready. Non-blocking — returns current state."""
-    return _hartos_backend_available
+# NOTE: `_ensure_hartos` is defined later (after `_background_hartos_init`),
+# where it can lazy-spawn the init thread if `start_hartos_init_background()`
+# wasn't called explicitly.  Historically there was an earlier stub here; it
+# was removed 2026-04-19 to avoid a confusing duplicate definition.
 
 
 def _background_hartos_init():
@@ -189,6 +197,15 @@ def _background_hartos_init():
             _hartos_initialized = True
         except Exception as _ie:
             _hartos_initialized = True  # mark done even on failure
+            # Write to file directly — logger may be silenced in frozen builds
+            try:
+                import traceback as _tb
+                _err_path = os.path.join(os.path.expanduser('~'), 'Documents', 'Nunba', 'logs', 'hartos_init_error.log')
+                with open(_err_path, 'w') as _ef:
+                    _ef.write(f"Tier-1 import failed: {_ie}\n")
+                    _tb.print_exc(file=_ef)
+            except Exception:
+                pass
             if _BUNDLED_MODE:
                 _user_set_backend = os.environ.get('HARTOS_BACKEND_URL')
                 if _user_set_backend:
@@ -204,9 +221,53 @@ def _background_hartos_init():
                 logger.info(f"BACKEND ADAPTER: Tier-1 unavailable — Tier-2 proxy ({_ie})")
 
 
-# Start background import immediately — don't wait for first chat
-_threading.Thread(target=_background_hartos_init, daemon=True,
-                  name='hartos-init').start()
+# ── HARTOS import lifecycle — EXPLICIT KICKOFF ONLY ──
+# Previously we spawned a `hartos-init` thread at module-import time (i.e.,
+# while Nunba's `main.py` was still executing).  That thread races with
+# `_bg_import` (app.py) on the same langchain/transformers/torch module
+# import locks; Python serializes per-module, so on a cold DLL cache the
+# two threads alternate and each boot adds 30-120s of wall-clock to
+# `main.py.exec_module`.  2026-04-19 startup_trace.log confirmed this
+# via parallel Thread-9 (hartos-init) vs _bg_import stacks.
+#
+# Fix: DO NOT spawn at module load.  Caller must invoke
+# `start_hartos_init_background()` AFTER main.py is fully imported.
+# `main.py._deferred_social_init()` is the designated kickoff site.
+#
+# `_ensure_hartos()` also lazy-spawns on first query, so accidental
+# early access from an alternate call-path still works — just slower.
+
+_hartos_init_thread_started = False
+_hartos_init_thread_started_lock = _threading.Lock()
+
+
+def start_hartos_init_background():
+    """Spawn the HARTOS background init thread.  Idempotent.
+
+    Call this AFTER main.py has finished importing (e.g., from
+    `_deferred_social_init`), never from module-load path.  Safe to call
+    multiple times — only the first call spawns the thread.
+    """
+    global _hartos_init_thread_started
+    with _hartos_init_thread_started_lock:
+        if _hartos_init_thread_started:
+            return
+        _hartos_init_thread_started = True
+    _threading.Thread(target=_background_hartos_init, daemon=True,
+                      name='hartos-init').start()
+
+
+def _ensure_hartos():  # noqa: F811 — intentional override of earlier stub
+    """Check if HARTOS is ready. Non-blocking — returns current state.
+
+    If the background init thread was never started (caller skipped the
+    `_deferred_social_init` path), lazy-spawn it here so Tier-1 still has
+    a chance.  Does not block the caller.
+    """
+    if not _hartos_init_thread_started:
+        start_hartos_init_background()
+    return _hartos_backend_available
+
 
 _first_chat_logged = False
 
@@ -326,6 +387,7 @@ def chat(
     autonomous: bool = False,
     agentic_execute: bool = False,
     agentic_plan: dict = None,
+    intelligence_preference: str = 'auto',
     **kwargs
 ) -> dict[str, Any]:
     """
@@ -375,6 +437,13 @@ def chat(
     }
     if agentic_plan:
         payload["agentic_plan"] = agentic_plan
+    # Tier ladder pref: forwarded so HARTOS dispatcher can route
+    # delegate='hive' to MoE HiveMind fusion when user asks for it.
+    # Older HARTOS builds ignore unknown keys, so this is safe to send
+    # unconditionally; we still guard the key so tests that snapshot
+    # the payload shape don't see spurious defaults.
+    if intelligence_preference and intelligence_preference != 'auto':
+        payload["intelligence_preference"] = intelligence_preference
 
     # Direct in-process call when hart-backend is available
     if _hartos_backend_available and _hevolve_app:

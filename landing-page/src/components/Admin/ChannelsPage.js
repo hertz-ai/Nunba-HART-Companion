@@ -1,7 +1,18 @@
 import {channelsApi} from '../../services/socialApi';
-import ChannelSetupWizard from '../Channels/ChannelSetupWizard';
 import ChannelPresenceIndicator from '../Channels/ChannelPresenceIndicator';
+import ChannelSetupWizard from '../Channels/ChannelSetupWizard';
 
+import AddIcon from '@mui/icons-material/Add';
+import ChatIcon from '@mui/icons-material/Chat';
+import CloseIcon from '@mui/icons-material/Close';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import StorageIcon from '@mui/icons-material/Storage';
+import TelegramIcon from '@mui/icons-material/Telegram';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   Typography,
   Card,
@@ -23,17 +34,6 @@ import {
   TextField,
   MenuItem,
 } from '@mui/material';
-import TelegramIcon from '@mui/icons-material/Telegram';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import ChatIcon from '@mui/icons-material/Chat';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import StorageIcon from '@mui/icons-material/Storage';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import React, {useState, useEffect} from 'react';
 
 const CHANNEL_TYPES = [

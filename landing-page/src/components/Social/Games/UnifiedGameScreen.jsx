@@ -1,21 +1,23 @@
-import React, {useState, useEffect, useMemo} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
-import {Box, Typography, CircularProgress, Button} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AdultLobby from './AdultLobby';
 import AdultGameShell from './AdultGameShell';
+import AdultLobby from './AdultLobby';
 import {LiveScoreBar, MultiplayerResults} from './AdultScoreboard';
-import TriviaEngine from './engines/TriviaEngine';
 import BoardGameEngine from './engines/BoardGameEngine';
 import PhaserGameBridge from './engines/PhaserGameBridge';
+import SudokuEngine from './engines/SudokuEngine';
+import TriviaEngine from './engines/TriviaEngine';
 import WordScrambleEngine from './engines/WordScrambleEngine';
 import WordSearchEngine from './engines/WordSearchEngine';
-import SudokuEngine from './engines/SudokuEngine';
-import useMultiplayerSync from '../KidsLearning/shared/useMultiplayerSync';
-import {gamesApi} from '../../../services/socialApi';
+
 import {LOCAL_CATALOG} from '../../../hooks/useGameCatalog';
+import {gamesApi} from '../../../services/socialApi';
 import {RADIUS} from '../../../theme/socialTokens';
 import {animFadeInUp} from '../../../utils/animations';
+import useMultiplayerSync from '../KidsLearning/shared/useMultiplayerSync';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import {Box, Typography, CircularProgress, Button} from '@mui/material';
+import React, {useState, useEffect, useMemo} from 'react';
+import {useParams, useNavigate} from 'react-router-dom';
 
 // ─── Engine placeholder for engines not yet implemented ───
 function EnginePlaceholder({label}) {

@@ -1,5 +1,10 @@
-import React, {useState, useEffect} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {onboardingApi} from '../../../services/socialApi';
+
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import {
   Paper,
   Typography,
@@ -10,12 +15,9 @@ import {
   Slide,
   useTheme,
 } from '@mui/material';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CloseIcon from '@mui/icons-material/Close';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
-import {onboardingApi} from '../../../services/socialApi';
+import React, {useState, useEffect} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 const STEPS = [
   {key: 'welcome', label: 'Welcome', path: null},

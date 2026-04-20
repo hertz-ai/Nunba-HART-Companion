@@ -1,11 +1,12 @@
-import React, {useEffect, useRef} from 'react';
-import {Box, Typography} from '@mui/material';
 import {
   kidsColors,
   kidsRadius,
   kidsShadows,
   kidsTransitions,
 } from '../data/kidsTheme';
+
+import {Box, Typography} from '@mui/material';
+import React, {useEffect, useRef} from 'react';
 
 /**
  * MediaLoadingIndicator

@@ -1,32 +1,34 @@
 import logo_dark from './../images/logo-dark.png';
 import Spacer from './Spacer';
+import Header from './TeacherLanding/Header';
+
+import {mailerApi} from '../services/socialApi';
 import {logger} from '../utils/logger';
 
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {RemoveRounded, AddRounded} from '@mui/icons-material';
+import {Autocomplete} from '@mui/lab';
+import Alert from '@mui/lab/Alert';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import {green, purple} from '@mui/material/colors';
 import Container from '@mui/material/Container';
-import {withStyles, useTheme} from '@mui/material/styles';
-import React, {useState, useEffect} from 'react';
-import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
+import Link from '@mui/material/Link';
+import {withStyles, useTheme} from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import React, {useState, useEffect} from 'react';
 
 // import {faUserPlus, faSearch} from '@fortawesome/fontawesome-free';
 
 import {useNavigate} from 'react-router-dom';
-import {Autocomplete} from '@mui/lab';
 import {useLocation} from 'react-router-dom';
 import Select, {components} from 'react-select';
-import {RemoveRounded, AddRounded} from '@mui/icons-material';
-import {mailerApi} from '../services/socialApi';
-import Alert from '@mui/lab/Alert';
-import Header from './TeacherLanding/Header';
+
 import './TeacherLanding/TeacherHome.css';
 
 const sxStyles = {
@@ -142,8 +144,8 @@ export default function CreateCourse() {
       });
   };
   useEffect(() => {
-    let access_token = localStorage.getItem('hevolve_access_token');
-    //TODO - verify the access token
+    const access_token = localStorage.getItem('hevolve_access_token');
+    // TODO - verify the access token
     if (access_token != null) {
       if (access_token.trim().length == 0) {
         navigate('/teacher/signin');

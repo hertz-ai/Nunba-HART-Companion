@@ -11,7 +11,7 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React from 'react';
+import {kidsColors} from '../kidsTheme';
 import CanvasGameBridge from '../shared/CanvasGameBridge';
 import ParticlePool from '../shared/CanvasParticles';
 import {
@@ -21,7 +21,8 @@ import {
   hitTestRect,
 } from '../shared/CanvasSprites';
 import {GameSounds} from '../shared/SoundManager';
-import {kidsColors} from '../kidsTheme';
+
+import React from 'react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,7 @@ class RunnerGame {
     });
 
     // Place wrong answers in remaining lanes
-    let wrongOptions = options.filter((_, idx) => idx !== correctIdx);
+    const wrongOptions = options.filter((_, idx) => idx !== correctIdx);
     for (let i = 1; i < LANE_COUNT; i++) {
       const lane = laneAssignments[i];
       const wrongText =

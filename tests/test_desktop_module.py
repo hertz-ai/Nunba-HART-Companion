@@ -175,6 +175,14 @@ class TestPlatformUtils:
 
     # -- get_subprocess_flags --
 
+    @pytest.mark.skipif(
+        sys.platform != 'win32',
+        reason='get_subprocess_flags() on Windows uses subprocess.STARTUPINFO / '
+               'STARTF_USESHOWWINDOW / SW_HIDE / CREATE_NO_WINDOW, none of '
+               'which exist in Python on Linux/macOS — patching IS_WINDOWS=True '
+               'alone can\'t fake them. The non-Windows behaviour is covered '
+               'by test_subprocess_flags_non_windows below.'
+    )
     @patch("desktop.platform_utils.IS_WINDOWS", True)
     def test_subprocess_flags_windows(self):
         pu = self._import_module()

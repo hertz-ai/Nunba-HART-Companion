@@ -1,5 +1,9 @@
 import {moderationApi} from '../../services/socialApi';
 
+import CancelIcon from '@mui/icons-material/Cancel';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ReportIcon from '@mui/icons-material/Report';
+import WarningIcon from '@mui/icons-material/Warning';
 import {
   Typography,
   Card,
@@ -11,10 +15,6 @@ import {
   Fade,
   Grow,
 } from '@mui/material';
-import ReportIcon from '@mui/icons-material/Report';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import WarningIcon from '@mui/icons-material/Warning';
 import React, {useState, useEffect} from 'react';
 
 // Reusable styles
@@ -107,7 +107,7 @@ export default function ModerationPage() {
   const handleReview = async (reportId, action) => {
     setActionLoading(reportId);
     try {
-      await moderationApi.reviewReport(reportId, {action});
+      await moderationApi.resolveReport(reportId, {action});
       setReports((prev) =>
         prev.map((r) => (r.id === reportId ? {...r, status: action} : r))
       );

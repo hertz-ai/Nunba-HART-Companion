@@ -4,41 +4,19 @@ import {
   AZURE_LOGIN_URL,
   AZURE_OTP_VERIFY_URL,
 } from '../config/apiBase';
-
+import {agentApi, authApi, chatApi, mailerApi} from '../services/socialApi';
+import {getStableDeviceId} from '../utils/deviceId';
 import {encrypt} from '../utils/encryption';
+import {logger} from '../utils/logger';
+
+import axios from 'axios';
 import {getCountries, getCountryCallingCode} from 'libphonenumber-js';
 import {X, User, ChevronDown, Mail, Phone, Search} from 'lucide-react';
+import {RefreshCw, Wifi, WifiOff} from 'lucide-react';
 import React, {useState, useEffect} from 'react';
 import {createPortal} from 'react-dom';
 import {useNavigate} from 'react-router-dom';
 import {v4 as uuidv4} from 'uuid';
-import axios from 'axios';
-import {RefreshCw, Wifi, WifiOff} from 'lucide-react';
-import {agentApi, authApi, chatApi, mailerApi} from '../services/socialApi';
-import {logger} from '../utils/logger';
-
-/**
- * Get a stable, hardware-based device ID from the local backend.
- * Falls back to a localStorage-cached random UUID only when the backend
- * is unreachable (offline mode).
- */
-const getStableDeviceId = async () => {
-  try {
-    const res = await axios.get(`${API_BASE_URL}/status`, {timeout: 3000});
-    if (res.data?.device_id) {
-      localStorage.setItem('device_id', res.data.device_id);
-      return res.data.device_id;
-    }
-  } catch {
-    // Backend unreachable — use cached or generate fallback
-  }
-  let cached = localStorage.getItem('device_id');
-  if (!cached) {
-    cached = uuidv4();
-    localStorage.setItem('device_id', cached);
-  }
-  return cached;
-};
 
 // Three-word name generator word lists (Adjective.Color.Username format)
 const ADJECTIVES = [

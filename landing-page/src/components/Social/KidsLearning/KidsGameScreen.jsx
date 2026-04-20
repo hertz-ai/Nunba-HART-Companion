@@ -1,3 +1,16 @@
+
+import {getGameById} from './data/gameConfigs';
+import kidsLearningStore from './data/kidsLearningStore';
+import {kidsColors} from './data/kidsTheme';
+import DynamicTemplateEngine, {getRenderMode} from './DynamicTemplateEngine';
+import ContentGenStatus from './shared/ContentGenStatus';
+import FeedbackOverlay from './shared/FeedbackOverlay';
+import GameShell from './shared/GameShell';
+import MultiplayerLobby from './shared/MultiplayerLobby';
+import {LiveScoreBar, MultiplayerResults} from './shared/MultiplayerScoreboard';
+import useMultiplayerSync from './shared/useMultiplayerSync';
+
+import {Box, Typography, CircularProgress, LinearProgress} from '@mui/material';
 import React, {
   useState,
   useCallback,
@@ -6,18 +19,6 @@ import React, {
   Suspense,
 } from 'react';
 import {useParams, useNavigate, useLocation} from 'react-router-dom';
-import {Box, Typography, CircularProgress, LinearProgress} from '@mui/material';
-
-import {getGameById} from './data/gameConfigs';
-import {kidsColors} from './data/kidsTheme';
-import kidsLearningStore from './data/kidsLearningStore';
-import GameShell from './shared/GameShell';
-import FeedbackOverlay from './shared/FeedbackOverlay';
-import ContentGenStatus from './shared/ContentGenStatus';
-import DynamicTemplateEngine, {getRenderMode} from './DynamicTemplateEngine';
-import useMultiplayerSync from './shared/useMultiplayerSync';
-import MultiplayerLobby from './shared/MultiplayerLobby';
-import {LiveScoreBar, MultiplayerResults} from './shared/MultiplayerScoreboard';
 
 /* ---------------------------------------------------------------
    Lazy-load game templates.

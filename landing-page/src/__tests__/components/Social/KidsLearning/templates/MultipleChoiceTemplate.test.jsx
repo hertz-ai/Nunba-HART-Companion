@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen, fireEvent, within} from '@testing-library/react';
-import {renderWithProviders} from '../../../../testHelpers';
 import MultipleChoiceTemplate from '../../../../../components/Social/KidsLearning/templates/MultipleChoiceTemplate';
+import {renderWithProviders} from '../../../../testHelpers';
+
+import {screen, fireEvent, within} from '@testing-library/react';
+import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks

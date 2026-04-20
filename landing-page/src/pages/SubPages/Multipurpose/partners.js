@@ -1,9 +1,11 @@
+import {logger} from '../../../utils/logger';
+
+import Grid from '@mui/material/Grid';
 import React, {Component} from 'react';
+import MetaTags from 'react-meta-tags';
 import {Link} from 'react-router-dom';
 import {ScrollTo} from 'react-scroll-to';
-import Grid from '@mui/material/Grid';
-import MetaTags from 'react-meta-tags';
-import {logger} from '../../../utils/logger';
+
 
 class Partners extends Component {
   constructor(props) {
@@ -121,12 +123,11 @@ class Partners extends Component {
                           <Grid item xs={12}>
                             <img
                               src="/MS_Startups_Celebration_Badge_Dark.png"
-                              height={120}
-                            ></img>
+                              height={120} alt="" ></img>
                           </Grid>
 
                           <Grid item xs={12}>
-                            <img src="/nvidia inception.png" height={150}></img>
+                            <img src="/nvidia inception.png" height={150} alt="" ></img>
                           </Grid>
                         </Grid>
                       </div>

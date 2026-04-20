@@ -1,5 +1,9 @@
 import {adminApi} from '../../services/socialApi';
 
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import SyncIcon from '@mui/icons-material/Sync';
 import {
   Typography,
   Button,
@@ -10,10 +14,6 @@ import {
   Grow,
   CircularProgress,
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import SyncIcon from '@mui/icons-material/Sync';
-import ErrorIcon from '@mui/icons-material/Error';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
 import React, {useState} from 'react';
 
 // Reusable card style

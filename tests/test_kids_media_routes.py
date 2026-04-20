@@ -752,7 +752,11 @@ class TestSafeSendFile:
         with open(valid_file, 'wb') as f:
             f.write(b'\x89PNG' + b'\x00' * 10)
 
-        with media_app.app_context():
+        # send_file() needs both app AND request context (it reads
+        # flask.request for conditional-response headers like ETag /
+        # If-Modified-Since).  app_context() alone isn't enough —
+        # swap to test_request_context() which provides both.
+        with media_app.test_request_context():
             resp = _safe_send_file(valid_file, "image/png", cache_root)
             # send_file returns a Response object, not a tuple
             assert hasattr(resp, 'status_code') and resp.status_code == 200

@@ -1,4 +1,5 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {RADIUS} from '../../../../theme/socialTokens';
+
 import {
   Box,
   Typography,
@@ -7,7 +8,7 @@ import {
   Fade,
   Grow,
 } from '@mui/material';
-import {RADIUS} from '../../../../theme/socialTokens';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 
 // ── Colors ──
 const COLOR_CORRECT = '#2ECC71';

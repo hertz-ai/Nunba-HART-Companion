@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Button, CircularProgress, Paper } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import { QRCodeSVG } from 'qrcode.react';
 import { channelUserApi } from '../../services/socialApi';
+
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { Box, Typography, Button, CircularProgress, Paper } from '@mui/material';
+import { QRCodeSVG } from 'qrcode.react';
+import React, { useState, useEffect, useCallback } from 'react';
+
 
 export default function QRPairingDisplay({ onPaired }) {
   const [code, setCode] = useState('');

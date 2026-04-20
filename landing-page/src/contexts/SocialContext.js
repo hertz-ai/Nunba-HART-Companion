@@ -1,3 +1,14 @@
+import {useReferral} from '../hooks/useReferral';
+import {apiCache} from '../services/apiCache';
+import realtimeService from '../services/realtimeService';
+import {
+  authApi,
+  notificationsApi,
+  resonanceApi,
+  onboardingApi,
+  mailerApi,
+} from '../services/socialApi';
+
 import React, {
   createContext,
   useContext,
@@ -6,18 +17,37 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import {
-  authApi,
-  notificationsApi,
-  resonanceApi,
-  onboardingApi,
-  mailerApi,
-} from '../services/socialApi';
-import {apiCache} from '../services/apiCache';
-import realtimeService from '../services/realtimeService';
-import {useReferral} from '../hooks/useReferral';
 
 const SocialContext = createContext();
+
+/**
+ * Recover `guest_user_id` from the Flask-injected hardware-derived
+ * id when localStorage was wiped (WebView2 UserDataFolder wipe on
+ * uninstall/reinstall).  Runs at module load so every subsequent
+ * localStorage.getItem('guest_user_id') call sees the restored id.
+ *
+ * Idempotent: if localStorage already has a guest_user_id, we leave
+ * it alone.  The stability invariant ("same hardware → same id")
+ * guarantees the injected id == the one that was wiped.
+ *
+ * See desktop/guest_identity.py for the derivation contract and
+ * J201/J206/J207 for behavioural guards.
+ */
+(function _restoreGuestIdFromInjection() {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+    const existing = localStorage.getItem('guest_user_id');
+    if (existing) return;
+    const injected = window.__NUNBA_GUEST_ID__;
+    if (injected && typeof injected === 'string') {
+      localStorage.setItem('guest_user_id', injected);
+    }
+  } catch {
+    /* quota / access — best effort */
+  }
+})();
 
 export function SocialProvider({children}) {
   // Capture referral code from URL on mount

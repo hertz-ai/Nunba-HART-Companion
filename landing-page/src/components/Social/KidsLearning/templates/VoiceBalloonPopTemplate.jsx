@@ -20,17 +20,19 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {Box, Typography, Button, Card, Fade, Grow, IconButton} from '@mui/material';
+import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
+import {kidsColors} from '../kidsTheme';
+import InlineCelebration from '../shared/InlineCelebration';
+import {GameSounds} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import {kidsColors} from '../kidsTheme';
-import {GameSounds} from '../shared/SoundManager';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
-import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
-import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import {Box, Typography, Button, Card, Fade, Grow, IconButton} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+
 
 const FEEDBACK_DELAY = 1600;
 const BALLOON_COLORS = ['#FF6B6B', '#6C63FF', '#4ECDC4', '#FF9F43', '#E040FB', '#2ECC71'];

@@ -241,7 +241,7 @@ def main():
     print(f"wrote {out}")
 
     # Compact stdout summary — top 30 files
-    print(f"\nTop 30 files by dead-candidate count:")
+    print("\nTop 30 files by dead-candidate count:")
     for f, items in list(sorted(by_file.items(), key=lambda kv: -len(kv[1])))[:30]:
         print(f"  {len(items):4d}  {f}")
 

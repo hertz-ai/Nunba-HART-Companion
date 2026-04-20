@@ -1,11 +1,13 @@
-import React from 'react';
-import {Box, Typography, Button, Chip, Avatar, useTheme} from '@mui/material';
-import {alpha} from '@mui/material/styles';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import GroupIcon from '@mui/icons-material/Group';
-import {useNavigate} from 'react-router-dom';
 import {gamesApi} from '../../../services/socialApi';
 import {RADIUS} from '../../../theme/socialTokens';
+
+import GroupIcon from '@mui/icons-material/Group';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import {Box, Typography, Button, Chip, Avatar, useTheme} from '@mui/material';
+import {alpha} from '@mui/material/styles';
+import React from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 const GAME_TYPE_LABELS = {
   trivia: 'Trivia',

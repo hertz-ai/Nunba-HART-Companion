@@ -1,9 +1,10 @@
-import React from 'react';
-import {Box, Typography} from '@mui/material';
-import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
-import PupitCardContainer from '../../PupitCardContainer';
 import {RADIUS} from '../../../theme/socialTokens';
 import {animFadeInUp} from '../../../utils/animations';
+import PupitCardContainer from '../../PupitCardContainer';
+
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import {Box, Typography} from '@mui/material';
+import React from 'react';
 
 /**
  * MindstoryPage — Social-integrated wrapper around existing PupitCardContainer.

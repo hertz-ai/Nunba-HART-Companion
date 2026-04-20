@@ -1,5 +1,8 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {challengesApi} from '../../../services/socialApi';
+import ChallengeCard, {ChallengeCardSkeleton} from '../shared/ChallengeCard';
+import EmptyState from '../shared/EmptyState';
+
+import FlagIcon from '@mui/icons-material/Flag';
 import {
   Typography,
   Box,
@@ -12,10 +15,8 @@ import {
   Fade,
   Grow,
 } from '@mui/material';
-import FlagIcon from '@mui/icons-material/Flag';
-import {challengesApi} from '../../../services/socialApi';
-import ChallengeCard, {ChallengeCardSkeleton} from '../shared/ChallengeCard';
-import EmptyState from '../shared/EmptyState';
+import React, {useState, useEffect, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 const TYPE_FILTERS = ['all', 'daily', 'weekly', 'seasonal', 'community'];
 

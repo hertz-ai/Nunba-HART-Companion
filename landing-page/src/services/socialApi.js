@@ -1,3 +1,5 @@
+import {createApiClient} from './axiosFactory';
+
 import {
   SOCIAL_API_URL,
   ADMIN_API_URL,
@@ -5,7 +7,6 @@ import {
   CLOUD_API_URL,
   MAILER_BASE_URL,
 } from '../config/apiBase';
-import {createApiClient} from './axiosFactory';
 
 const socialApi = createApiClient(SOCIAL_API_URL);
 
@@ -438,6 +439,13 @@ export const settingsApi = {
   export: () => adminApiClient.get('/config/export'),
   import: (data) => adminApiClient.post('/config/import', data),
   reset: () => adminApiClient.post('/config/reset'),
+  // Chat-restore policy (J207) — single source of truth for both
+  // frontend provider + admin UI. Wraps the canonical handlers at
+  // main.py (/api/admin/config/chat) which delegate to
+  // desktop.chat_settings. Keep this next to the other settingsApi
+  // entries so adding new settings slabs stays a one-file edit.
+  getChat: () => adminApiClient.get('/config/chat'),
+  updateChat: (data) => adminApiClient.put('/config/chat', data),
 };
 
 // --- Identity API (Agent personality) --- uses channels admin_bp at /api/admin/identity
@@ -528,6 +536,12 @@ export const chatApi = {
   // Generic passthrough (for one-off endpoints)
   get: (path, config) => chatApiClient.get(path, config),
   post: (path, data, config) => chatApiClient.post(path, data, config),
+
+  // J207 "Forget Me" — wipes guest_id.json + bucket cache on server.
+  // The confirm:true envelope is a belt-and-suspenders check the
+  // backend enforces (main.py api_guest_id_delete).
+  forgetGuest: () =>
+    chatApiClient.delete('/api/guest-id', {data: {confirm: true}}),
 };
 
 // --- Thought Experiment Tracker API ---

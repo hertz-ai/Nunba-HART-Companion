@@ -1,4 +1,8 @@
-import React, {useState, useEffect} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {onboardingApi} from '../../../services/socialApi';
+
+import CelebrationIcon from '@mui/icons-material/Celebration';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import {
   Box,
   Typography,
@@ -12,10 +16,7 @@ import {
   Paper,
   Stack,
 } from '@mui/material';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import CelebrationIcon from '@mui/icons-material/Celebration';
-import {useSocial} from '../../../contexts/SocialContext';
-import {onboardingApi} from '../../../services/socialApi';
+import React, {useState, useEffect} from 'react';
 
 const confettiKeyframes = `
 @keyframes confetti-burst {

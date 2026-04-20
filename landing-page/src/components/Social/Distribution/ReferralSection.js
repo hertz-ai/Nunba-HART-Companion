@@ -1,8 +1,9 @@
-import React, {useState, useEffect} from 'react';
-import {Box, Typography, CircularProgress} from '@mui/material';
-import ReferralCard from '../shared/ReferralCard';
-import {referralsApi} from '../../../services/socialApi';
 import {useSocial} from '../../../contexts/SocialContext';
+import {referralsApi} from '../../../services/socialApi';
+import ReferralCard from '../shared/ReferralCard';
+
+import {Box, Typography, CircularProgress} from '@mui/material';
+import React, {useState, useEffect} from 'react';
 
 export default function ReferralSection({userId}) {
   const {currentUser} = useSocial();

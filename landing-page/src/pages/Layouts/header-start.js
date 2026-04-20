@@ -1,10 +1,12 @@
+import ScrollspyNav from './Scrollspy';
+
+import logo_dark from '../../images/logo-dark.png';
+import logo_light from '../../images/logo-light.png';
+
 import React, {Component} from 'react';
 import {Link} from 'react-router-dom';
-import ScrollspyNav from './Scrollspy';
 import {Modal, ModalHeader, ModalBody} from 'reactstrap';
 
-import logo_light from '../../images/logo-light.png';
-import logo_dark from '../../images/logo-dark.png';
 
 class HeaderStart extends Component {
   constructor(props) {

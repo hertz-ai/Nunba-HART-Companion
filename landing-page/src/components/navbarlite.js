@@ -1,11 +1,12 @@
+import HevolveLogo from '../data/logo.gif';
+import HevolveLogoLight from '../data/logo.gif';
+
 import React, {useEffect, useState, useRef} from 'react';
+import ReactGA from 'react-ga';
 import {Link as RouterLink, useNavigate} from 'react-router-dom';
 import {Link as ScrollLink, animateScroll as scroll} from 'react-scroll';
 import {animateScroll as scrollLibrary} from 'react-scroll';
-import ReactGA from 'react-ga';
 
-import HevolveLogo from '../data/logo.gif';
-import HevolveLogoLight from '../data/logo.gif';
 export default function NabBarLite() {
   const navigate = useNavigate();
 
@@ -35,9 +36,9 @@ export default function NabBarLite() {
     navigate('/');
   };
 
-  /*********************/
+  /** *******************/
   /*    Menu Active    */
-  /*********************/
+  /** *******************/
   function getClosest(elem, selector) {
     // Element.matches() polyfill
     if (!Element.prototype.matches) {
@@ -48,7 +49,7 @@ export default function NabBarLite() {
         Element.prototype.oMatchesSelector ||
         Element.prototype.webkitMatchesSelector ||
         function (s) {
-          var matches = (this.document || this.ownerDocument).querySelectorAll(
+          let matches = (this.document || this.ownerDocument).querySelectorAll(
               s
             ),
             i = matches.length;
@@ -65,10 +66,10 @@ export default function NabBarLite() {
   }
 
   function activateMenu() {
-    var menuItems = document.getElementsByClassName('sub-menu-item');
+    const menuItems = document.getElementsByClassName('sub-menu-item');
     if (menuItems) {
-      var matchingMenuItem = null;
-      for (var idx = 0; idx < menuItems.length; idx++) {
+      let matchingMenuItem = null;
+      for (let idx = 0; idx < menuItems.length; idx++) {
         if (menuItems[idx].href === window.location.href) {
           matchingMenuItem = menuItems[idx];
         }
@@ -77,7 +78,7 @@ export default function NabBarLite() {
       if (matchingMenuItem) {
         matchingMenuItem.classList.add('active');
 
-        var immediateParent = getClosest(matchingMenuItem, 'li');
+        const immediateParent = getClosest(matchingMenuItem, 'li');
 
         if (immediateParent) {
           immediateParent.classList.add('active');
@@ -93,7 +94,7 @@ export default function NabBarLite() {
         if (parent) {
           parent.classList.add('active');
 
-          var parentMenuitem = parent.querySelector('.menu-item');
+          const parentMenuitem = parent.querySelector('.menu-item');
           if (parentMenuitem) {
             parentMenuitem.classList.add('active');
           }
@@ -116,13 +117,13 @@ export default function NabBarLite() {
   }
 
   if (document.getElementById('navigation')) {
-    var elements = document
+    const elements = document
       .getElementById('navigation')
       .getElementsByTagName('a');
-    for (var i = 0, len = elements.length; i < len; i++) {
+    for (let i = 0, len = elements.length; i < len; i++) {
       elements[i].onclick = function (elem) {
         if (elem.target.getAttribute('href') === '#') {
-          var submenu = elem.target.nextElementSibling.nextElementSibling;
+          const submenu = elem.target.nextElementSibling.nextElementSibling;
           submenu.classList.toggle('open');
         }
       };

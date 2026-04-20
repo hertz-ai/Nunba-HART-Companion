@@ -290,7 +290,7 @@ class TestPopulateMediaGen(unittest.TestCase):
 
     def test_acestep_entry_exists(self):
         populate_media_gen(self.catalog)
-        entry = self.catalog.get('audio_gen-acestep-1.5')
+        entry = self.catalog.get('audio_gen-acestep')
         self.assertIsNotNone(entry)
         self.assertEqual(entry.model_type, ModelType.AUDIO_GEN)
 
@@ -302,7 +302,7 @@ class TestPopulateMediaGen(unittest.TestCase):
 
     def test_acestep_tags(self):
         populate_media_gen(self.catalog)
-        tags = self.catalog.get('audio_gen-acestep-1.5').tags
+        tags = self.catalog.get('audio_gen-acestep').tags
         self.assertIn('local', tags)
         self.assertIn('music', tags)
         self.assertIn('generative', tags)
@@ -316,7 +316,7 @@ class TestPopulateMediaGen(unittest.TestCase):
 
     def test_acestep_supports_cpu(self):
         populate_media_gen(self.catalog)
-        entry = self.catalog.get('audio_gen-acestep-1.5')
+        entry = self.catalog.get('audio_gen-acestep')
         self.assertTrue(entry.supports_cpu)
         self.assertTrue(entry.supports_gpu)
 
@@ -335,13 +335,13 @@ class TestPopulateMediaGen(unittest.TestCase):
     def test_auto_load_false(self):
         """Media gen models should not auto-load."""
         populate_media_gen(self.catalog)
-        self.assertFalse(self.catalog.get('audio_gen-acestep-1.5').auto_load)
+        self.assertFalse(self.catalog.get('audio_gen-acestep').auto_load)
         self.assertFalse(self.catalog.get('video_gen-ltx2').auto_load)
 
     def test_cpu_offload_method(self):
         populate_media_gen(self.catalog)
         self.assertEqual(
-            self.catalog.get('audio_gen-acestep-1.5').cpu_offload_method,
+            self.catalog.get('audio_gen-acestep').cpu_offload_method,
             'torch_to_cpu')
         self.assertEqual(
             self.catalog.get('video_gen-ltx2').cpu_offload_method,
@@ -349,7 +349,7 @@ class TestPopulateMediaGen(unittest.TestCase):
 
     def test_idle_timeout(self):
         populate_media_gen(self.catalog)
-        self.assertEqual(self.catalog.get('audio_gen-acestep-1.5').idle_timeout_s, 300)
+        self.assertEqual(self.catalog.get('audio_gen-acestep').idle_timeout_s, 300)
         self.assertEqual(self.catalog.get('video_gen-ltx2').idle_timeout_s, 300)
 
 

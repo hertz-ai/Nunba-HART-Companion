@@ -1,5 +1,5 @@
-import React, {useEffect, useRef, useState} from 'react';
 import {Box, Typography, CircularProgress} from '@mui/material';
+import React, {useEffect, useRef, useState} from 'react';
 
 // Scene registry — lazy imports
 const SCENE_REGISTRY = {

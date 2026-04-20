@@ -1,15 +1,22 @@
+import useGameCatalog from '../../../hooks/useGameCatalog';
 import {searchApi, mcpApi, marketplaceApi} from '../../../services/socialApi';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import BuildIcon from '@mui/icons-material/Build';
-import BoltIcon from '@mui/icons-material/Bolt';
-import Chip from '@mui/material/Chip';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
 import PostCard from '../Feed/PostCard';
+import GameCard from '../Games/GameCard';
 import EmptyState from '../shared/EmptyState';
 import UserChip from '../shared/UserChip';
-import GameCard from '../Games/GameCard';
-import useGameCatalog from '../../../hooks/useGameCatalog';
 
+import BoltIcon from '@mui/icons-material/Bolt';
+import BuildIcon from '@mui/icons-material/Build';
+import SearchIcon from '@mui/icons-material/Search';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import {
   TextField,
   Tabs,
@@ -22,17 +29,11 @@ import {
   useTheme,
   keyframes,
 } from '@mui/material';
+import Chip from '@mui/material/Chip';
 import {alpha} from '@mui/material/styles';
-import SearchIcon from '@mui/icons-material/Search';
 import React, {useState, useEffect, useMemo} from 'react';
 import {useLocation, useNavigate} from 'react-router-dom';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
+
 
 const TYPES = [
   'posts',

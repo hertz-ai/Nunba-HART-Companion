@@ -1,7 +1,9 @@
-import React, {useState, useEffect} from 'react';
-import {Switch, Typography, Box} from '@mui/material';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import {encountersApi} from '../../../services/socialApi';
+
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import {Switch, Typography, Box} from '@mui/material';
+import React, {useState, useEffect} from 'react';
+
 
 export default function LocationSettingsToggle({onChange}) {
   const [enabled, setEnabled] = useState(false);

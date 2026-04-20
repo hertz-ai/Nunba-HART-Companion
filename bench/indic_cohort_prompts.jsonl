@@ -1,0 +1,50 @@
+{"id": "en-001", "lang": "en", "prompt": "Explain the difference between a stack and a queue in one short paragraph.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-002", "lang": "en", "prompt": "Write a Python function that returns the n-th Fibonacci number using memoization.", "expected_response_lang": "en", "min_tokens": 80}
+{"id": "en-003", "lang": "en", "prompt": "If a train leaves Boston at 3pm travelling 60 mph and another leaves NYC at 4pm at 75 mph, when do they meet? Give the reasoning, not just the answer.", "expected_response_lang": "en", "min_tokens": 90}
+{"id": "en-004", "lang": "en", "prompt": "Summarise the plot of Hamlet in under 100 words.", "expected_response_lang": "en", "min_tokens": 70}
+{"id": "en-005", "lang": "en", "prompt": "What are the main trade-offs between SQLite and PostgreSQL for a small production web app?", "expected_response_lang": "en", "min_tokens": 80}
+{"id": "en-006", "lang": "en", "prompt": "Translate this sentence into simple English: 'The ephemeral nature of contemporary discourse belies its profound cultural ramifications.'", "expected_response_lang": "en", "min_tokens": 40}
+{"id": "en-007", "lang": "en", "prompt": "What is the derivative of x^3 * sin(x) with respect to x? Show the product rule steps.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-008", "lang": "en", "prompt": "List five common causes of slow SQL queries and one mitigation for each.", "expected_response_lang": "en", "min_tokens": 90}
+{"id": "en-009", "lang": "en", "prompt": "Write a haiku about a rainy afternoon in a coastal village.", "expected_response_lang": "en", "min_tokens": 30}
+{"id": "en-010", "lang": "en", "prompt": "Explain what a race condition is using a bank-account example.", "expected_response_lang": "en", "min_tokens": 80}
+{"id": "en-011", "lang": "en", "prompt": "A farmer has 17 sheep; all but 9 die. How many are left? Explain the trick.", "expected_response_lang": "en", "min_tokens": 40}
+{"id": "en-012", "lang": "en", "prompt": "Compare supervised, unsupervised, and reinforcement learning in one paragraph each.", "expected_response_lang": "en", "min_tokens": 120}
+{"id": "en-013", "lang": "en", "prompt": "Write a short, polite email declining a meeting invitation for next Tuesday.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-014", "lang": "en", "prompt": "What does the acronym ACID mean in database theory?", "expected_response_lang": "en", "min_tokens": 50}
+{"id": "en-015", "lang": "en", "prompt": "Describe the water cycle for a curious 10-year-old.", "expected_response_lang": "en", "min_tokens": 80}
+{"id": "en-016", "lang": "en", "prompt": "Given the list [3, 1, 4, 1, 5, 9, 2, 6], write Python to return the three largest unique values.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-017", "lang": "en", "prompt": "What is Bayes' theorem? Give the formula and a one-line real-world example.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-018", "lang": "en", "prompt": "Outline the pros and cons of microservices vs a modular monolith.", "expected_response_lang": "en", "min_tokens": 90}
+{"id": "en-019", "lang": "en", "prompt": "Write a short motivational paragraph for a student about to start exam week.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-020", "lang": "en", "prompt": "Explain why HTTPS is more secure than HTTP in two or three sentences.", "expected_response_lang": "en", "min_tokens": 50}
+{"id": "en-021", "lang": "en", "prompt": "What does 'big-O notation' mean? Give O(1), O(log n), and O(n^2) examples.", "expected_response_lang": "en", "min_tokens": 80}
+{"id": "en-022", "lang": "en", "prompt": "Name three techniques to reduce overfitting in a neural network.", "expected_response_lang": "en", "min_tokens": 60}
+{"id": "en-023", "lang": "en", "prompt": "Compose a four-line rhyming verse about the moon.", "expected_response_lang": "en", "min_tokens": 30}
+{"id": "en-024", "lang": "en", "prompt": "What was the Treaty of Westphalia and why is it historically important?", "expected_response_lang": "en", "min_tokens": 80}
+{"id": "en-025", "lang": "en", "prompt": "Given a dictionary counting word frequencies, write Python that returns the top-k keys by value.", "expected_response_lang": "en", "min_tokens": 70}
+{"id": "ta-001", "lang": "ta", "prompt": "தண்ணீரின் முக்கியத்துவத்தை இரண்டு வாக்கியங்களில் விளக்குங்கள்.", "expected_response_lang": "ta", "min_tokens": 40}
+{"id": "ta-002", "lang": "ta", "prompt": "தமிழ்நாட்டின் ஏதாவது மூன்று பாரம்பரிய உணவுகளைப் பற்றி சுருக்கமாக எழுதுங்கள்.", "expected_response_lang": "ta", "min_tokens": 70}
+{"id": "ta-003", "lang": "ta", "prompt": "திருக்குறள் என்றால் என்ன? அதன் ஆசிரியர் யார்?", "expected_response_lang": "ta", "min_tokens": 50}
+{"id": "ta-004", "lang": "ta", "prompt": "ஒரு நல்ல நண்பனின் குணங்களை நான்கு புள்ளிகளில் எழுதுங்கள்.", "expected_response_lang": "ta", "min_tokens": 50}
+{"id": "ta-005", "lang": "ta", "prompt": "சூரிய ஒளியில் இருந்து தோலை எப்படி பாதுகாக்க வேண்டும் என்று சொல்லுங்கள்.", "expected_response_lang": "ta", "min_tokens": 60}
+{"id": "hi-001", "lang": "hi", "prompt": "भारत की राष्ट्रीय नदी कौन सी है और वह क्यों महत्वपूर्ण है?", "expected_response_lang": "hi", "min_tokens": 50}
+{"id": "hi-002", "lang": "hi", "prompt": "मानसून क्या होता है? इसे दो-तीन वाक्यों में समझाइए।", "expected_response_lang": "hi", "min_tokens": 50}
+{"id": "hi-003", "lang": "hi", "prompt": "एक स्वस्थ दिनचर्या के पाँच सुझाव लिखिए।", "expected_response_lang": "hi", "min_tokens": 60}
+{"id": "hi-004", "lang": "hi", "prompt": "महात्मा गांधी के अहिंसा सिद्धांत का आधुनिक युग में क्या महत्व है?", "expected_response_lang": "hi", "min_tokens": 70}
+{"id": "hi-005", "lang": "hi", "prompt": "एक छोटी कहानी लिखिए जिसमें एक किसान और एक पेड़ हो।", "expected_response_lang": "hi", "min_tokens": 80}
+{"id": "bn-001", "lang": "bn", "prompt": "রবীন্দ্রনাথ ঠাকুরের সাহিত্যিক অবদান সম্পর্কে সংক্ষেপে লিখুন।", "expected_response_lang": "bn", "min_tokens": 70}
+{"id": "bn-002", "lang": "bn", "prompt": "বাংলাদেশের প্রধান নদীগুলোর নাম বলুন এবং একটি সম্পর্কে কয়েক বাক্যে লিখুন।", "expected_response_lang": "bn", "min_tokens": 60}
+{"id": "bn-003", "lang": "bn", "prompt": "শীতকালে স্বাস্থ্যের যত্ন কীভাবে নেওয়া উচিত?", "expected_response_lang": "bn", "min_tokens": 60}
+{"id": "bn-004", "lang": "bn", "prompt": "একটি আদর্শ বিদ্যালয়ের পরিবেশ কেমন হওয়া উচিত?", "expected_response_lang": "bn", "min_tokens": 70}
+{"id": "bn-005", "lang": "bn", "prompt": "চা তৈরির সহজ পদ্ধতি ধাপে ধাপে লিখুন।", "expected_response_lang": "bn", "min_tokens": 50}
+{"id": "te-001", "lang": "te", "prompt": "ఆంధ్రప్రదేశ్ యొక్క ప్రసిద్ధ పర్యాటక ప్రదేశాలను పేర్కొనండి.", "expected_response_lang": "te", "min_tokens": 60}
+{"id": "te-002", "lang": "te", "prompt": "పుస్తక పఠనం వల్ల కలిగే ప్రయోజనాలు ఏమిటి?", "expected_response_lang": "te", "min_tokens": 60}
+{"id": "te-003", "lang": "te", "prompt": "ఒక మంచి ఉపాధ్యాయుడి లక్షణాలు ఏమిటి? నాలుగు పాయింట్లలో చెప్పండి.", "expected_response_lang": "te", "min_tokens": 60}
+{"id": "te-004", "lang": "te", "prompt": "వ్యాయామం ఆరోగ్యానికి ఎలా సహాయపడుతుంది అనే అంశంపై సంక్షిప్తంగా రాయండి.", "expected_response_lang": "te", "min_tokens": 60}
+{"id": "te-005", "lang": "te", "prompt": "ఒక చిన్న పిల్లవాడికి సూర్యోదయాన్ని ఎలా వివరిస్తారు?", "expected_response_lang": "te", "min_tokens": 60}
+{"id": "mr-001", "lang": "mr", "prompt": "महाराष्ट्राचा राज्य प्राणी आणि राज्य पक्षी कोणता आहे?", "expected_response_lang": "mr", "min_tokens": 40}
+{"id": "mr-002", "lang": "mr", "prompt": "छत्रपती शिवाजी महाराज यांच्या कारकिर्दीतील कोणत्याही दोन महत्त्वाच्या घटना लिहा.", "expected_response_lang": "mr", "min_tokens": 70}
+{"id": "mr-003", "lang": "mr", "prompt": "पावसाळ्यात घ्यावयाची काळजी याबद्दल तीन-चार मुद्दे लिहा.", "expected_response_lang": "mr", "min_tokens": 60}
+{"id": "mr-004", "lang": "mr", "prompt": "संगणकाचे दैनंदिन आयुष्यातील उपयोग थोडक्यात सांगा.", "expected_response_lang": "mr", "min_tokens": 60}
+{"id": "mr-005", "lang": "mr", "prompt": "एक लहान कथा लिहा ज्यात एक शाळकरी मुलगी आणि तिचा कुत्रा असेल.", "expected_response_lang": "mr", "min_tokens": 80}

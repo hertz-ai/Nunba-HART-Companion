@@ -10,27 +10,27 @@ import React, { useRef, useEffect, useCallback } from 'react';
  * - Neon glow via 3-pass stroke (bloom + mid + sharp)
  * - 60fps, zero shadowBlur, zero canvas filter
  */
-var PTS = 180;
+const PTS = 180;
 
-var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
+const VoiceVisualizer = function({ audioRef, isActive, size, style }) {
   size = size || 200;
-  var canvasRef = useRef(null);
-  var animRef = useRef(null);
-  var analyserRef = useRef(null);
-  var sourceRef = useRef(null);
-  var audioCtxRef = useRef(null);
-  var stateRef = useRef({ bass: 0, mid: 0, treble: 0, bassCur: 0, midCur: 0, trebleCur: 0, time: 0, dir: 1, wasQuiet: false });
-  var outerR = useRef(new Float32Array(PTS + 1));
+  const canvasRef = useRef(null);
+  const animRef = useRef(null);
+  const analyserRef = useRef(null);
+  const sourceRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const stateRef = useRef({ bass: 0, mid: 0, treble: 0, bassCur: 0, midCur: 0, trebleCur: 0, time: 0, dir: 1, wasQuiet: false });
+  const outerR = useRef(new Float32Array(PTS + 1));
 
-  var lastAudioEl = useRef(null);
+  const lastAudioEl = useRef(null);
 
-  var connectAnalyser = useCallback(function() {
+  const connectAnalyser = useCallback(function() {
     if (!audioRef || !audioRef.current) return;
     // Already connected to THIS audio element — skip
     if (sourceRef.current && lastAudioEl.current === audioRef.current) return;
     try {
       // Reuse existing AudioContext, create new source for new audio element
-      var ctx = audioCtxRef.current;
+      let ctx = audioCtxRef.current;
       if (!ctx || ctx.state === 'closed') {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
         audioCtxRef.current = ctx;
@@ -40,7 +40,7 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
         try { sourceRef.current.disconnect(); } catch(e) {}
         sourceRef.current = null;
       }
-      var analyser = analyserRef.current;
+      let analyser = analyserRef.current;
       if (!analyser) {
         analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
@@ -48,7 +48,7 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
         analyser.connect(ctx.destination);
         analyserRef.current = analyser;
       }
-      var source = ctx.createMediaElementSource(audioRef.current);
+      const source = ctx.createMediaElementSource(audioRef.current);
       source.connect(analyser);
       sourceRef.current = source;
       lastAudioEl.current = audioRef.current;
@@ -56,15 +56,15 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
   }, [audioRef]);
 
   useEffect(function() {
-    var canvas = canvasRef.current;
+    const canvas = canvasRef.current;
     if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    var W = canvas.width, H = canvas.height;
-    var cx = W / 2, cy = H / 2;
-    var baseR = W * 0.25;
-    var freqData = new Uint8Array(256);
-    var s = stateRef.current;
-    var oR = outerR.current;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2;
+    const baseR = W * 0.25;
+    const freqData = new Uint8Array(256);
+    const s = stateRef.current;
+    const oR = outerR.current;
 
     if (isActive) connectAnalyser();
 
@@ -75,11 +75,11 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       if (isActive && audioRef && audioRef.current && lastAudioEl.current !== audioRef.current) {
         connectAnalyser();
       }
-      var an = analyserRef.current;
+      const an = analyserRef.current;
 
       if (isActive && an) {
         an.getByteFrequencyData(freqData);
-        var bS = 0, mS = 0, tS = 0, len = freqData.length;
+        let bS = 0, mS = 0, tS = 0, len = freqData.length;
         for (var i = 0; i < len; i++) {
           if (i < len * 0.15) bS += freqData[i];
           else if (i < len * 0.5) mS += freqData[i];
@@ -100,7 +100,7 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       s.bassCur += (s.bass - s.bassCur) * 0.12;
       s.midCur += (s.mid - s.midCur) * 0.10;
       s.trebleCur += (s.treble - s.trebleCur) * 0.08;
-      var energy = s.bassCur * 0.5 + s.midCur * 0.35 + s.trebleCur * 0.15;
+      const energy = s.bassCur * 0.5 + s.midCur * 0.35 + s.trebleCur * 0.15;
 
       // Flip wave direction on natural speech pauses
       if (isActive) {
@@ -108,36 +108,36 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
         else if (s.wasQuiet && energy > 0.08) { s.wasQuiet = false; s.dir = -s.dir; }
       }
 
-      var t = s.time;
-      var d = s.dir;
+      const t = s.time;
+      const d = s.dir;
 
       ctx.clearRect(0, 0, W, H);
 
       // Background glow
-      var bg = ctx.createRadialGradient(cx, cy, baseR - 10, cx, cy, baseR + 70);
+      const bg = ctx.createRadialGradient(cx, cy, baseR - 10, cx, cy, baseR + 70);
       bg.addColorStop(0, 'rgba(108,99,255,' + (0.02 + energy * 0.06).toFixed(3) + ')');
       bg.addColorStop(1, 'rgba(10,9,20,0)');
       ctx.fillStyle = bg;
       ctx.beginPath(); ctx.arc(cx, cy, baseR + 70, 0, Math.PI * 2); ctx.fill();
 
       // Compute outer ring — peaks only outward
-      var maxPeakR = baseR;
+      let maxPeakR = baseR;
       for (var i = 0; i <= PTS; i++) {
         var a = (i / PTS) * Math.PI * 2;
         // Idle breathing — visible but calm
-        var idle =
+        const idle =
           6 * Math.sin(2 * a + t * 0.6) +
           4 * Math.sin(3 * a - t * 0.45) +
           3 * Math.sin(5 * a + t * 0.7);
-        var wave = idle +
+        const wave = idle +
           s.bassCur * 55 * Math.sin(2 * a + t * 1.5 * d) +
           s.bassCur * 32 * Math.sin(3 * a - t * 0.8 * d) +
           s.midCur * 40 * Math.sin(4 * a + t * 2.2 * d) +
           s.midCur * 24 * Math.sin(6 * a - t * 1.3 * d) +
           s.trebleCur * 28 * Math.sin(8 * a + t * 3.0 * d) +
           s.trebleCur * 16 * Math.sin(11 * a - t * 1.8 * d);
-        var soft = 8;
-        var rectified = (wave * wave) / (Math.abs(wave) + soft);
+        const soft = 8;
+        const rectified = (wave * wave) / (Math.abs(wave) + soft);
         // Scale amplitude relative to canvas size
         oR[i] = baseR + rectified * (baseR / 100);
         if (oR[i] > maxPeakR) maxPeakR = oR[i];
@@ -147,7 +147,7 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       ctx.beginPath();
       for (var i = 0; i <= PTS; i++) {
         var a = (i / PTS) * Math.PI * 2;
-        var x = cx + Math.cos(a) * oR[i], y = cy + Math.sin(a) * oR[i];
+        const x = cx + Math.cos(a) * oR[i], y = cy + Math.sin(a) * oR[i];
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       for (var i = PTS; i >= 0; i--) {
@@ -157,7 +157,7 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       ctx.closePath();
 
       if (maxPeakR > baseR + 1) {
-        var fg = ctx.createRadialGradient(cx, cy, baseR, cx, cy, maxPeakR);
+        const fg = ctx.createRadialGradient(cx, cy, baseR, cx, cy, maxPeakR);
         fg.addColorStop(0, 'rgba(10,9,20,0)');
         fg.addColorStop(0.3, 'rgba(80,60,220,' + (0.08 + energy * 0.15).toFixed(3) + ')');
         fg.addColorStop(0.7, 'rgba(108,99,255,' + (0.15 + energy * 0.25).toFixed(3) + ')');
@@ -178,11 +178,11 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       ctx.globalCompositeOperation = 'source-over';
 
       // Core — breathing glow + pulsing dot
-      var breathe1 = Math.sin(t * 1.2) * 0.3 + Math.sin(t * 1.9) * 0.15;
-      var breathe2 = Math.sin(t * 0.8) * 0.2 + Math.cos(t * 1.4) * 0.1;
+      const breathe1 = Math.sin(t * 1.2) * 0.3 + Math.sin(t * 1.9) * 0.15;
+      const breathe2 = Math.sin(t * 0.8) * 0.2 + Math.cos(t * 1.4) * 0.1;
 
-      var glowR = (8 + energy * 12 + breathe1 * 4) * 3;
-      var cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      const glowR = (8 + energy * 12 + breathe1 * 4) * 3;
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
       cg.addColorStop(0, 'rgba(200,195,255,' + (0.15 + energy * 0.5 + breathe1 * 0.08).toFixed(3) + ')');
       cg.addColorStop(0.3, 'rgba(108,99,255,' + (0.08 + energy * 0.2 + breathe2 * 0.04).toFixed(3) + ')');
       cg.addColorStop(0.6, 'rgba(80,60,200,' + (0.03 + energy * 0.08 + breathe1 * 0.02).toFixed(3) + ')');
@@ -190,15 +190,15 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
       ctx.fillStyle = cg;
       ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
 
-      var coreR = 3 + energy * 6 + breathe1 * 1.5;
-      var cg2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+      const coreR = 3 + energy * 6 + breathe1 * 1.5;
+      const cg2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
       cg2.addColorStop(0, 'rgba(220,215,255,' + (0.3 + energy * 0.5 + breathe2 * 0.1).toFixed(3) + ')');
       cg2.addColorStop(0.5, 'rgba(108,99,255,' + (0.1 + energy * 0.3 + breathe1 * 0.05).toFixed(3) + ')');
       cg2.addColorStop(1, 'rgba(108,99,255,0)');
       ctx.fillStyle = cg2;
       ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill();
 
-      var dotR = 1.5 + energy * 2.5 + Math.sin(t * 2.5) * 0.6;
+      const dotR = 1.5 + energy * 2.5 + Math.sin(t * 2.5) * 0.6;
       ctx.fillStyle = 'rgba(255,255,255,' + (0.15 + energy * 0.7 + breathe2 * 0.1).toFixed(3) + ')';
       ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI * 2); ctx.fill();
     }
@@ -241,9 +241,9 @@ var VoiceVisualizer = function({ audioRef, isActive, size, style }) {
 
 function drawRing(ctx, cx, cy, oR, color, lw) {
   ctx.beginPath();
-  for (var i = 0; i <= PTS; i++) {
-    var a = (i / PTS) * Math.PI * 2;
-    var x = cx + Math.cos(a) * oR[i], y = cy + Math.sin(a) * oR[i];
+  for (let i = 0; i <= PTS; i++) {
+    const a = (i / PTS) * Math.PI * 2;
+    const x = cx + Math.cos(a) * oR[i], y = cy + Math.sin(a) * oR[i];
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   ctx.closePath();

@@ -1,4 +1,8 @@
-import React, {useState, useEffect} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {achievementsApi} from '../../../services/socialApi';
+
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import LockIcon from '@mui/icons-material/Lock';
 import {
   Typography,
   Box,
@@ -11,10 +15,8 @@ import {
   Grow,
   keyframes,
 } from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import {achievementsApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
+import React, {useState, useEffect} from 'react';
+
 
 const RARITY_COLORS = {
   common: '#95a5a6',

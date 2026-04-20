@@ -290,8 +290,21 @@ build_exe_options = {
         "waitress",
         "requests",
 
+        "routes.auth",  # Shared auth decorator (require_local_or_token)
         "routes.chatbot_routes",  # Chatbot routes module
         "routes.kids_media_routes",  # Kids media generation routes
+
+        # core.* — architect-refactor modules (diag, optional_import,
+        # gpu_tier, hub_allowlist) now live in HARTOS core/ alongside
+        # the canonical infrastructure (http_pool, port_registry,
+        # realtime, agent_tools, platform_paths, constants).  Nunba
+        # NO LONGER has its own core/ directory — the previous split
+        # caused a namespace-package collision (Nunba core/ lacked
+        # __init__.py, HARTOS core/ has one → whichever loaded first
+        # won, hiding the other's modules at runtime).  HARTOS core/
+        # is picked up via the "Including core package" trace above,
+        # so no explicit packages list is needed here — cx_Freeze
+        # bundles everything in the package tree automatically.
 
         "uvicorn",
         "fastapi",
@@ -318,7 +331,11 @@ build_exe_options = {
         "desktop.platform_utils",  # Platform utilities
         "tts.piper_tts",  # Piper TTS for CPU text-to-speech
         "tts.package_installer",  # Runtime TTS package installer
+        "tts.backend_venv",  # Per-backend venv infra (Track A)
+        "tts.indic_parler_worker",  # Subprocess entrypoint (runs inside venv) (Track B)
         "tts.tts_engine",  # Unified TTS engine (auto-selects GPU/CPU backend)
+        "tts.tts_handshake",  # First-run voice-check handshake (gates Ready banner)
+        "tts.verified_synth",  # Verified-signal gate (consumed by tts_handshake + _bg_install)
         "desktop.ai_installer",  # Unified AI components installer
         "desktop.ai_key_vault",  # Encrypted API key vault
         "desktop.crash_reporter",  # Sentry crash reporting (auto-initialized)
@@ -328,6 +345,8 @@ build_exe_options = {
         "desktop.platform_utils",  # Platform utilities
         "desktop.splash_effects",  # Splash screen effects
         "desktop.media_classification",  # Media classification
+        "desktop.guest_identity",  # Hardware-derived stable guest_id (J201)
+        "desktop.chat_settings",  # Admin-controlled restore policy/scope (J207)
         "routes.hartos_backend_adapter",  # Backend adapter (single-file module)
         "numpy",
         "jose",  # python-jose — JWT handling (HARTOS social auth)
@@ -346,6 +365,16 @@ build_exe_options = {
         "redis",
         "bs4",
 
+        # torch._dynamo / torch.fx.experimental.symbolic_shapes import sympy
+        # at module-load time.  cx_Freeze's tracer can't follow torch (it's
+        # in excludes[] — too heavy for the main bundle) but Indic Parler's
+        # gpu_worker subprocess imports sympy through torch.  Listing sympy
+        # here is defensive per Gate 6 (feedback_frozen_build_pitfalls.md
+        # Rule 1): any runtime-discovered module must be declared.  The
+        # real install target for sympy is python-embed/Lib/site-packages/
+        # (see EMBED_DEPS in scripts/deps.py); cx_Freeze will skip it in
+        # lib/ because the main exe's sys.path resolves python-embed first.
+        "sympy",
     ],
     "zip_includes": [],
     "build_exe": "build/Nunba",
@@ -359,6 +388,31 @@ build_exe_options = {
         # (torch, transformers) are bundled via python-embed, not cx_Freeze
         "embodied_ai", "hevolveai",
         "matplotlib", "scipy", "numpy.tests",
+        # wandb is pulled transitively by autogen → flaml; never used
+        # at runtime and adds ~60MB of .exe + proto files to the build.
+        "wandb", "wandb_core",
+        # Heavy transitive deps not used at runtime (~200MB total):
+        # pandas: 37M (only chromadb.utils.results optional formatting)
+        # sklearn: 30M (only HevolveAI latent_transfer, excluded above)
+        # onnxruntime: 36M (transitive via langchain)
+        # faiss: 24M + faiss_cpu: 50M libs (transitive, chromadb optional)
+        # kubernetes: 18M (chromadb distributed mode, not enabled)
+        # grpc: 12M (chromadb/OpenTelemetry optional)
+        # lief: 12M (binary analysis, unknown transitive)
+        # bitsandbytes: 166M (HevolveAI optional GPU accelerator)
+        # NOTE: sympy was previously excluded but is load-bearing via
+        # torch._dynamo → torch.utils._sympy → sympy at import time for
+        # Indic Parler / any transformers TTS worker.  It now lives in
+        # python-embed (EMBED_DEPS) and packages[] above.
+        "pandas", "pandas.tests",
+        "sklearn", "sklearn.tests",
+        "onnxruntime",
+        "faiss", "faiss_cpu",
+        "kubernetes",
+        "grpc", "grpcio",
+        "lief",
+        "bitsandbytes",
+        "posthog",  # analytics (chromadb optional)
         "IPython", "jupyter", "notebook",
         "pandas.tests", "PIL.tests",
         "setuptools", "distutils",
@@ -398,7 +452,9 @@ build_exe_options = {
         + [(f, f) for f in glob.glob("*.json")]
         # 3. Auto-include ALL .png/.ico asset files from project root
         + [(f, f) for f in glob.glob("*.png") + glob.glob("*.ico")]
-        # 4. Key directories
+        # 4. License (origin attestation requires it)
+        + ([("LICENSE", "LICENSE")] if os.path.isfile("LICENSE") else [])
+        # 5. Key directories
         + [
             ("templates", "templates"),
             ("landing-page/build", "landing-page/build"),
@@ -979,8 +1035,9 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
                 print(f"python-embed: re-installing {_pkg_name} from {_sib_dir}...")
                 _r = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "--no-deps",
+                     "--no-build-isolation",
                      "--target", _embed_sp, "--upgrade", _sib_path],
-                    capture_output=True, text=True, timeout=600)
+                    capture_output=True, text=True, timeout=900)
                 if _r.returncode == 0:
                     print(f"python-embed: {_pkg_name} updated OK")
                 else:

@@ -375,6 +375,57 @@ export function subscribeCommunity(communityId, callback) {
   };
 }
 
+// ── TTS language-mismatch / unsupported topics ─────────────────────
+// Surfaces the silent-degradation warnings from tts_engine.py:
+//   - com.hertzai.hevolve.tts.lang_mismatch  (backend != preferred ladder)
+//   - com.hertzai.hevolve.tts.lang_unsupported (no capable backend fits)
+// Backend publishes one-off payloads via core.realtime.publish_async;
+// frontend toasts them so users know why their Tamil voice became
+// English mumbling instead of silently mis-routing.
+
+const _ttsLangListeners = new Set();
+let _ttsLangWorkerHandler = null;
+
+function _ensureTtsLangWorker() {
+  if (_ttsLangWorkerHandler || !_worker) return;
+  _ttsLangWorkerHandler = (e) => {
+    const {type, payload} = e.data || {};
+    if (type === 'TTS_LANG_EVENT' && payload) {
+      _ttsLangListeners.forEach((cb) => {
+        try {
+          cb(payload);
+        } catch (err) {
+          console.warn('TTS lang event handler error:', err);
+        }
+      });
+    }
+  };
+  _worker.addEventListener('message', _ttsLangWorkerHandler);
+  // Ask the worker to subscribe to both topics.  The worker relays as
+  // `{type:'TTS_LANG_EVENT', payload:{kind:'mismatch'|'unsupported', ...}}`
+  _worker.postMessage({
+    type: 'TTS_LANG_SUBSCRIBE',
+    payload: {
+      topics: [
+        'com.hertzai.hevolve.tts.lang_mismatch',
+        'com.hertzai.hevolve.tts.lang_unsupported',
+      ],
+    },
+  });
+}
+
+/**
+ * Subscribe to TTS language-mismatch / unsupported events.
+ * Callback receives `{kind, requested_lang, active_backend, preferred?}`.
+ * @param {Function} callback
+ * @returns {Function} unsubscribe
+ */
+export function subscribeTtsLangEvents(callback) {
+  _ensureTtsLangWorker();
+  _ttsLangListeners.add(callback);
+  return () => _ttsLangListeners.delete(callback);
+}
+
 // Singleton
 const realtimeService = new RealtimeService();
 export default realtimeService;

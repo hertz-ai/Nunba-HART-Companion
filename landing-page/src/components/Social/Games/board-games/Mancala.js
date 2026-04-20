@@ -1,6 +1,6 @@
-import React from 'react';
 import {Box, Typography} from '@mui/material';
 import {INVALID_MOVE} from 'boardgame.io/core';
+import React from 'react';
 
 const PITS_PER_SIDE = 6;
 const INITIAL_STONES = 4;

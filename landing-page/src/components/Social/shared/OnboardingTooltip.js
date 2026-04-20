@@ -1,4 +1,4 @@
-import React from 'react';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import {
   Popper,
   Paper,
@@ -8,7 +8,7 @@ import {
   Box,
   Chip,
 } from '@mui/material';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import React from 'react';
 
 export default function OnboardingTooltip({
   step,

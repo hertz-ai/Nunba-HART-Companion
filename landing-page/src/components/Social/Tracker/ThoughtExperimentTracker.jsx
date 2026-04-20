@@ -11,32 +11,34 @@
  *  - Conversation bubbles: typing indicator, staggered message appearance
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import ExperimentInsightsPanel from './ExperimentInsightsPanel';
+
+import { trackerApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import IntentBadge from '../Feed/IntentBadge';
+import LiquidPostContent from '../Feed/LiquidPostContent';
+import PledgeDialog from '../Feed/PledgeDialog';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import InsightsIcon from '@mui/icons-material/Insights';
+import MemoryIcon from '@mui/icons-material/Memory';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ScienceIcon from '@mui/icons-material/Science';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import ThumbDownAltIcon from '@mui/icons-material/ThumbDownAlt';
+import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
 import {
   Box, Typography, Paper, LinearProgress, Tabs, Tab, Chip, IconButton,
   Button, Tooltip, Divider, Avatar, Skeleton, useTheme, useMediaQuery,
   ButtonBase, Alert, keyframes,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import ScienceIcon from '@mui/icons-material/Science';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
-import ThumbDownAltIcon from '@mui/icons-material/ThumbDownAlt';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import MemoryIcon from '@mui/icons-material/Memory';
-import InsightsIcon from '@mui/icons-material/Insights';
-import IntentBadge from '../Feed/IntentBadge';
-import LiquidPostContent from '../Feed/LiquidPostContent';
-import ExperimentInsightsPanel from './ExperimentInsightsPanel';
-import PledgeDialog from '../Feed/PledgeDialog';
-import { trackerApi } from '../../../services/socialApi';
-import { socialTokens, RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // ─── Keyframes ───────────────────────────────────────────────────────────────
 

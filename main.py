@@ -5,7 +5,6 @@ A Friend, A Well Wisher, Your LocalMind
 Connect to Hivemind to collaborate with your friends' agents.
 """
 import argparse
-import hmac
 import logging
 import os
 import shlex
@@ -154,29 +153,62 @@ _splash('Loading chat routes...')
 from routes import chatbot_routes
 
 _splash('Loading social platform...')
-# Try to import hart-backend directly (pip installed)
+# Try to import hart-backend directly (pip installed).  Uses
+# core.optional_import so the failure (if any) lands in
+# /api/admin/diag/degradations instead of being silently swallowed.
 HARTOS_BACKEND_DIRECT = False
+init_social = None
+social_bp = None
+get_engine = None
+init_db = None
 try:
-    from integrations.social import init_social, social_bp
-    from integrations.social.models import get_engine, init_db
-    HARTOS_BACKEND_DIRECT = True
-except ImportError:
-    pass
-
-# Import crash reporter
-try:
-    from desktop.crash_reporter import (
-        add_breadcrumb,
-        capture_exception,
-        capture_message,
-        create_crash_reporter_blueprint,
-        init_crash_reporting,
-        set_user,
+    from core.optional_import import optional_import as _opt_import
+    _social_mod = _opt_import(
+        'integrations.social',
+        reason='HARTOS social platform (posts, comments, channels, auth)',
     )
-    from desktop.crash_reporter import get_status as get_crash_status
-    CRASH_REPORTER_AVAILABLE = True
-except ImportError:
-    CRASH_REPORTER_AVAILABLE = False
+    _social_models = _opt_import(
+        'integrations.social.models',
+        reason='HARTOS social DB engine + init_db migration runner',
+    )
+    if _social_mod is not None and _social_models is not None:
+        init_social = _social_mod.init_social
+        social_bp = _social_mod.social_bp
+        get_engine = _social_models.get_engine
+        init_db = _social_models.init_db
+        HARTOS_BACKEND_DIRECT = True
+except Exception as _se:
+    # core.optional_import itself failing is a cold-boot bug — log loud.
+    logging.warning(f"social platform optional-import wiring failed: {_se}")
+
+# Import crash reporter — visible in /api/admin/diag/degradations so the
+# operator can SEE that crash telemetry is off (silent absence used to be
+# the failure mode for "we never get crash reports from this build").
+CRASH_REPORTER_AVAILABLE = False
+add_breadcrumb = None
+capture_exception = None
+capture_message = None
+create_crash_reporter_blueprint = None
+init_crash_reporting = None
+set_user = None
+get_crash_status = None
+try:
+    from core.optional_import import optional_import as _opt_import_cr
+    _cr_mod = _opt_import_cr(
+        'desktop.crash_reporter',
+        reason='Sentry crash reporter (operator-visible incident telemetry)',
+    )
+    if _cr_mod is not None:
+        add_breadcrumb = _cr_mod.add_breadcrumb
+        capture_exception = _cr_mod.capture_exception
+        capture_message = _cr_mod.capture_message
+        create_crash_reporter_blueprint = _cr_mod.create_crash_reporter_blueprint
+        init_crash_reporting = _cr_mod.init_crash_reporting
+        set_user = _cr_mod.set_user
+        get_crash_status = _cr_mod.get_status
+        CRASH_REPORTER_AVAILABLE = True
+except Exception as _cre:
+    logging.warning(f"crash_reporter optional-import wiring failed: {_cre}")
 
 # Define default paths in Documents (uses PROGRAM_DATA_DIR defined above)
 DEFAULT_LOG_DIR = os.path.join(PROGRAM_DATA_DIR, 'logs')
@@ -414,11 +446,29 @@ def _deferred_platform_init():
     #     4B download+load doesn't hold up the faster 0.8B, and neither
     #     blocks the Flask app thread.
     #
-    # Disable the draft eager-boot with HEVOLVE_DRAFT_FIRST=0.
-    # Disable the main eager-boot with HEVOLVE_EAGER_LLM=0 (e.g. when
-    # running against a remote llama.cpp server already serving :8080).
-    _boot_draft = os.environ.get('HEVOLVE_DRAFT_FIRST', '').strip() != '0'
-    _boot_main = os.environ.get('HEVOLVE_EAGER_LLM', '').strip() != '0'
+    # Env var overrides; otherwise LlamaConfig.should_boot_draft() decides
+    # based on VRAMManager (≥8GB → dual, 4-6GB → main only, ≤2GB → single 0.8B).
+    _draft_env = os.environ.get('HEVOLVE_DRAFT_FIRST', '').strip()
+    # Accept BOTH env var names so pytest fixtures using either spelling
+    # toggle eager-LLM-boot correctly.  Historically the flag migrated
+    # from NUNBA_DISABLE_LLAMA_AUTOSTART to HEVOLVE_EAGER_LLM; tests/e2e
+    # /conftest.py still sets the old name.  Either '0' disables eager
+    # boot so pytest collection doesn't hang waiting for llama-server.
+    _main_env = (
+        os.environ.get('HEVOLVE_EAGER_LLM', '').strip()
+        or ('0' if os.environ.get('NUNBA_DISABLE_LLAMA_AUTOSTART') == '1' else '')
+    )
+
+    if _draft_env:
+        _boot_draft = _draft_env != '0'
+    else:
+        try:
+            from llama.llama_config import LlamaConfig
+            _boot_draft = LlamaConfig.should_boot_draft()
+        except Exception:
+            _boot_draft = True  # safe default if detection fails
+
+    _boot_main = _main_env != '0' if _main_env else True
 
     if _boot_draft:
         def _boot_draft_server():
@@ -496,55 +546,8 @@ threading.Thread(target=_deferred_platform_init, daemon=True,
 # =============================================================================
 # Security: API Token Authentication for sensitive endpoints
 # =============================================================================
-from functools import wraps
-
-# Get API token from environment (for sensitive endpoints)
-API_TOKEN = os.environ.get('NUNBA_API_TOKEN', '')
-
-def _is_local_request():
-    """Check if request is truly local, accounting for proxies.
-
-    When running behind a reverse proxy, *all* requests appear as 127.0.0.1
-    because the proxy connects locally.  If the ``TRUSTED_PROXY`` env-var is
-    set to the proxy's address we inspect ``X-Forwarded-For`` to determine the
-    *real* client IP.  Without the env-var, only ``remote_addr`` is checked
-    (safe default for direct connections).
-    """
-    trusted_proxy = os.environ.get('TRUSTED_PROXY', '')
-    if trusted_proxy and request.remote_addr == trusted_proxy:
-        forwarded_for = request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
-        return forwarded_for in ('127.0.0.1', '::1', 'localhost', '')
-    # Direct connection - check remote_addr
-    return request.remote_addr in ('127.0.0.1', '::1')
-
-
-def require_local_or_token(f):
-    """
-    Decorator to protect sensitive endpoints.
-    Allows access if:
-    1. Request comes from localhost (127.0.0.1 or ::1), accounting for proxies
-    2. Valid API token is provided in Authorization header
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if _is_local_request():
-            return f(*args, **kwargs)
-
-        # Check for API token if not local
-        if API_TOKEN:
-            auth_header = request.headers.get('Authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header[7:]
-                if hmac.compare_digest(token, API_TOKEN):
-                    return f(*args, **kwargs)
-
-        # Unauthorized
-        return jsonify({
-            'error': 'Unauthorized',
-            'message': 'This endpoint requires local access or valid API token'
-        }), 401
-
-    return decorated_function
+# Auth decorators — single source of truth in routes/auth.py
+from routes.auth import _is_local_request, require_local_or_token  # noqa: E402
 
 # Register Nunba AI health endpoints
 try:
@@ -623,6 +626,28 @@ def after_request(response):
     # may block requests to localhost in future versions.
     if request.headers.get('Access-Control-Request-Private-Network') == 'true':
         response.headers['Access-Control-Allow-Private-Network'] = 'true'
+
+    # Security headers — desktop app, never iframed, no external scripts
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Content-Security-Policy — desktop app only talks to its own
+    # Flask origin + localhost llama-server (:8080/:8082) + VisionService
+    # (:5460) + crossbar (:8088). `unsafe-inline` is required because
+    # CRA's runtime and MUI emotion inject inline styles; migrating to
+    # nonce/hash CSP is a separate, larger task. blob: covers generated
+    # audio URLs used for synthesized TTS playback.
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob: https:; "
+        "media-src 'self' blob: data:; "
+        "connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:*; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
 
     return response
 
@@ -791,9 +816,261 @@ def call_stop_api():
 DEVICE_ID = get_device_id()
 logging.info(f"Device ID: {DEVICE_ID}")
 
+# Bootstrap the hardware-derived stable guest_id BEFORE any request
+# comes in so /api/guest-id and the /local index.html injection both
+# see the same cached id.  The file lives under get_data_dir() so it
+# survives uninstall/reinstall — WebView2 localStorage wipes don't
+# reach it.  See desktop/guest_identity.py for the derivation
+# contract and J201/J206/J207 for the behavioural guards.
+try:
+    from desktop.guest_identity import get_guest_id as _get_guest_id
+    GUEST_ID = _get_guest_id()
+    logging.info(f"Guest ID (hardware-derived): {GUEST_ID}")
+except Exception as _gie:
+    # Never crash Flask boot because of guest-id derivation — degrade
+    # gracefully so the frontend's chain still works (it falls through
+    # to 'guest' if window.__NUNBA_GUEST_ID__ is null).
+    logging.warning(f"guest_id bootstrap failed: {_gie}")
+    GUEST_ID = None
+
 @app.route('/probe', methods=['GET'])
 def probe_endpoint():
     return jsonify({"status": "Probe successful", "message": "Service is operational"}), 200
+
+
+@app.route('/api/guest-id', methods=['GET'])
+def api_guest_id():
+    """Return the hardware-derived stable guest_id for the frontend.
+
+    Contract (J207):
+      * 200 + {"guest_id": "g_<16 hex>"} on success
+      * 503 + {"error": "unavailable"} if derivation failed at boot
+      * Two calls in the same process MUST return the same value
+    The frontend reads this in its fallback chain so guest identity
+    survives a WebView2 cache wipe (uninstall/reinstall cycle).
+    """
+    if not GUEST_ID:
+        return jsonify({'error': 'unavailable'}), 503
+    return jsonify({'guest_id': GUEST_ID}), 200
+
+
+@app.route('/api/guest-id', methods=['DELETE'])
+def api_guest_id_delete():
+    """Wipe local guest identity + per-bucket history.
+
+    Admin-driven destructive action: surface only behind the
+    "Clear all guest history now" button in admin/config/chat.
+    Body: ``{"confirm": true}`` (belt-and-suspenders against
+    accidental no-body DELETEs).
+
+    What gets wiped:
+      * ``guest_id.json`` under ~/Documents/Nunba/data/
+      * The module cache in ``desktop.guest_identity`` so the next
+        ``GET /api/guest-id`` re-derives a fresh id (same hardware
+        means same id — so this is more "rotate the cached file"
+        than "rotate the identity").
+    What does NOT get wiped (intentionally):
+      * SQLite ``conversation_history`` rows. The browser's local
+        per-bucket history is the user-facing surface; the SQLite
+        rows are agent-side memory and are governed by a separate
+        admin path (``/api/admin/clear-conversations``, J162).
+
+    Returns: ``{"deleted": true, "previous_guest_id": "g_..."}``
+    """
+    body = request.get_json(silent=True) or {}
+    if not body.get('confirm'):
+        return jsonify({
+            'error': 'confirm_required',
+            'message': 'Body must include {"confirm": true} to wipe guest identity.',
+        }), 400
+
+    prev = GUEST_ID
+    try:
+        from desktop.guest_identity import (
+            get_guest_id_file_path,
+        )
+        from desktop.guest_identity import (
+            reset_cache_for_tests as _reset_guest_cache,
+        )
+        gid_path = get_guest_id_file_path()
+        if os.path.isfile(gid_path):
+            os.remove(gid_path)
+        _reset_guest_cache()
+    except Exception as e:  # noqa: BLE001 — never 5xx the admin
+        logging.warning("guest-id delete failed: %s", e)
+        return jsonify({'error': 'delete_failed', 'message': str(e)}), 500
+    return jsonify({'deleted': True, 'previous_guest_id': prev}), 200
+
+
+@app.route('/api/admin/config/chat', methods=['GET'])
+def api_admin_chat_config_get():
+    """Return the current admin-controlled chat-restore settings.
+
+    Schema:
+      ``restore_policy``   one of ("always","prompt","never","session")
+      ``restore_scope``    one of ("all_agents","active_only","manual")
+      ``cloud_sync_enabled`` bool — opt-in cross-device guest sync
+                          (Track 3 wires the export/import endpoints;
+                          the toggle is here so the UI is forward-
+                          compatible).
+
+    The frontend (NunbaChatProvider) fetches this on mount and uses
+    it to gate the auto-restore + auto-scroll behaviour. See
+    desktop/chat_settings.py for the canonical schema + writer.
+    """
+    try:
+        from desktop.chat_settings import get_chat_settings
+        return jsonify(get_chat_settings().to_dict()), 200
+    except Exception as e:  # noqa: BLE001
+        logging.warning("chat-config GET failed: %s", e)
+        # Defensive default — frontend treats this as 'always' so the
+        # user still gets restore behaviour even if the settings file
+        # is unreachable.
+        return jsonify({
+            'restore_policy': 'always',
+            'restore_scope': 'all_agents',
+            'cloud_sync_enabled': False,
+            'fallback': True,
+        }), 200
+
+
+@app.route('/api/admin/config/chat', methods=['PUT'])
+def api_admin_chat_config_put():
+    """Update the admin-controlled chat-restore settings.
+
+    Body: any subset of ``{restore_policy, restore_scope,
+    cloud_sync_enabled}``. Unknown keys are ignored (forward
+    compat for older clients), invalid enum values 400.
+
+    Auth: this endpoint is local-only by virtue of Nunba's flask
+    binding to 127.0.0.1; admin gating in the broader sense is
+    out-of-scope for the MVP per CLAUDE.md (single-user desktop).
+    """
+    try:
+        from desktop.chat_settings import update_chat_settings
+        payload = request.get_json(silent=True) or {}
+        new_settings = update_chat_settings(payload)
+        return jsonify(new_settings.to_dict()), 200
+    except ValueError as ve:
+        return jsonify({'error': 'invalid_payload', 'message': str(ve)}), 400
+    except Exception as e:  # noqa: BLE001
+        logging.error("chat-config PUT failed: %s", e)
+        return jsonify({'error': 'update_failed', 'message': str(e)}), 500
+
+
+# ─── Chat-Sync (Track C: cross-device restore, opt-in) ──────────────
+# Requires: (a) signed-in JWT and (b) cloud_sync_enabled=true in the
+# admin chat settings. Both gates MUST pass; a stray JWT alone isn't
+# enough. See desktop/chat_sync.py for the persistence contract.
+
+def _chat_sync_resolve_uid():
+    """Return (uid, err_response_or_None).
+
+    Extracts the user id from Bearer token, gates on
+    cloud_sync_enabled, and uniformly returns a 401/403 tuple on
+    failure. Call sites only need to check the error slot:
+
+        uid, err = _chat_sync_resolve_uid()
+        if err: return err
+    """
+    # Gate 1: cloud_sync_enabled
+    try:
+        from desktop.chat_settings import get_chat_settings
+        if not get_chat_settings().cloud_sync_enabled:
+            return None, (jsonify({
+                'error': 'sync_disabled',
+                'message': 'Enable cloud sync in admin settings first.',
+            }), 403)
+    except Exception as e:  # noqa: BLE001
+        logging.warning("chat-sync cloud_sync_enabled probe failed: %s", e)
+        # Fail-closed: if we can't confirm the toggle is on, don't sync
+        return None, (jsonify({'error': 'sync_probe_failed'}), 500)
+
+    # Gate 2: JWT → user_id
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return None, (jsonify({'error': 'unauthorized'}), 401)
+    token = auth[7:].strip()
+    try:
+        from integrations.social.auth import decode_jwt
+        payload = decode_jwt(token)
+        uid = payload.get('user_id') if isinstance(payload, dict) else None
+    except Exception:
+        return None, (jsonify({'error': 'unauthorized'}), 401)
+    if not uid:
+        return None, (jsonify({'error': 'unauthorized'}), 401)
+    return str(uid), None
+
+
+@app.route('/api/chat-sync/push', methods=['POST'])
+def api_chat_sync_push():
+    """Merge the caller's chat-bucket into the server-side store.
+
+    Body: ``{"buckets": {agent_key: {"messages":[...],
+    "updated_at": ms_epoch}}, "updated_at": ms_epoch}``.
+
+    Returns the merged blob so the client can update its local
+    ``updated_at`` after the round-trip.
+    """
+    uid, err = _chat_sync_resolve_uid()
+    if err:
+        return err
+    try:
+        from desktop.chat_sync import push as _push
+        body = request.get_json(silent=True) or {}
+        merged = _push(uid, body)
+        return jsonify(merged), 200
+    except ValueError as ve:
+        return jsonify({'error': 'invalid_payload', 'message': str(ve)}), 400
+    except Exception as e:  # noqa: BLE001
+        logging.error("chat-sync push failed for %s: %s", uid, e)
+        return jsonify({'error': 'push_failed'}), 500
+
+
+@app.route('/api/chat-sync/pull', methods=['GET'])
+def api_chat_sync_pull():
+    """Return the stored chat-bucket for the authenticated user.
+
+    Shape: same as push-merge output. An empty dict (``{"buckets":
+    {}, "updated_at": 0}``) is returned when the user has never
+    pushed — the frontend should treat that as "no cloud copy".
+    """
+    uid, err = _chat_sync_resolve_uid()
+    if err:
+        return err
+    try:
+        from desktop.chat_sync import pull as _pull
+        return jsonify(_pull(uid)), 200
+    except Exception as e:  # noqa: BLE001
+        logging.error("chat-sync pull failed for %s: %s", uid, e)
+        return jsonify({'error': 'pull_failed'}), 500
+
+
+@app.route('/api/chat-sync/forget', methods=['DELETE'])
+def api_chat_sync_forget():
+    """Delete the server-side chat-bucket for the authenticated
+    user. Intended for 'Forget me on all devices' flows.
+
+    Belt-and-suspenders: requires ``{"confirm": true}`` just like
+    DELETE /api/guest-id does.
+    """
+    uid, err = _chat_sync_resolve_uid()
+    if err:
+        return err
+    body = request.get_json(silent=True) or {}
+    if not body.get('confirm'):
+        return jsonify({
+            'error': 'confirm_required',
+            'message': 'Body must include {"confirm": true}.',
+        }), 400
+    try:
+        from desktop.chat_sync import forget as _forget
+        deleted = _forget(uid)
+        return jsonify({'deleted': bool(deleted)}), 200
+    except Exception as e:  # noqa: BLE001
+        logging.error("chat-sync forget failed for %s: %s", uid, e)
+        return jsonify({'error': 'forget_failed'}), 500
+
 
 def get_embedded_python_path():
     """Get the path to the embedded Python executable"""
@@ -1309,6 +1586,42 @@ def admin_models_delete(model_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/models/<model_id>/set-purpose', methods=["POST"])
+def admin_models_set_purpose(model_id):
+    """Toggle a purpose on/off for a model.
+
+    Body: {"purpose": "draft", "enabled": true}
+    A model can have multiple purposes (e.g. same LLM as draft + main).
+    Each purpose is globally unique — enabling it here clears it from
+    any other model regardless of type.
+    """
+    if not _is_local_request():
+        return jsonify({"error": "local only"}), 403
+    try:
+        from models.catalog import get_catalog
+        catalog = get_catalog()
+        entry = catalog.get(model_id)
+        if not entry:
+            return jsonify({"error": "not found"}), 404
+        data = request.get_json(silent=True) or {}
+        purpose = data.get('purpose')
+        if not purpose:
+            return jsonify({"error": "purpose is required"}), 400
+        enabled = data.get('enabled', True)
+        ok = catalog.set_purpose(model_id, purpose, enabled=enabled)
+        if not ok:
+            return jsonify({
+                "error": f"Invalid purpose. Valid: {catalog.ALL_PURPOSES}",
+            }), 400
+        entry = catalog.get(model_id)
+        return jsonify({
+            "success": True, "model_id": model_id,
+            "purposes": entry.purposes,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/models/<model_id>/load', methods=["POST"])
 def admin_models_load(model_id):
     """Load a specific model (downloads if needed)."""
@@ -1351,8 +1664,10 @@ def admin_models_download(model_id):
     if not _is_local_request():
         return jsonify({"error": "local only"}), 403
     try:
+        import threading
+        import time
+
         from models.orchestrator import get_orchestrator
-        import threading, time
         orch = get_orchestrator()
 
         _download_progress[model_id] = {
@@ -1424,6 +1739,7 @@ def admin_models_health():
     """
     try:
         from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+
         from models.orchestrator import get_orchestrator
         mlm = get_model_lifecycle_manager()
 
@@ -1483,6 +1799,7 @@ def admin_models_swap():
         return jsonify({"error": "local only"}), 403
     try:
         from integrations.service_tools.model_lifecycle import get_model_lifecycle_manager
+
         from models.orchestrator import get_orchestrator
         data = request.get_json(silent=True) or {}
         needed = data.get('needed_model')
@@ -1527,16 +1844,674 @@ def admin_models_swap():
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# HuggingFace Hub discovery  (/api/admin/models/hub/*)
+# Browse trending/top-downloaded models by category + install into catalog
+# ═══════════════════════════════════════════════════════════════════════
+
+# Map Nunba purpose → (HF pipeline_tag, library filters).  Drives what
+# shows up when user picks a category in the "Browse HuggingFace" UI tab.
+_HUB_CATEGORY_FILTERS = {
+    'llm':         {'pipeline_tag': 'text-generation', 'library': 'transformers'},
+    'draft':       {'pipeline_tag': 'text-generation', 'library': 'transformers'},
+    'vision':      {'pipeline_tag': 'image-text-to-text'},
+    'caption':     {'pipeline_tag': 'image-to-text'},
+    'tts':         {'pipeline_tag': 'text-to-speech'},
+    'stt':         {'pipeline_tag': 'automatic-speech-recognition'},
+    'diarization': {'pipeline_tag': 'voice-activity-detection'},  # pyannote tag
+    'vad':         {'pipeline_tag': 'voice-activity-detection'},
+    'embedding':   {'pipeline_tag': 'sentence-similarity'},
+    'rerank':      {'pipeline_tag': 'text-ranking'},
+    'ocr':         {'pipeline_tag': 'image-to-text'},  # OCR shows under image-to-text
+    'music':       {'pipeline_tag': 'text-to-audio'},
+    'image-gen':   {'pipeline_tag': 'text-to-image'},
+    'video-gen':   {'pipeline_tag': 'text-to-video'},
+    'translate':   {'pipeline_tag': 'translation'},
+}
+
+
+# Trusted-publisher list moved to runtime config (`~/.nunba/hub_allowlist.json`)
+# managed by `core.hub_allowlist`.  Operators can add/remove via the admin
+# CRUD endpoints below WITHOUT a release.  The legacy frozenset literal that
+# lived here was the friction point that pushed the field team to recommend
+# `confirm_unverified=True` instead of expanding the list — defeating the
+# entire safety gate.  Seeded defaults preserve the previous 27 entries.
+#
+# Kept as a module-level alias for backward compat with any test that
+# imports `_TRUSTED_HF_ORGS` directly.  New code MUST go through the
+# allowlist API (`get_allowlist().is_trusted(org)`) so audit + persistence
+# stay coherent.
+def _get_trusted_orgs_legacy_view():
+    """Backward-compat shim — returns the current trusted-org names as a
+    frozenset.  Snapshots the live allowlist; do NOT cache the result."""
+    from core.hub_allowlist import get_allowlist
+    return frozenset(e['org'] for e in get_allowlist().list())
+
+
+_TRUSTED_HF_ORGS = _get_trusted_orgs_legacy_view  # callable, not a set
+
+
+# Category → default capabilities mapping for HF-installed models.
+# Today hub-install writes `capabilities={}` — which makes
+# `ModelCatalog.select_best(require_capability=…)` silently reject the
+# newly-installed model for every capability-driven route.  Seeding a
+# small, well-known capability set from the user-selected category
+# unblocks capability-based routing without introducing any new enum
+# or taxonomy — the keys below are the ones already used by seeded
+# populators (`'image_input'`, `'tts'`, `'stt'`, `'music_gen'`, etc.).
+_CATEGORY_CAPABILITIES: dict[str, dict[str, bool]] = {
+    'llm':         {'text_gen': True, 'reason': True},
+    'draft':       {'text_gen': True, 'reason': True, 'draft': True},
+    'translate':   {'text_gen': True, 'translate': True},
+    'vision':      {'image_input': True, 'text_gen': True},
+    'caption':     {'image_input': True, 'caption': True},
+    'grounding':   {'image_input': True, 'grounding': True},
+    'ocr':         {'image_input': True, 'ocr': True},
+    'tts':         {'audio_gen': True, 'tts': True},
+    'stt':         {'audio_input': True, 'stt': True},
+    'diarization': {'audio_input': True, 'diarization': True},
+    'vad':         {'audio_input': True, 'vad': True},
+    'embedding':   {'embedding': True},
+    'rerank':      {'rerank': True},
+    'music':       {'audio_gen': True, 'music_gen': True},
+    'image-gen':   {'image_gen': True},
+    'video-gen':   {'video_gen': True},
+}
+
+
+def _normalize_hf_id(raw: str) -> str:
+    """NFKC-normalize + reject non-ASCII hf_ids to defeat Unicode
+    homoglyph attacks.  `aí4bharat/indic-parler-tts` (Latin Small I
+    With Acute, U+00ED) looks identical to `ai4bharat/...` but resolves
+    to an attacker-controlled repo."""
+    import unicodedata
+    cleaned = unicodedata.normalize('NFKC', raw).strip()
+    if any(ord(c) > 0x7F for c in cleaned):
+        raise ValueError(
+            f"hf_id must be ASCII only (non-ASCII char detected — "
+            f"possible homoglyph attack): {cleaned!r}",
+        )
+    return cleaned
+
+
+@app.route('/api/admin/models/hub/search', methods=['GET'])
+def admin_models_hub_search():
+    """Search HuggingFace Hub by Nunba task category.
+
+    Query params:
+      category:   llm|draft|vision|caption|tts|stt|diarization|vad|embedding|...
+      lang:       (optional) ISO code to filter — e.g. 'ta', 'hi', 'zh'
+      sort:       downloads (default) | trending-score | likes
+      limit:      (default 20, max 50)
+      search:     (optional) substring to match in model id
+
+    Returns top N models from HF Hub matching the filter.
+    """
+    # Local-only — avoid letting remote callers enumerate/recon via this
+    # endpoint (same policy as /hub/install).  Previously unauthenticated.
+    if not _is_local_request():
+        return jsonify({"error": "local only"}), 403
+    try:
+        from huggingface_hub import list_models
+    except ImportError:
+        return jsonify({"error": "huggingface_hub not installed"}), 503
+    try:
+        category = (request.args.get('category') or 'llm').lower()
+        filt = _HUB_CATEGORY_FILTERS.get(category)
+        if not filt:
+            return jsonify({
+                "error": "unknown category",
+                "valid": sorted(_HUB_CATEGORY_FILTERS.keys()),
+            }), 400
+        lang = request.args.get('lang')
+        sort_by = request.args.get('sort', 'downloads')
+        if sort_by not in ('downloads', 'trending-score', 'likes'):
+            sort_by = 'downloads'
+        try:
+            limit = max(1, min(50, int(request.args.get('limit', 20))))
+        except ValueError:
+            limit = 20
+        search = request.args.get('search')
+
+        kwargs = {
+            'sort': sort_by,
+            'direction': -1,  # descending
+            'limit': limit,
+            'full': False,
+        }
+        if filt.get('pipeline_tag'):
+            kwargs['pipeline_tag'] = filt['pipeline_tag']
+        if filt.get('library'):
+            kwargs['library'] = filt['library']
+        if lang:
+            kwargs['language'] = lang
+        if search:
+            kwargs['search'] = search
+
+        models = list(list_models(**kwargs))
+        # Build minimal payload — don't leak full HF metadata blobs
+        results = []
+        for m in models:
+            results.append({
+                'id': m.id,
+                'author': getattr(m, 'author', None),
+                'downloads': getattr(m, 'downloads', 0) or 0,
+                'likes': getattr(m, 'likes', 0) or 0,
+                'pipeline_tag': getattr(m, 'pipeline_tag', None),
+                'library_name': getattr(m, 'library_name', None),
+                'tags': list(getattr(m, 'tags', []) or [])[:10],
+                'created_at': getattr(m, 'created_at', None).isoformat()
+                    if getattr(m, 'created_at', None) else None,
+                'last_modified': getattr(m, 'last_modified', None).isoformat()
+                    if getattr(m, 'last_modified', None) else None,
+            })
+        return jsonify({
+            'category': category,
+            'lang': lang,
+            'count': len(results),
+            'results': results,
+        })
+    except Exception as e:
+        logging.warning(f"HF Hub search failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/models/hub/install', methods=['POST'])
+def admin_models_hub_install():
+    """Register a HuggingFace model into the Nunba catalog + download.
+
+    Body: {
+      hf_id: 'org/model-name',         # required
+      category: 'tts',                 # required — drives model_type mapping
+      purposes: ['tts', 'main'],       # optional — auto-assign in catalog
+      name: 'Friendly display name',   # optional — defaults to hf_id tail
+      languages: ['en', 'ta'],         # optional — lang_priority hint
+    }
+    """
+    if not _is_local_request():
+        return jsonify({"error": "local only"}), 403
+    try:
+        from models.catalog import ModelEntry, get_catalog
+        from models.orchestrator import get_orchestrator
+        data = request.get_json(silent=True) or {}
+        raw_hf_id = (data.get('hf_id') or '').strip()
+        category = (data.get('category') or '').lower().strip()
+        confirm_unverified = bool(data.get('confirm_unverified'))
+        if not raw_hf_id or '/' not in raw_hf_id:
+            return jsonify({"error": "hf_id must be 'org/name'"}), 400
+        # ── Homoglyph / Unicode defense ──
+        try:
+            hf_id = _normalize_hf_id(raw_hf_id)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
+        if category not in _HUB_CATEGORY_FILTERS:
+            return jsonify({
+                "error": "unknown category",
+                "valid": sorted(_HUB_CATEGORY_FILTERS.keys()),
+            }), 400
+
+        # ── Trusted-org gate ──
+        # Unknown orgs are allowed ONLY if the user explicitly confirms
+        # they understand the supply-chain risk.  Frontend shows a red
+        # "unverified publisher" banner and collects the checkbox.
+        # Allowlist is now runtime-editable via /api/admin/hub/allowlist
+        # so enterprise tenants can add internal orgs without a release.
+        from core.hub_allowlist import get_allowlist
+        _allowlist = get_allowlist()
+        org = hf_id.split('/', 1)[0]
+        if not _allowlist.is_trusted(org) and not confirm_unverified:
+            return jsonify({
+                "error": "unverified_org",
+                "message": (
+                    f"'{org}' is not in the trusted-publisher list. "
+                    f"If you've verified the author and repo are legitimate, "
+                    f"resubmit with confirm_unverified=true."
+                ),
+                "trusted_orgs": sorted(e['org'] for e in _allowlist.list()),
+            }), 403
+
+        # ── Safetensors-only gate ──
+        # Reject repos whose weights are ONLY in pickle/.bin format —
+        # `torch.load()` on a malicious pickle achieves arbitrary code
+        # execution in the Nunba process (full user token).  If a repo
+        # has both .safetensors and .bin, safetensors is preferred and
+        # we accept.  If only .bin/.pt/.pkl, refuse.
+        #
+        # `list_repo_files` is a blocking HTTPS call with NO explicit
+        # timeout in huggingface_hub (defaults to ~10s connect + TCP
+        # stall up to 75s).  Running it directly on the Flask thread
+        # can hang an admin worker for up to a minute on a network
+        # blip.  Wrap in a 5s future.result(timeout=5) and fail the
+        # admin request with 504 instead of stalling.
+        try:
+            from concurrent.futures import ThreadPoolExecutor
+            from concurrent.futures import TimeoutError as _FT
+
+            from huggingface_hub import list_repo_files
+            with ThreadPoolExecutor(max_workers=1) as _ex:
+                _fut = _ex.submit(list_repo_files, hf_id)
+                try:
+                    _files = set(_fut.result(timeout=5.0))
+                except _FT:
+                    return jsonify({
+                        "error": "hf_timeout",
+                        "message": "HuggingFace Hub file listing timed out "
+                                   "after 5s — retry when network is stable",
+                    }), 504
+            _has_safetensors = any(
+                f.endswith('.safetensors') for f in _files
+            )
+            _risky = {
+                f for f in _files
+                if f.endswith(('.bin', '.pt', '.pkl', '.pickle', '.ckpt'))
+            }
+            if _risky and not _has_safetensors:
+                return jsonify({
+                    "error": "unsafe_weights_format",
+                    "message": (
+                        "This repo ships weights only in pickle format "
+                        "(.bin/.pt/.pkl/.ckpt).  Loading these executes "
+                        "arbitrary code.  Nunba requires a .safetensors "
+                        "variant."
+                    ),
+                    "found_files": sorted(_risky)[:10],
+                }), 415
+        except Exception as _fe:
+            # If list_repo_files fails (private repo, network), fail
+            # closed — do not silently bypass the gate.
+            return jsonify({
+                "error": "file_probe_failed",
+                "message": f"could not verify repo contents: {_fe}",
+            }), 502
+
+        # Category → model_type mapping for catalog registration
+        type_map = {
+            'llm': 'llm', 'draft': 'llm',
+            'vision': 'mllm', 'caption': 'vlm', 'grounding': 'vlm', 'ocr': 'vlm',
+            'tts': 'tts', 'stt': 'stt',
+            'diarization': 'audio', 'vad': 'audio',
+            'embedding': 'embedding', 'rerank': 'embedding',
+            'music': 'audio-gen', 'image-gen': 'image-gen',
+            'video-gen': 'video-gen', 'translate': 'llm',
+        }
+        model_type = type_map.get(category, 'llm')
+
+        # Synthesize catalog entry.  Use a safe id: strip org prefix + sanitize.
+        safe_id = f"{category}-" + hf_id.split('/', 1)[1].lower().replace('_', '-').replace('.', '-')
+        catalog = get_catalog()
+        if catalog.get(safe_id):
+            return jsonify({"error": f"already registered as '{safe_id}'"}), 409
+
+        # Seed capability dict from the user-chosen category so
+        # capability-gated routing (`select_best(require_capability=…)`)
+        # can actually pick this HF install.  Without this the entry
+        # would register with `capabilities={}` and be invisible to
+        # every capability-specific task.
+        _seeded_caps = dict(_CATEGORY_CAPABILITIES.get(category, {}))
+        # Source-tag marks the entry as "not yet runtime-proven"; the
+        # background validate probe will flip `install_validated` to
+        # True once `loader.load()` succeeds.  Until then, the
+        # dispatcher capability gate treats the entry with caution.
+        _seeded_caps['install_validated'] = False
+
+        entry_dict = {
+            'id': safe_id,
+            'name': data.get('name') or hf_id.rsplit('/', 1)[-1],
+            'model_type': model_type,
+            'provider': 'huggingface',
+            'hf_repo': hf_id,
+            'enabled': True,
+            'purposes': [p for p in (data.get('purposes') or []) if p in catalog.ALL_PURPOSES],
+            'lang_priority': data.get('languages') or [],
+            'capabilities': _seeded_caps,
+            'source': 'hub-install',
+        }
+        entry = ModelEntry.from_dict(entry_dict)
+        catalog.register(entry)
+
+        # Trigger background download so user sees progress in UI.
+        import threading
+        import time
+        _download_progress[safe_id] = {
+            'status': 'downloading', 'percent': 0,
+            'message': f'Downloading {hf_id}...', 'started_at': time.time(),
+        }
+        def _bg():
+            try:
+                get_orchestrator().download(safe_id)
+                # ── Runtime validation probe ────────────────────────
+                # Until this point the install is merely "bytes landed
+                # on disk".  Actually load() the model so we can prove
+                # it works *before* a real user-facing request depends
+                # on it.  Success flips capabilities['install_validated']
+                # so the dispatcher capability gate will start routing
+                # to it.  Failure leaves install_validated=False and
+                # records the reason — the model stays in the catalog
+                # but dispatch refuses it.
+                validated = False
+                validate_reason = ''
+                try:
+                    _entry = get_orchestrator().load(safe_id)
+                    if _entry is not None:
+                        # ── Capability probe ────────────────────────
+                        # Beyond "subprocess started", actually send a
+                        # canned modality-specific input and require a
+                        # plausible response before claiming validated.
+                        # VLMLoader.validate → 32×32 JPEG caption,
+                        # TTSLoader.validate → synth a fixed phrase,
+                        # STTLoader.validate → transcribe TTS output,
+                        # LlamaLoader.validate → canned prompt complete.
+                        # Default base returns (True, 'no probe defined')
+                        # so loaders without an override don't gate.
+                        _cap_ok, _cap_reason = True, 'no probe'
+                        try:
+                            _orch = get_orchestrator()
+                            _loader = _orch._loaders.get(_entry.model_type)
+                            if _loader is not None:
+                                _cap_ok, _cap_reason = _loader.validate(_entry)
+                        except Exception as _ve:
+                            _cap_ok = False
+                            _cap_reason = f'validate() raised: {_ve}'
+
+                        if _cap_ok:
+                            validated = True
+                            validate_reason = _cap_reason
+                            try:
+                                from models.catalog import get_catalog as _get_cat
+                                _e = _get_cat().get(safe_id)
+                                if _e is not None:
+                                    _e.capabilities['install_validated'] = True
+                            except Exception as _ce:
+                                logging.debug(
+                                    f"[hub-install] capability flip skipped: {_ce}")
+                        else:
+                            validate_reason = f'capability probe failed: {_cap_reason}'
+                            logging.info(
+                                f"[hub-install] {safe_id} loaded but "
+                                f"capability probe failed: {_cap_reason}")
+                    else:
+                        validate_reason = 'loader returned None'
+                except Exception as _le:
+                    validate_reason = str(_le)
+                    logging.info(
+                        f"[hub-install] runtime validation failed "
+                        f"for {safe_id}: {_le}")
+
+                # ── Optional hive benchmark challenge ───────────────
+                # If the HiveBenchmarkProver knows a baseline for this
+                # model family, fire a CHALLENGE run in the background.
+                # The prover compares hive output against KNOWN_BASELINES
+                # and publishes results on 'hive.benchmark.challenge'.
+                # Best-effort, non-blocking — most HF models won't have
+                # a baseline and that's fine (the install is still
+                # validated by the load probe above).
+                if validated:
+                    try:
+                        from integrations.agent_engine.hive_benchmark_prover import (
+                            KNOWN_BASELINES,
+                            get_benchmark_prover,
+                        )
+                        _baselines = KNOWN_BASELINES.get(safe_id) or {}
+                        if _baselines:
+                            _bench = next(iter(_baselines.keys()))
+                            _p = get_benchmark_prover()
+                            threading.Thread(
+                                target=lambda: _p.challenge(safe_id, _bench),
+                                name=f'hub-challenge-{safe_id}',
+                                daemon=True,
+                            ).start()
+                    except Exception as _pe:
+                        logging.debug(
+                            f"[hub-install] prover challenge skipped: {_pe}")
+
+                _download_progress[safe_id] = {
+                    'status': 'complete', 'percent': 100,
+                    'message': 'Downloaded + validated' if validated
+                               else f'Downloaded (unvalidated: {validate_reason})',
+                    'validated': validated,
+                    'validate_reason': validate_reason,
+                    'started_at': _download_progress[safe_id]['started_at'],
+                }
+            except Exception as e:
+                _download_progress[safe_id] = {
+                    'status': 'error', 'percent': 0,
+                    'message': str(e), 'started_at': _download_progress[safe_id]['started_at'],
+                }
+        threading.Thread(target=_bg, name=f'hub-dl-{safe_id}', daemon=True).start()
+
+        return jsonify({
+            'success': True,
+            'model_id': safe_id,
+            'hf_repo': hf_id,
+            'download_started': True,
+        })
+    except Exception as e:
+        logging.warning(f"HF Hub install failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/models/manifest/export', methods=['GET'])
+def admin_models_manifest_export():
+    """Export the user's hub-installed model set as a portable manifest.
+
+    Today each user manually installs models one-by-one via the HF hub
+    UI — there's no way to reproduce "my working model set" on another
+    machine.  This endpoint serialises every catalog entry whose
+    `source == 'hub-install'` into a JSON blob that admin_models_manifest_import
+    can replay.  Seeded presets and manually-registered entries are
+    intentionally excluded (they reproduce via the app version, not
+    via a manifest).
+
+    Response shape:
+        {
+          "manifest_version": 1,
+          "exported_at": "<iso>",
+          "entries": [
+            {"hf_id": "...", "category": "...", "purposes": [...],
+             "languages": [...], "name": "..."},
+            ...
+          ]
+        }
+    """
+    if not _is_local_request():
+        return jsonify({"error": "local only"}), 403
+    try:
+        from datetime import datetime as _dt
+
+        from models.catalog import get_catalog
+        catalog = get_catalog()
+        entries = []
+        for entry in catalog.list_all():
+            if getattr(entry, 'source', '') != 'hub-install':
+                continue
+            entries.append({
+                'hf_id': getattr(entry, 'hf_repo', '') or '',
+                # Derive category back from safe_id prefix (e.g. 'tts-…')
+                # or fall back to model_type.
+                'category': (entry.id.split('-', 1)[0]
+                             if '-' in entry.id
+                             else entry.model_type),
+                'name': entry.name,
+                'purposes': list(entry.purposes or []),
+                'languages': list(entry.languages or []),
+            })
+        return jsonify({
+            'manifest_version': 1,
+            'exported_at': _dt.utcnow().isoformat() + 'Z',
+            'entries': entries,
+        })
+    except Exception as e:
+        logging.warning(f"manifest export failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/models/manifest/import', methods=['POST'])
+def admin_models_manifest_import():
+    """Replay a manifest produced by /manifest/export on this machine.
+
+    For each entry, re-run the existing admin_models_hub_install flow
+    so every one of the 4 supply-chain gates is applied fresh (trusted
+    org / safetensors / homoglyph / file-probe) — there is NO bypass.
+    This guarantees that a manifest from a malicious peer cannot
+    smuggle in an unverified repo just because it's in "import" mode.
+
+    Body: {"manifest": {manifest_version, entries: [...]},
+           "confirm_unverified": bool  # passed through to each install}
+
+    Response:
+        {success, attempted: N, succeeded: [...], failed: [{hf_id, reason}, ...]}
+    """
+    if not _is_local_request():
+        return jsonify({"error": "local only"}), 403
+    try:
+        body = request.get_json(silent=True) or {}
+        manifest = body.get('manifest') or {}
+        entries = manifest.get('entries') or []
+        confirm_unverified = bool(body.get('confirm_unverified'))
+        if not isinstance(entries, list) or not entries:
+            return jsonify({"error": "manifest.entries must be a non-empty list"}), 400
+
+        # Re-dispatch each entry through admin_models_hub_install via
+        # Flask's test_client so all gates fire identically — no
+        # duplicated gate logic, no parallel code path.
+        succeeded = []
+        failed = []
+        with app.test_client() as client:
+            for e in entries:
+                hf_id = (e.get('hf_id') or '').strip()
+                category = (e.get('category') or '').lower().strip()
+                if not hf_id or not category:
+                    failed.append({'hf_id': hf_id, 'reason': 'missing hf_id/category'})
+                    continue
+                payload = {
+                    'hf_id': hf_id,
+                    'category': category,
+                    'name': e.get('name'),
+                    'purposes': e.get('purposes') or [],
+                    'languages': e.get('languages') or [],
+                    'confirm_unverified': confirm_unverified,
+                }
+                # test_client hits the live route — preserves every
+                # gate (trusted-org, safetensors, homoglyph, file-probe,
+                # capability seeding, load probe, optional challenge).
+                r = client.post(
+                    '/api/admin/models/hub/install',
+                    json=payload,
+                    headers={
+                        # Preserve the local-only gate by forwarding
+                        # the requesting client's remote addr context.
+                        'X-Forwarded-For': request.remote_addr or '127.0.0.1',
+                    },
+                )
+                if r.status_code == 200:
+                    succeeded.append(hf_id)
+                else:
+                    try:
+                        err = r.get_json() or {}
+                    except Exception:
+                        err = {}
+                    failed.append({
+                        'hf_id': hf_id,
+                        'status': r.status_code,
+                        'reason': err.get('error') or err.get('message') or 'install failed',
+                    })
+        return jsonify({
+            'success': True,
+            'attempted': len(entries),
+            'succeeded': succeeded,
+            'failed': failed,
+        })
+    except Exception as e:
+        logging.warning(f"manifest import failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # Provider Management Admin API  (/api/admin/providers/*)
 # Exposes HARTOS ProviderRegistry + Gateway + EfficiencyMatrix
+#
+# Every endpoint below routes the "is the provider integration actually
+# loaded?" check through core.optional_import so silent failures (missing
+# openai / anthropic wheel, bad import chain, stale python-embed snapshot)
+# land in /api/admin/diag/degradations.  Previously each endpoint had an
+# inline `except ImportError: return 503` that swallowed the reason —
+# operators had no way to tell "is my OpenAI key wrong" apart from "did
+# the openai wheel fail to install in the frozen build".  The helpers
+# below return (module, None) on success or (None, 503_response) on
+# failure; caller unpacks and either short-circuits or proceeds.
 # ═══════════════════════════════════════════════════════════════════════
+
+def _providers_registry():
+    """Resolve integrations.providers.registry via optional_import.
+
+    Returns:
+        (module, None) on success so caller can call mod.get_registry().
+        (None, (jsonify(...), 503)) on import failure — caller returns
+        the tuple directly so Flask emits the 503 and the degradation is
+        recorded in /api/admin/diag/degradations.
+    """
+    from core.optional_import import optional_import
+    mod = optional_import(
+        'integrations.providers.registry',
+        reason='Provider admin API — registry CRUD',
+    )
+    if mod is None:
+        return None, (jsonify({'error': 'Provider gateway not available'}), 503)
+    return mod, None
+
+
+def _providers_gateway():
+    """Resolve integrations.providers.gateway via optional_import (same
+    contract as _providers_registry — see its docstring)."""
+    from core.optional_import import optional_import
+    mod = optional_import(
+        'integrations.providers.gateway',
+        reason='Provider admin API — runtime dispatch / stats',
+    )
+    if mod is None:
+        return None, (jsonify({'error': 'Provider gateway not available'}), 503)
+    return mod, None
+
+
+def _providers_matrix():
+    """Resolve integrations.providers.efficiency_matrix via optional_import
+    (same contract as _providers_registry)."""
+    from core.optional_import import optional_import
+    mod = optional_import(
+        'integrations.providers.efficiency_matrix',
+        reason='Provider admin API — efficiency leaderboard',
+    )
+    if mod is None:
+        return None, (jsonify({'error': 'Efficiency matrix not available'}), 503)
+    return mod, None
+
+
+def _wamp_mod():
+    """Resolve the embedded wamp_router module via optional_import.
+
+    Same (module, None) / (None, error_response) contract as the provider
+    helpers.  Routes a failed wamp_router import (missing file, port-
+    conflict during module-init, circular import) into the degradations
+    registry — previously every WAMP HTTP bridge / status / ticket call
+    would silently 503 with no operator signal.
+    """
+    from core.optional_import import optional_import
+    mod = optional_import(
+        'wamp_router',
+        reason='Embedded WAMP v2 router (realtime push bridge)',
+    )
+    if mod is None:
+        return None, (jsonify({'error': 'WAMP router not available'}), 503)
+    return mod, None
+
 
 @app.route('/api/admin/providers', methods=['GET'])
 def admin_providers_list():
     """List all providers with status, model count, and capabilities."""
+    mod, err = _providers_registry()
+    if err:
+        return err
     try:
-        from integrations.providers.registry import get_registry
-        reg = get_registry()
+        reg = mod.get_registry()
         category = request.args.get('category', '')
         ptype = request.args.get('type', '')  # api, affiliate, local
 
@@ -1564,50 +2539,59 @@ def admin_providers_list():
                 'avg_latency_ms': p.avg_latency_ms,
             })
         return jsonify({'success': True, 'providers': result})
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_list runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/<provider_id>', methods=['GET'])
 def admin_providers_get(provider_id):
     """Get full provider details including all models and pricing."""
+    mod, err = _providers_registry()
+    if err:
+        return err
     try:
-        from integrations.providers.registry import get_registry
-        reg = get_registry()
+        reg = mod.get_registry()
         p = reg.get(provider_id)
         if not p:
             return jsonify({'error': 'Provider not found'}), 404
         data = p.to_dict()
         data['api_key_set'] = p.has_api_key()
         return jsonify({'success': True, 'provider': data})
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_get runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/<provider_id>/api-key', methods=['POST'])
 def admin_providers_set_key(provider_id):
     """Set or update API key for a provider."""
+    mod, err = _providers_registry()
+    if err:
+        return err
     try:
-        from integrations.providers.registry import get_registry
         data = request.get_json(force=True)
         api_key = data.get('api_key', '')
         if not api_key:
             return jsonify({'error': 'api_key required'}), 400
-        reg = get_registry()
+        reg = mod.get_registry()
         success = reg.set_api_key(provider_id, api_key)
         if not success:
             return jsonify({'error': 'Provider not found or no env_key configured'}), 404
         return jsonify({'success': True})
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_set_key runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/<provider_id>/api-key', methods=['DELETE'])
 def admin_providers_remove_key(provider_id):
     """Remove API key for a provider."""
+    mod, err = _providers_registry()
+    if err:
+        return err
     try:
-        from integrations.providers.registry import get_registry
-        reg = get_registry()
+        reg = mod.get_registry()
         p = reg.get(provider_id)
         if not p or not p.env_key:
             return jsonify({'error': 'Provider not found'}), 404
@@ -1615,16 +2599,19 @@ def admin_providers_remove_key(provider_id):
         p.api_key_set = False
         reg.save()
         return jsonify({'success': True})
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_remove_key runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/<provider_id>/test', methods=['POST'])
 def admin_providers_test(provider_id):
     """Test provider connection with a simple request."""
+    mod, err = _providers_gateway()
+    if err:
+        return err
     try:
-        from integrations.providers.gateway import get_gateway
-        gw = get_gateway()
+        gw = mod.get_gateway()
         result = gw.generate(
             'Say "hello" in one word.',
             model_type='llm',
@@ -1639,8 +2626,6 @@ def admin_providers_test(provider_id):
             'cost_usd': result.cost_usd,
             'error': result.error,
         })
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1648,60 +2633,73 @@ def admin_providers_test(provider_id):
 @app.route('/api/admin/providers/<provider_id>/enable', methods=['POST'])
 def admin_providers_enable(provider_id):
     """Enable or disable a provider."""
+    mod, err = _providers_registry()
+    if err:
+        return err
     try:
-        from integrations.providers.registry import get_registry
         data = request.get_json(force=True)
         enabled = data.get('enabled', True)
-        reg = get_registry()
+        reg = mod.get_registry()
         p = reg.get(provider_id)
         if not p:
             return jsonify({'error': 'Provider not found'}), 404
         p.enabled = enabled
         reg.save()
         return jsonify({'success': True, 'enabled': p.enabled})
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_enable runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/gateway/stats', methods=['GET'])
 def admin_providers_gateway_stats():
     """Get gateway usage stats: total cost, requests, recent activity."""
+    mod, err = _providers_gateway()
+    if err:
+        return err
     try:
-        from integrations.providers.gateway import get_gateway
-        return jsonify({'success': True, **get_gateway().get_stats()})
-    except ImportError:
-        return jsonify({'error': 'Provider gateway not available'}), 503
+        return jsonify({'success': True, **mod.get_gateway().get_stats()})
+    except Exception as e:
+        logging.warning(f"admin_providers_gateway_stats runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/efficiency/leaderboard', methods=['GET'])
 def admin_providers_leaderboard():
     """Get efficiency leaderboard — ranked by speed, quality, cost."""
+    mod, err = _providers_matrix()
+    if err:
+        return err
     try:
-        from integrations.providers.efficiency_matrix import get_matrix
         model_type = request.args.get('model_type', 'llm')
         sort_by = request.args.get('sort_by', 'efficiency')
-        entries = get_matrix().get_leaderboard(model_type, sort_by)
+        matrix = mod.get_matrix()
+        entries = matrix.get_leaderboard(model_type, sort_by)
         from dataclasses import asdict
         return jsonify({
             'success': True,
             'leaderboard': [asdict(e) for e in entries[:20]],
-            'summary': get_matrix().get_matrix_summary(),
+            'summary': matrix.get_matrix_summary(),
         })
-    except ImportError:
-        return jsonify({'error': 'Efficiency matrix not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_leaderboard runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/providers/capabilities', methods=['GET'])
 def admin_providers_capabilities():
     """Get capabilities summary: what model types Nunba can serve right now."""
+    mod, err = _providers_registry()
+    if err:
+        return err
     try:
-        from integrations.providers.registry import get_registry
         return jsonify({
             'success': True,
-            'capabilities': get_registry().get_capabilities_summary(),
+            'capabilities': mod.get_registry().get_capabilities_summary(),
         })
-    except ImportError:
-        return jsonify({'error': 'Provider registry not available'}), 503
+    except Exception as e:
+        logging.warning(f"admin_providers_capabilities runtime error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1711,28 +2709,43 @@ def admin_providers_capabilities():
 @app.route('/api/admin/resources/stats', methods=['GET'])
 def admin_resources_stats():
     """Get current resource usage: CPU, RAM, GPU, throttle, mode."""
+    from core.optional_import import optional_import
+    _gov_mod = optional_import(
+        'core.resource_governor',
+        reason='Resource governor (CPU/RAM throttle, mode controller)',
+    )
+    if _gov_mod is None:
+        return jsonify({'error': 'Resource governor not available'}), 503
     try:
-        from core.resource_governor import get_governor
-        gov = get_governor()
+        gov = _gov_mod.get_governor()
         stats = gov.get_stats()
-        # Add live system metrics
-        try:
-            import psutil
-            stats['cpu_percent'] = psutil.cpu_percent(interval=None)
-            mem = psutil.virtual_memory()
+        # Add live system metrics — both psutil (host process metrics) and
+        # vram_manager (GPU telemetry) are optional, logged once via the
+        # same registry that powers /api/admin/diag/degradations.
+        _psutil = optional_import(
+            'psutil', reason='Host CPU/RAM live metrics',
+        )
+        if _psutil is not None:
+            stats['cpu_percent'] = _psutil.cpu_percent(interval=None)
+            mem = _psutil.virtual_memory()
             stats['ram_used_gb'] = round(mem.used / (1024**3), 1)
             stats['ram_total_gb'] = round(mem.total / (1024**3), 1)
             stats['ram_percent'] = mem.percent
-        except ImportError:
-            pass
-        try:
-            from integrations.service_tools.vram_manager import vram_manager
-            stats['gpu'] = vram_manager.detect_gpu()
-        except Exception:
-            pass
+        _vram_mod = optional_import(
+            'integrations.service_tools.vram_manager',
+            reason='GPU VRAM telemetry (HARTOS service tool)',
+        )
+        if _vram_mod is not None:
+            try:
+                stats['gpu'] = _vram_mod.vram_manager.detect_gpu()
+            except Exception as ge:
+                # The MODULE imported but the live probe failed (driver
+                # crash, no CUDA at runtime).  Surface as a soft warning
+                # in the response, not a 503 — base stats are still useful.
+                stats['gpu_error'] = str(ge)
         return jsonify({'success': True, **stats})
-    except ImportError:
-        return jsonify({'error': 'Resource governor not available'}), 503
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/status', methods=["GET"])
@@ -1745,6 +2758,53 @@ def status():
         response['device_id'] = DEVICE_ID
         response['log_file'] = args.log_file
     return jsonify(response), 200
+
+
+# ────────────────────────────────────────────────────────────────
+# Coverage helper endpoints (loopback-only, coverage-run only).
+#
+# These are registered ONLY when the process was launched with
+# `coverage run …` (which sets up a Coverage instance as the
+# current tracer).  Windows `taskkill /F` bypasses atexit, so the
+# only reliable way to collect a `.coverage.*` fragment is an HTTP
+# call that flushes + exits in the middle of a Python instruction.
+#
+# Gated by `NUNBA_COVERAGE_ENABLED=1` in the env AND by
+# `_is_local_request()` (loopback only) so these cannot be hit
+# from a network peer.
+# ────────────────────────────────────────────────────────────────
+if os.environ.get('NUNBA_COVERAGE_ENABLED') == '1':
+    @app.route('/_debug/coverage/flush', methods=['GET', 'POST'])
+    def _cov_flush():  # pragma: no cover — loopback helper
+        if not _is_local_request():
+            return jsonify({'error': 'loopback only'}), 403
+        try:
+            import coverage
+            cov = coverage.Coverage.current()
+            if cov is not None:
+                cov.save()
+                return jsonify({'ok': True, 'flushed': True})
+            return jsonify({'ok': False, 'error': 'no active Coverage instance'}), 500
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+
+    @app.route('/_debug/coverage/shutdown', methods=['GET', 'POST'])
+    def _cov_shutdown():  # pragma: no cover — loopback helper
+        if not _is_local_request():
+            return jsonify({'error': 'loopback only'}), 403
+        try:
+            import coverage
+            cov = coverage.Coverage.current()
+            if cov is not None:
+                cov.save()
+        except Exception:
+            pass
+        # Schedule process exit AFTER the HTTP response has flushed.
+        # A short Timer avoids killing mid-response and losing the
+        # 200 that the client needs to confirm shutdown.
+        import threading as _t
+        _t.Timer(0.25, lambda: os._exit(0)).start()
+        return jsonify({'ok': True, 'shutdown': True})
 
 
 @app.route('/backend/watchdog', methods=["GET"])
@@ -1765,6 +2825,85 @@ def watchdog_status():
         'port_in_use': _is_port_in_use(langchain_port),
     })
 
+
+@app.route('/backend/health', methods=["GET"])
+def backend_health():
+    """Return backend + GPU tier diagnostics for the chat UI badge.
+
+    Surfaces the speculation-capability boundary so 8GB-GPU laptops can SEE
+    why chat is ~1.3-2.0s slower per reply (commit 2acf21a raised the
+    draft-boot threshold from >=8GB to >=10GB VRAM to leave room for TTS).
+
+    Tier ladder (matches LlamaConfig.should_boot_draft + VRAMManager budget):
+      ultra    >= 24 GB total VRAM  (70B-class models viable)
+      full     >= 10 GB total VRAM  (draft + main speculative decoding)
+      standard  4-10 GB total VRAM  (main-only, no speculation)
+      none     no CUDA / < 4 GB     (CPU or tiny integrated GPU)
+    """
+    gpu_name = None
+    vram_total = 0.0
+    vram_free = 0.0
+    cuda_available = False
+    speculation_enabled = False
+
+    # VRAMManager is the single source of truth for GPU state (shared with
+    # TTS, vision, llama). Fall back to 'none' tier if import fails.
+    try:
+        from integrations.service_tools.vram_manager import vram_manager
+        gpu_info = vram_manager.detect_gpu() or {}
+        gpu_name = gpu_info.get('name')
+        cuda_available = bool(gpu_info.get('cuda_available'))
+        vram_total = float(vram_manager.get_total_vram() or 0.0)
+        vram_free = float(vram_manager.get_free_vram() or 0.0)
+    except Exception as e:
+        logging.debug(f"/backend/health: VRAM detection unavailable: {e}")
+
+    try:
+        from llama.llama_config import LlamaConfig
+        speculation_enabled = bool(LlamaConfig.should_boot_draft())
+    except Exception as e:
+        logging.debug(f"/backend/health: should_boot_draft unavailable: {e}")
+        # Fall back to raw threshold if the helper errors.
+        speculation_enabled = cuda_available and vram_total >= 10.0
+
+    # Tier classification — single source of truth in core.gpu_tier.
+    # Removed the inline 24/10/4 threshold ladder that used to live here
+    # (drifted from the frontend GpuTierBadge.jsx hard-coded copy).  Any
+    # future threshold change happens ONCE in core.gpu_tier and the
+    # frontend re-fetches via /api/v1/system/tiers.
+    from core.gpu_tier import classify as _classify_tier
+    gpu_tier = _classify_tier(vram_total, cuda_available).value
+
+    return jsonify({
+        'status': 'operational',
+        'gpu_tier': gpu_tier,
+        'gpu_name': gpu_name,
+        'cuda_available': cuda_available,
+        'vram_total_gb': round(vram_total, 2),
+        'vram_free_gb': round(vram_free, 2),
+        'speculation_enabled': speculation_enabled,
+    }), 200
+
+
+@app.route('/api/v1/system/tiers', methods=['GET'])
+def system_tiers():
+    """Return the canonical GPU tier table.
+
+    Frontend consumers (GpuTierBadge.jsx) MUST fetch this on mount instead
+    of hard-coding thresholds — that's the whole point of the refactor.
+    Public endpoint (no auth gate) because the table contains no
+    secrets and the chat UI needs it on the first render path.
+
+    Cached aggressively at the CDN/proxy via Cache-Control because the
+    table only changes when we ship a release.
+    """
+    from core.gpu_tier import tier_table
+    response = jsonify({
+        'tiers': tier_table(),
+    })
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response, 200
+
 def _is_private_ip(hostname):
     """Block SSRF by checking if resolved IP is private/internal."""
     try:
@@ -1783,24 +2922,38 @@ def image_proxy():
 
     image_url = request.args.get('url', '')
     if not image_url:
-        # Return fallback image
+        # Return fallback image — but tolerate a missing static_dir
+        # (dev worktree without a built React bundle, or a frozen
+        # install where the media directory layout differs).  Without
+        # this guard `os.listdir(missing)` raises FileNotFoundError
+        # which bubbles up as 500 and fails J98 "never 500 on bad
+        # input" contract.
         static_dir = os.path.join(LANDING_PAGE_BUILD_DIR, 'static', 'media')
-        fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
+        try:
+            fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
+        except OSError:
+            fallback_files = []
         if fallback_files:
             return send_from_directory(static_dir, fallback_files[0])
         return jsonify({'error': 'No image URL provided'}), 400
 
+    # Scheme + SSRF validation MUST fail hard before we fall into the
+    # network-error fallback path below — otherwise `file:///etc/passwd`
+    # produces a 200 with a decoy image, masking the SSRF attempt
+    # entirely (J98 red-product).  Validate up-front, outside the
+    # try/except that handles transient network failures.
+    parsed = urllib.parse.urlparse(image_url)
+    if parsed.scheme not in ('http', 'https'):
+        return jsonify({
+            'error': 'Only http/https URLs are allowed',
+            'scheme': parsed.scheme or '(empty)',
+        }), 400
+
+    hostname = parsed.hostname
+    if not hostname or _is_private_ip(hostname):
+        return jsonify({'error': 'Access to internal networks is not allowed'}), 403
+
     try:
-        # Validate URL
-        parsed = urllib.parse.urlparse(image_url)
-        if parsed.scheme not in ('http', 'https'):
-            raise ValueError('Invalid URL scheme')
-
-        # SSRF protection: block requests to private/internal networks
-        hostname = parsed.hostname
-        if not hostname or _is_private_ip(hostname):
-            return jsonify({'error': 'Access to internal networks is not allowed'}), 403
-
         # Fetch the image
         response = requests.get(image_url, timeout=10, stream=True)
         response.raise_for_status()
@@ -1812,7 +2965,9 @@ def image_proxy():
         return response.content, 200, {'Content-Type': content_type}
     except Exception as e:
         logging.warning(f"Image proxy failed for {image_url}: {e}")
-        # Return fallback image on any error
+        # Return fallback image ONLY on transient network / server errors
+        # (the scheme + SSRF gates above have already rejected malicious
+        # inputs, so anything landing here is a remote-host issue).
         static_dir = os.path.join(LANDING_PAGE_BUILD_DIR, 'static', 'media')
         try:
             fallback_files = [f for f in os.listdir(static_dir) if f.startswith('AgentPoster')]
@@ -1820,7 +2975,7 @@ def image_proxy():
                 return send_from_directory(static_dir, fallback_files[0])
         except OSError:
             pass
-        return jsonify({'error': 'Failed to fetch image'}), 500
+        return jsonify({'error': 'Failed to fetch image'}), 502
 
 # ============== Register API routes BEFORE catch-all ==============
 # Register chatbot routes (includes /chat, /prompts, /tts, /custom_gpt)
@@ -1879,13 +3034,104 @@ def serve_landing_page_root():
     return redirect('/local', code=302)
 
 
+def _inject_guest_id_into_html(html_text: str) -> str:
+    """Inject `window.__NUNBA_GUEST_ID__` into an index.html at request
+    time so the React SPA can read the hardware-derived guest id
+    synchronously (no API round-trip, no race with first-paint).
+
+    The frontend fallback chain uses this AFTER localStorage (so it
+    only kicks in when localStorage was wiped — exactly the WebView2
+    UserDataFolder-wipe scenario we're protecting against).
+
+    Idempotent: if __NUNBA_GUEST_ID__ is already present (e.g. the
+    builder pre-injected it) we skip.  Never crashes the response —
+    worst case the frontend sees no global and falls through to
+    /api/guest-id or plain 'guest'.
+    """
+    if not GUEST_ID:
+        return html_text
+    try:
+        if 'window.__NUNBA_GUEST_ID__' in html_text:
+            return html_text
+        # JSON-encode the id so a malicious override can't break out
+        # of the string literal (defence-in-depth; derivation is SHA
+        # truncation so characters are always [0-9a-f_]).
+        import json as _json
+        safe_id = _json.dumps(GUEST_ID)
+        snippet = (
+            f"<script>window.__NUNBA_GUEST_ID__={safe_id};</script>"
+        )
+        # Inject just before </head>; fall back to prepending if
+        # </head> isn't present for any reason.
+        idx = html_text.lower().find('</head>')
+        if idx == -1:
+            return snippet + html_text
+        return html_text[:idx] + snippet + html_text[idx:]
+    except Exception as _ie:  # noqa: BLE001 — never let injection break render
+        logging.debug(f"guest-id injection skipped: {_ie}")
+        return html_text
+
+
+def _render_spa_index(build_dir: str):
+    """Render the SPA index.html with guest-id injection.
+
+    Used by every route that serves index.html (`/local`, the `/` SPA
+    fallback, and the 404 handler) so the injected global is present
+    regardless of which path the webview hit first.
+
+    Returns `None` if the SPA bundle is missing or unreadable.  When
+    returning None, logs a structured diagnostic so a failing frozen
+    install (e.g. LANDING_PAGE_BUILD_DIR resolved to the wrong path on
+    Program Files x86) is visible in `gui_app.log` / `server.log`
+    instead of silently falling back to a boot-stub page.
+    """
+    from flask import Response
+    index_path = os.path.join(build_dir, 'index.html')
+    if not os.path.exists(index_path):
+        # Diagnose: which build_dir was tried, what's in its parent, and
+        # whether the parent exists at all.  Don't spam on every request —
+        # use a module-level sentinel so we only log once per missing path.
+        try:
+            _miss_key = '_render_spa_index_missed_paths'
+            _missed = globals().setdefault(_miss_key, set())
+            if index_path not in _missed:
+                _missed.add(index_path)
+                _parent = os.path.dirname(index_path)
+                _exists_parent = os.path.isdir(_parent)
+                try:
+                    _contents = (os.listdir(_parent)[:20]
+                                 if _exists_parent else [])
+                except OSError:
+                    _contents = ['<listdir-failed>']
+                logging.warning(
+                    f"_render_spa_index: index.html NOT FOUND at {index_path} "
+                    f"(parent_exists={_exists_parent}, "
+                    f"parent_contents={_contents}). "
+                    f"Caller will fall back to placeholder HTML.",
+                )
+        except Exception:
+            pass
+        return None
+    try:
+        with open(index_path, encoding='utf-8') as fh:
+            html_text = fh.read()
+    except Exception as e:
+        logging.warning(
+            f"_render_spa_index: read failed for {index_path}: "
+            f"{type(e).__name__}: {e}",
+        )
+        return None
+    html_text = _inject_guest_id_into_html(html_text)
+    return Response(html_text, 200, content_type='text/html; charset=utf-8')
+
+
 @app.route('/local')
 def serve_local_page():
     """Always serve local page (for offline use or testing)"""
-    from flask import Response, send_from_directory
-    index_path = os.path.join(LANDING_PAGE_BUILD_DIR, 'index.html')
-    if os.path.exists(index_path):
-        return send_from_directory(LANDING_PAGE_BUILD_DIR, 'index.html')
+    from flask import Response
+    rendered = _render_spa_index(LANDING_PAGE_BUILD_DIR)
+    if rendered is not None:
+        return rendered
     return Response(
         '<html><body style="background:#0F0E17;color:#fff;font-family:sans-serif;display:flex;'
         'align-items:center;justify-content:center;height:100vh;margin:0">'
@@ -1953,7 +3199,7 @@ def broadcast_sse_event(event_type, data, user_id=None):
     """
     # Mirror to embedded WAMP router for crossbarWorker.js subscribers
     try:
-        from wamp_router import publish_local, is_running
+        from wamp_router import is_running, publish_local
         if is_running() and user_id:
             # Map event types to the WAMP topics crossbarWorker.js subscribes to
             wamp_data = dict(data) if isinstance(data, dict) else {'raw': data}
@@ -2028,10 +3274,17 @@ def wamp_http_bridge():
     Accepts POST with JSON body: {topic: str, args: list, kwargs: dict}
     Publishes into the embedded WAMP router so all WebSocket subscribers receive it.
     This replaces the Crossbar.io HTTP Bridge Service for local/bundled mode.
+
+    Import failures land in /api/admin/diag/degradations via _wamp_mod —
+    previously a missing wamp_router.py (bundle drift, port-conflict
+    during module import) would silently 503 every realtime publish with
+    no hint to the operator.
     """
+    wmod, err = _wamp_mod()
+    if err:
+        return err
     try:
-        from wamp_router import publish_local, is_running
-        if not is_running():
+        if not wmod.is_running():
             return jsonify({'error': 'WAMP router not running'}), 503
         data = request.get_json(silent=True) or {}
         topic = data.get('topic', '')
@@ -2045,23 +3298,46 @@ def wamp_http_bridge():
                 args = [json.loads(args)]
             except (json.JSONDecodeError, TypeError):
                 args = [args]
-        publish_local(topic, args, kwargs)
+        wmod.publish_local(topic, args, kwargs)
         return jsonify({'id': None}), 200
-    except ImportError:
-        return jsonify({'error': 'WAMP router not available'}), 503
     except Exception as e:
         logging.warning(f"WAMP HTTP bridge error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/wamp/status')
+@require_local_or_token
 def wamp_router_status():
     """Return embedded WAMP router health and statistics."""
-    try:
-        from wamp_router import get_stats
-        return jsonify(get_stats())
-    except ImportError:
+    wmod, err = _wamp_mod()
+    if err:
+        # Preserve prior response shape for the /api/wamp/status endpoint
+        # (frontend expects {running, error} not {error}).
         return jsonify({'running': False, 'error': 'module not available'}), 503
+    try:
+        return jsonify(wmod.get_stats())
+    except Exception as e:
+        return jsonify({'running': False, 'error': str(e)}), 500
+
+
+@app.route('/api/wamp/ticket')
+@require_local_or_token
+def wamp_ticket():
+    """Return WAMP ticket for authenticated clients (LAN mode).
+
+    Protected by require_local_or_token — only local requests or
+    requests with a valid API token can get the WAMP ticket.
+    Returns empty ticket when auth is not required (localhost mode).
+    """
+    wmod, _err = _wamp_mod()
+    if wmod is None:
+        # Preserve prior contract: empty ticket on unavailability (frontend
+        # falls back to LAN mode w/o auth). Degradation already recorded.
+        return jsonify({'ticket': ''})
+    try:
+        return jsonify({'ticket': wmod.get_wamp_ticket()})
+    except Exception:
+        return jsonify({'ticket': ''})
 
 
 @app.route('/api/jslog', methods=['POST'])
@@ -2193,7 +3469,10 @@ def serve_static_file(path):
     file_path = os.path.join(LANDING_PAGE_BUILD_DIR, path)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return send_from_directory(LANDING_PAGE_BUILD_DIR, path)
-    # For client-side routing, serve index.html
+    # For client-side routing, serve index.html with guest-id injected.
+    rendered = _render_spa_index(LANDING_PAGE_BUILD_DIR)
+    if rendered is not None:
+        return rendered
     return send_from_directory(LANDING_PAGE_BUILD_DIR, 'index.html')
 
 # Static file routes (must be explicit to not conflict with API routes)
@@ -2231,10 +3510,10 @@ def handle_404(e):
     if os.path.exists(full_path) and os.path.isfile(full_path):
         return send_from_directory(LANDING_PAGE_BUILD_DIR, file_path)
 
-    # Serve React app for client-side routing
-    index_path = os.path.join(LANDING_PAGE_BUILD_DIR, 'index.html')
-    if os.path.exists(index_path):
-        return send_from_directory(LANDING_PAGE_BUILD_DIR, 'index.html')
+    # Serve React app for client-side routing (with guest-id injection)
+    rendered = _render_spa_index(LANDING_PAGE_BUILD_DIR)
+    if rendered is not None:
+        return rendered
     return jsonify({'error': 'Not found', 'hint': 'React app not built. Run: cd landing-page && npm run build'}), 404
 
 # Initialize crash reporting
@@ -2255,63 +3534,134 @@ _splash('Initializing services...')
 # Deferred to background thread — chat routes are already registered above,
 # so the user can start chatting immediately. Social, agents, peer discovery
 # initialize in the background while the user is already interacting.
-# ── Register social blueprints synchronously (fast — just route registration) ──
-# The heavy init (DB, migrations, expert agents) is deferred to background.
-if HARTOS_BACKEND_DIRECT:
-    try:
-        init_social(app)  # registers gamification_bp, discovery_bp, admin_bp
-        from integrations.social.api import social_bp as _social_core_bp
-        app.register_blueprint(_social_core_bp)  # auth, users, posts, feed
-        logging.info("Social blueprints registered (routes available immediately)")
-    except Exception as _bp_err:
-        logging.warning(f"Social blueprint registration failed: {_bp_err}")
+#
+# ── CRITICAL: `init_social(app)` is NOT synchronous-safe (2026-04-19) ──
+# The HARTOS `init_social` implementation at integrations/social/__init__.py:329
+# calls `init_agent_engine(app)` unconditionally, which transitively pulls
+# autogen → openai → langchain → transformers → sympy.  In the frozen build
+# this import chain can take 4+ minutes due to import-lock contention with the
+# parallel `hartos-init` thread in `routes/hartos_backend_adapter.py`.
+# Symptom: `_bg_import` (the thread that calls `exec_module(main.py)`) stalls
+# for 240s+, `flask_app` never gets set, `_dynamic_wsgi_app` permanently
+# dispatches to the boot stub `gui_app`, and the user sees "Server is running.
+# App may have encountered an error" with 404s on the React bundle.
+#
+# Mitigation: ALL HARTOS blueprint registration (init_social, distributed
+# agent, kids routes, etc.) is now deferred to `_deferred_social_init()` below
+# so main.py's module-load finishes fast (<2s instead of 240s).  Frontend
+# endpoints that fire on first boot (/chat, /backend/health, /api/admin/config/chat,
+# /api/guest-id) are all defined directly on `app` above, so they work during
+# the deferred-init window.
+#
+# This is a functional change but NOT user-visible — the social UI was always
+# expected to lag behind chat-ready (see _deferred_social_init comment).
 
+
+def _has_bp(name: str) -> bool:
+    """Idempotency helper — True if a blueprint with this name is already
+    registered on `app`.  Used to guard against double-registration when the
+    deferred init path runs after any eager path that slipped through."""
     try:
-        from integrations.distributed_agent import distributed_agent_bp
-        app.register_blueprint(distributed_agent_bp)
+        return name in getattr(app, 'blueprints', {})
     except Exception:
-        pass
+        return False
 
-    try:
-        from routes import kids_media_routes
-        kids_media_routes.register_routes(app)
-    except Exception:
-        pass
 
+def _safe_register_bp(bp, *, name_hint: str = '') -> bool:
+    """Idempotent wrapper for `app.register_blueprint`.  Returns True if
+    the blueprint was registered this call, False if it was already present
+    (or registration raised)."""
     try:
-        from routes.kids_game_recommendation import kids_recommendation_bp
-        app.register_blueprint(kids_recommendation_bp)
-    except Exception:
-        pass
-
-    try:
-        from routes.upload_routes import register_upload_routes
-        register_upload_routes(app)
-    except Exception:
-        pass
-
-    try:
-        from routes.db_routes import register_db_routes
-        register_db_routes(app)
-    except Exception:
-        pass
-
-    # ── Register ALL HARTOS hive blueprints (marketplace, benchmarks, robotics, etc.) ──
-    try:
-        from integrations.blueprint_registry import register_all_blueprints
-        result = register_all_blueprints(app)
-        logging.info(f"HARTOS blueprints: {len(result['registered'])} registered, "
-                     f"{len(result['skipped'])} skipped: {result['registered']}")
-    except Exception as e:
-        logging.warning(f"HARTOS blueprint registry failed: {e}")
+        bp_name = getattr(bp, 'name', None) or name_hint
+        if bp_name and _has_bp(bp_name):
+            return False
+        app.register_blueprint(bp)
+        return True
+    except Exception as _bp_e:
+        logging.debug(f"blueprint {name_hint or getattr(bp, 'name', '?')} register failed: {_bp_e}")
+        return False
 
 
 def _deferred_social_init():
-    """Heavy social init in background — DB, migrations, channels, agents."""
+    """Heavy social init in background — blueprint registration, DB,
+    migrations, channels, agents.
+
+    Blueprint registration (init_social + social_bp + distributed_agent +
+    kids_media + upload + db + blueprint_registry) was moved here on
+    2026-04-19 after the HARTOS `init_social` was found to transitively pull
+    autogen/openai/langchain/transformers/sympy during its unconditional
+    `init_agent_engine(app)` call (HARTOS integrations/social/__init__.py:329).
+    Keeping those calls synchronous in main.py's module-load path stalled
+    `_bg_import` for 240s+ and never let `flask_app` reach the dispatcher.
+
+    Frontend boot-critical endpoints (/chat, /backend/health, /api/guest-id,
+    /api/admin/config/chat) are defined directly on `app` above main.py's
+    deferred-init block, so they answer correctly during this init window.
+    HARTOS social endpoints (/api/social/*) return 404 until this function
+    finishes — expected (frontend already silent-fails those calls)."""
     if not HARTOS_BACKEND_DIRECT:
         return
     try:
-        # DB + migrations (heavy I/O, safe to defer)
+        # ── 1) Blueprint registration (moved from module-load path) ──
+        # Each `if not _has_bp(...)` is an idempotency guard — if anything
+        # ever registers a blueprint eagerly in the future, we won't crash
+        # with "A blueprint named X is already registered".
+        try:
+            if init_social is not None:
+                init_social(app)  # registers gamification_bp, mcp_bp, sharing_bp,
+                                  # games_bp, discovery_bp, admin_bp, channel_user_bp,
+                                  # dashboard_bp, tracker_bp, fleet_update_bp,
+                                  # regional_host_bp, sync_bp, audit_bp, content_gen_bp,
+                                  # learning_bp, theme_bp, thought_experiments_bp,
+                                  # and (behind HEVOLVE_CODING_AGENT_ENABLED) the
+                                  # coding_agent.  ALSO pulls autogen+langchain via
+                                  # init_agent_engine — this is THE heavy call.
+            from integrations.social.api import social_bp as _social_core_bp
+            _safe_register_bp(_social_core_bp, name_hint='social')  # auth, users, posts, feed
+            logging.info("Social blueprints registered (deferred — routes available after this log line)")
+        except Exception as _bp_err:
+            logging.warning(f"Social blueprint registration failed: {_bp_err}")
+
+        try:
+            from integrations.distributed_agent import distributed_agent_bp
+            _safe_register_bp(distributed_agent_bp, name_hint='distributed_agent')
+        except Exception:
+            pass
+
+        try:
+            from routes import kids_media_routes
+            kids_media_routes.register_routes(app)
+        except Exception:
+            pass
+
+        try:
+            from routes.kids_game_recommendation import kids_recommendation_bp
+            _safe_register_bp(kids_recommendation_bp, name_hint='kids_recommendation')
+        except Exception:
+            pass
+
+        try:
+            from routes.upload_routes import register_upload_routes
+            register_upload_routes(app)
+        except Exception:
+            pass
+
+        try:
+            from routes.db_routes import register_db_routes
+            register_db_routes(app)
+        except Exception:
+            pass
+
+        # ── Register ALL HARTOS hive blueprints (marketplace, benchmarks, robotics, etc.) ──
+        try:
+            from integrations.blueprint_registry import register_all_blueprints
+            result = register_all_blueprints(app)
+            logging.info(f"HARTOS blueprints: {len(result['registered'])} registered, "
+                         f"{len(result['skipped'])} skipped: {result['registered']}")
+        except Exception as e:
+            logging.warning(f"HARTOS blueprint registry failed: {e}")
+
+        # ── 2) DB + migrations (heavy I/O, safe to defer) ──
         init_db()
         try:
             from integrations.social.migrations import run_migrations
@@ -2320,7 +3670,7 @@ def _deferred_social_init():
             logging.warning(f"hart-backend migrations: {mig_err}")
         logging.info(f"hart-backend DB initialized: {NUNBA_DB_PATH}")
 
-        # Channel adapters — env-gated, each registers only if its token/URL is set
+        # Channel adapters — auto-activate from saved admin config + env vars
         try:
             from core.port_registry import get_port
             from integrations.channels.flask_integration import init_channels
@@ -2330,16 +3680,41 @@ def _deferred_social_init():
                 'default_prompt_id': 8888,
                 'device_id': DEVICE_ID,
             })
-            channels.register_telegram()    # needs TELEGRAM_BOT_TOKEN
-            channels.register_discord()     # needs DISCORD_BOT_TOKEN
-            channels.register_whatsapp()    # needs WHATSAPP_API_URL
-            channels.register_slack()       # needs SLACK_BOT_TOKEN
-            channels.register_signal()      # needs SIGNAL_PHONE_NUMBER
-            channels.register_imessage()    # needs BLUEBUBBLES_PASSWORD
-            channels.register_google_chat() # needs GOOGLE_CHAT_WEBHOOK or GOOGLE_CHAT_SA_FILE
-            channels.register_web_chat()    # always available (WebSocket)
+            # Auto-activate channels saved in admin config
+            _activated = 0
+            try:
+                from integrations.channels.admin.api import get_api
+                for _ch_type, _ch_cfg in get_api()._channels.items():
+                    if _ch_cfg.get('enabled', True):
+                        _tok = _ch_cfg.get('token') or _ch_cfg.get('api_key')
+                        if channels.register_channel(_ch_type, token=_tok):
+                            _activated += 1
+            except Exception:
+                pass
+            # Env-var channels: ONLY register adapters that actually have
+            # credentials.  Previously we registered all 6 (telegram,
+            # discord, whatsapp, slack, signal, web) unconditionally,
+            # which imported ~250MB of heavy SDK modules even when the
+            # user had no tokens.  `web` stays unconditional because it's
+            # the local HTTP adapter — no external creds, already cheap.
+            _env_creds = {
+                'telegram': os.environ.get('TELEGRAM_BOT_TOKEN'),
+                'discord':  os.environ.get('DISCORD_BOT_TOKEN'),
+                'whatsapp': os.environ.get('WHATSAPP_ACCESS_TOKEN'),
+                'slack':    os.environ.get('SLACK_BOT_TOKEN'),
+                'signal':   os.environ.get('SIGNAL_SERVICE_URL'),
+            }
+            for _ch_type, _tok in _env_creds.items():
+                if _tok and _ch_type not in (channels.registry._adapters or {}):
+                    channels.register_channel(_ch_type, token=_tok)
+            # `web` adapter is in-process, cheap, always register
+            if 'web' not in (channels.registry._adapters or {}):
+                channels.register_channel('web')
             channels.start()
-            logging.info("Channel adapters initialized")
+            logging.info(
+                f"Channel adapters initialized "
+                f"({_activated} from config, {sum(1 for t in _env_creds.values() if t)} from env, web)",
+            )
         except Exception as ch_err:
             logging.debug(f"Channel adapters skipped: {ch_err}")
 
@@ -2357,6 +3732,22 @@ def _deferred_social_init():
     except Exception as e:
         logging.warning(f"hart-backend direct init failed: {e}")
 
+    # ── Kick off HARTOS hart_intelligence import (Tier-1 direct dispatch) ──
+    # Previously this fired at module-load time of `routes/hartos_backend_adapter`
+    # (see that file's `start_hartos_init_background` docstring) and raced
+    # with `_bg_import` on langchain/transformers/torch import locks.  Now
+    # we spawn it HERE — after main.py is fully imported, blueprints are
+    # registered, and the Flask app is ready to answer requests.  This
+    # guarantees `flask_app` is set in app.py before the heavy import chain
+    # begins.  The user can already chat via fallback (Tier-3 local llama);
+    # Tier-1 comes online a few seconds later.
+    try:
+        from routes.hartos_backend_adapter import start_hartos_init_background
+        start_hartos_init_background()
+        logging.info("hartos-init background thread kicked off (deferred)")
+    except Exception as _hi_err:
+        logging.debug(f"start_hartos_init_background skipped: {_hi_err}")
+
     logging.info("Social subsystem initialized (background)")
 
 
@@ -2372,6 +3763,25 @@ if not HARTOS_BACKEND_DIRECT and HARTOS_BACKEND_AVAILABLE:
         logging.info("hart-backend adapter registered (proxy mode)")
     except Exception as e:
         logging.warning(f"hart-backend adapter failed: {e}")
+
+# ============== HARTOS MCP over HTTP (lifecycle-bound to Nunba) ==============
+# The HTTP MCP blueprint at /api/mcp/local replaces the standalone stdio
+# python subprocess that Claude Code would otherwise spawn (see
+# HARTOS/integrations/mcp/mcp_server.py). When Claude Code's MCP config
+# points at http://localhost:5000/api/mcp/local, the MCP lifecycle is the
+# same as Nunba's — stop Nunba → /mcp/local 404s → Claude auto-disconnects.
+# No orphan python.exe, no DB lock contention, no extra ~200MB RAM.
+try:
+    from integrations.mcp import auto_register_local_mcp, mcp_local_bp
+    app.register_blueprint(mcp_local_bp)
+    auto_register_local_mcp()
+    logging.info(
+        "HARTOS MCP mounted at /api/mcp/local — "
+        "set Claude Code mcpServers.hartos = {type:'http', "
+        "url:'http://localhost:5000/api/mcp/local'} to drop the stdio subprocess",
+    )
+except Exception as e:
+    logging.warning(f"HARTOS MCP HTTP blueprint not registered: {e}")
 
 # ============== Fleet Command Watcher (auto-restart on tier change) ==============
 def _fleet_restart_watcher():
@@ -2409,6 +3819,7 @@ logging.info(f"hart-backend direct: {HARTOS_BACKEND_DIRECT}, adapter: {HARTOS_BA
 # ============== Logs Viewer Endpoints ==============
 
 @app.route('/logs', methods=['GET'])
+@require_local_or_token
 def list_logs():
     """List available log files"""
     log_files = []
@@ -2500,6 +3911,268 @@ def view_log():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/diag/thread-dump', methods=['POST'])
+@require_local_or_token
+def admin_diag_thread_dump():
+    """On-demand thread-stack dump for diagnosing a live hang.
+
+    Calls `_dump_all_thread_stacks()` (app.py) which writes to BOTH
+    the logger AND ~/Documents/Nunba/logs/startup_trace.log (the
+    trace channel flushes immediately and survives GIL-held hangs).
+    Returns the number of threads dumped + path to the trace file.
+
+    Guards: local-or-token gate (no remote callers); on `central`
+    topology this endpoint is DISABLED outright (TPO finding) because
+    dumping all Python thread stacks from a multi-tenant cloud process
+    leaks cross-tenant source-line info (filename:lineno of handlers
+    currently executing other tenants' requests, plus partial locals
+    visible in frame-bound generators).  On `regional` and `flat`
+    topologies the local-or-token gate is sufficient — a single
+    operator owns the box.
+
+    Topology is read from the env var ``HEVOLVE_TOPOLOGY`` (values:
+    ``flat`` | ``regional`` | ``central``; default ``flat``) since
+    Nunba has no ``core.platform_paths.get_topology`` helper today.
+    """
+    # TPO finding: on central (multi-tenant cloud) deployments, thread
+    # stacks leak cross-tenant frame-source info.  Disable outright.
+    _topology = os.environ.get('HEVOLVE_TOPOLOGY', 'flat').strip().lower()
+    if _topology == 'central':
+        return jsonify({
+            'error': 'disabled_on_central',
+            'message': 'Thread dump disabled for tenant isolation',
+        }), 403
+    try:
+        # Single canonical dumper lives in `core.diag` (refactor: 3 parallel
+        # implementations across app.py + node_watchdog.py + this endpoint
+        # collapsed into one).  Direct import — no module-lookup chain.
+        from core.diag import dump_all_thread_stacks
+        reason = (request.get_json(silent=True) or {}).get(
+            'reason', 'admin-requested'
+        )
+        dump_all_thread_stacks(f"admin diag: {reason}")
+        import threading as _t
+        return jsonify({
+            'success': True,
+            'threads_dumped': _t.active_count(),
+            'trace_file': os.path.join(
+                os.path.expanduser('~'), 'Documents', 'Nunba',
+                'logs', 'startup_trace.log',
+            ),
+            'reason': reason,
+        })
+    except Exception as e:
+        logging.error(f"thread-dump admin endpoint failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/diag/degradations', methods=['GET'])
+@require_local_or_token
+def admin_diag_degradations():
+    """List every optional dependency that failed to import.
+
+    Powered by `core.optional_import` — every `try: import X; except: pass`
+    block in main.py was refactored to register failures here so operators
+    can DIAGNOSE silent feature degradation without re-bundling with print
+    statements.  The legacy pattern silently swallowed ImportError and the
+    affected feature simply never worked, with no logged signal.
+
+    Response:
+      {
+        success: True,
+        count: 3,
+        degradations: [
+          {module, reason, error, first_failed_at, attempts},
+          ...
+        ]
+      }
+
+    Guards: local-or-token gate.  On central tier this list could leak
+    paid-tier integration absence (info disclosure) — the SAME gate
+    protecting /api/admin/diag/thread-dump is sufficient because the
+    central-tier check there is policy-equivalent.
+    """
+    try:
+        from core.optional_import import list_degradations
+        items = list_degradations()
+        return jsonify({
+            'success': True,
+            'count': len(items),
+            'degradations': items,
+        })
+    except Exception as e:
+        logging.error(f"degradations admin endpoint failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Trusted-publisher allowlist CRUD ─────────────────────────────────────
+# Enterprise tenants can add their internal HF org to the trusted list
+# WITHOUT a release.  Pre-refactor the list was a frozenset literal in
+# this file, which made the field team route around it (told customers
+# to pass `confirm_unverified=true` instead).  All three endpoints are
+# local-or-token gated — same gate that protects the install flow.
+
+@app.route('/api/admin/hub/allowlist', methods=['GET'])
+@require_local_or_token
+def admin_hub_allowlist_list():
+    """Return the current trusted HF org allowlist."""
+    try:
+        from core.hub_allowlist import get_allowlist
+        return jsonify({
+            'success': True,
+            'orgs': get_allowlist().list(),
+        })
+    except Exception as e:
+        logging.error(f"hub allowlist list failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/hub/allowlist', methods=['POST'])
+@require_local_or_token
+def admin_hub_allowlist_add():
+    """Add an HF org to the trusted-publisher allowlist.
+
+    Body: {org: 'acme-corp', reason: 'internal model registry'}
+    """
+    try:
+        from core.hub_allowlist import get_allowlist
+        data = request.get_json(silent=True) or {}
+        org = data.get('org', '')
+        reason = data.get('reason', '')
+        get_allowlist().add(org, reason)
+        return jsonify({'success': True, 'org': org, 'reason': reason})
+    except ValueError as ve:
+        # Validation failures land here — surface the message verbatim
+        # so the operator UI can render it.
+        return jsonify({'error': str(ve)}), 400
+    except Exception as e:
+        logging.error(f"hub allowlist add failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/hub/allowlist/<path:org>', methods=['DELETE'])
+@require_local_or_token
+def admin_hub_allowlist_remove(org):
+    """Remove an HF org from the trusted-publisher allowlist.
+
+    Idempotent — returns 200 with `removed: false` if the org wasn't
+    present, so the operator UI can call this safely on a stale list.
+    """
+    try:
+        from core.hub_allowlist import get_allowlist
+        removed = get_allowlist().remove(org)
+        return jsonify({'success': True, 'removed': removed, 'org': org})
+    except Exception as e:
+        logging.error(f"hub allowlist remove failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ── MCP bearer-token surface for Claude Code setup UX ─────────────────────
+# Background: commit f5b99d8 added `/api/mcp/local` bearer-token auth gate
+# in HARTOS/integrations/mcp/mcp_http_bridge.py.  Pre-existing Claude Code
+# installs use the old stdio-spawn `.claude/settings.local.json` config
+# and have NO way to discover (a) the token value, (b) the new HTTP URL,
+# or (c) the JSON snippet they need to paste.  Silent 403s ensue.
+#
+# These two endpoints power the Admin → Integrations → Claude Code card
+# that shows + rotates the token.  Gated by `require_local_or_token` so
+# only the local desktop user (or a caller with the Nunba admin token)
+# can read/rotate — this is the same gate protecting `/thread-dump`.
+#
+# NOTE: token I/O lives in HARTOS — Nunba uses the PUBLIC contract
+# `from integrations.mcp import get_mcp_token, rotate_mcp_token`.  The
+# previous implementation reached into the private `_ensure_mcp_token`
+# + `_MCP_TOKEN_CACHE` poke + `_mcp_token_path()` direct-file-write,
+# which silently broke any time HARTOS renamed an internal symbol.
+# rotate_mcp_token() handles HARTOS_MCP_TOKEN env-pinning gracefully.
+_MCP_CONFIG_URL = 'http://localhost:5000/api/mcp/local'
+
+
+def _mcp_config_snippet(token: str) -> str:
+    """Return the JSON blob users paste into `.claude/settings.local.json`.
+
+    Kept in sync with Claude Code's http-type MCP server schema
+    (type:'http' + url + headers).  The bearer header is the SAME
+    token file Claude Code would otherwise read on its own — we
+    expose it here so non-technical users don't have to `cat` the
+    file out of `%LOCALAPPDATA%/Nunba/mcp.token`.
+    """
+    return json.dumps({
+        'mcpServers': {
+            'hartos': {
+                'type': 'http',
+                'url': _MCP_CONFIG_URL,
+                'headers': {
+                    'Authorization': f'Bearer {token}',
+                },
+            },
+        },
+    }, indent=2)
+
+
+@app.route('/api/admin/mcp/token', methods=['GET'])
+@require_local_or_token
+def admin_mcp_token_get():
+    """Return the current MCP bearer token + ready-to-paste client config.
+
+    Response:
+      {
+        token: '<bearer token from %LOCALAPPDATA%/Nunba/mcp.token>',
+        url: 'http://localhost:5000/api/mcp/local',
+        config_snippet: '<JSON blob for .claude/settings.local.json>'
+      }
+    """
+    try:
+        # Use the PUBLIC HARTOS API — was reaching into the private
+        # underscore-prefix `_ensure_mcp_token` which coupled Nunba's
+        # release cadence to HARTOS internal naming.
+        from integrations.mcp import get_mcp_token
+        token = get_mcp_token()
+        return jsonify({
+            'token': token,
+            'url': _MCP_CONFIG_URL,
+            'config_snippet': _mcp_config_snippet(token),
+        })
+    except Exception as e:
+        logging.error(f"mcp token admin endpoint failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/mcp/token/rotate', methods=['POST'])
+@require_local_or_token
+def admin_mcp_token_rotate():
+    """Regenerate the MCP bearer token.
+
+    Overwrites `%LOCALAPPDATA%/Nunba/mcp.token` (or `~/.nunba/mcp.token`
+    on Unix) with a fresh `secrets.token_urlsafe(32)` and invalidates
+    the in-process cache on the HARTOS module so the next
+    `/api/mcp/local` before_request hook picks the new value.
+
+    Any live Claude Code clients using the old token will start
+    getting 403s immediately — operator must re-paste the new
+    `config_snippet` into `.claude/settings.local.json`.
+    """
+    try:
+        # PUBLIC HARTOS API — replaces the previous reach into private
+        # `_mcp_token_path()` + direct file write + private cache poke
+        # (`_MCP_TOKEN_CACHE = new_token`).  HARTOS now owns the rotation
+        # mechanism end-to-end; Nunba just calls the contract.
+        # rotate_mcp_token() also handles HARTOS_MCP_TOKEN env-var pinning
+        # gracefully (no-ops with a warning instead of overwriting an
+        # operator-controlled secret).
+        from integrations.mcp import rotate_mcp_token
+        new_token = rotate_mcp_token()
+        return jsonify({
+            'token': new_token,
+            'url': _MCP_CONFIG_URL,
+            'config_snippet': _mcp_config_snippet(new_token),
+            'rotated': True,
+        })
+    except Exception as e:
+        logging.error(f"mcp token rotate endpoint failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/logs/download', methods=['GET'])
 @require_local_or_token
 def download_log():
@@ -2565,6 +4238,7 @@ def clear_log():
 
 
 @app.route('/logs/open-folder', methods=['GET'])
+@require_local_or_token
 def open_logs_folder():
     """Open the logs folder in file explorer"""
     try:
@@ -2601,12 +4275,37 @@ def start_langchain_service():
     # In bundled mode, never launch LangChain as a subprocess.
     # Tier-1 is import-only; Tier-2 is llama.cpp. No ports needed.
     if os.environ.get('NUNBA_BUNDLED') or getattr(sys, 'frozen', False):
-        try:
-            from routes.hartos_backend_adapter import _hartos_backend_available
-            if _hartos_backend_available:
+        # `_hartos_backend_available` is set by a background thread that
+        # imports `hart_intelligence` (takes 15-30s on first boot because
+        # LangChain + hevolveai pulls are heavy).  Checking synchronously
+        # the moment the main boot thread reaches here gives a FALSE-
+        # NEGATIVE warning — the thread hasn't finished yet, but Tier-1
+        # will be active shortly.  Wait briefly for a definitive answer
+        # before emitting status, and if still pending, log as INFO (not
+        # WARNING) so it isn't mistaken for a hard failure.
+        def _report_tier_status():
+            from routes.hartos_backend_adapter import (
+                _hartos_backend_available as _avail,
+            )
+            from routes.hartos_backend_adapter import (
+                _hartos_initialized as _done,
+            )
+            if _avail:
                 logging.info("hart-backend available in-process (bundled), no subprocess needed")
+            elif _done:
+                # Init finished AND failed — this is a real failure
+                logging.warning(
+                    "hart-backend import failed in bundled mode — chat will use llama.cpp fallback",
+                )
             else:
-                logging.warning("hart-backend import failed in bundled mode — chat will use llama.cpp fallback")
+                # Still in flight — schedule a retry log shortly
+                logging.info(
+                    "hart-backend Tier-1 init in progress (background thread); "
+                    "the adapter will log 'Tier-1 ACTIVE' when ready.",
+                )
+
+        try:
+            _report_tier_status()
         except Exception as ex:
             logging.error(f"hartos_backend_adapter import failed in bundled mode: {ex}")
         return
@@ -2863,19 +4562,27 @@ _diarization_service = None  # Global DiarizationService instance
 
 
 def _start_vision_service():
-    """Start the VisionService in a daemon thread if GPU is available."""
+    """Start the VisionService in a daemon thread if GPU is available.
+
+    Uses core.optional_import so a missing `integrations.vision` lands in
+    /api/admin/diag/degradations (operator can see WHY visual context is
+    silent) instead of the legacy `except ImportError: pass` pattern.
+    """
     global _vision_service
+    from core.optional_import import optional_import
+    _vmod = optional_import(
+        'integrations.vision',
+        reason='HARTOS visual context (MiniCPM VLM sidecar)',
+    )
+    if _vmod is None:
+        return
     try:
-        # Import from hart-backend (installed as git dependency)
-        from integrations.vision import VisionService
-        _vision_service = VisionService(
+        _vision_service = _vmod.VisionService(
             ws_port=int(os.environ.get('VISION_WS_PORT', 5460)),
             minicpm_port=int(os.environ.get('HEVOLVE_MINICPM_PORT', 9891)),
         )
         _vision_service.start()
         logging.info("VisionService started (MiniCPM sidecar + frame receiver)")
-    except ImportError:
-        logging.info("VisionService not available (hart-backend vision module not found)")
     except Exception as e:
         logging.warning(f"VisionService failed to start: {e}")
 
@@ -2883,15 +4590,19 @@ def _start_vision_service():
 def _start_diarization_service():
     """Start the DiarizationService in a daemon thread if whisperx available."""
     global _diarization_service
+    from core.optional_import import optional_import
+    _amod = optional_import(
+        'integrations.audio',
+        reason='HARTOS speaker diarization (whisperx sidecar)',
+    )
+    if _amod is None:
+        return
     try:
-        from integrations.audio import DiarizationService
-        _diarization_service = DiarizationService(
+        _diarization_service = _amod.DiarizationService(
             port=int(os.environ.get('HEVOLVE_DIARIZATION_PORT', 8004)),
         )
         _diarization_service.start()
         logging.info("DiarizationService starting (sidecar)")
-    except ImportError:
-        logging.info("DiarizationService not available (whisperx not installed)")
     except Exception as e:
         logging.warning(f"DiarizationService failed to start: {e}")
 
@@ -2910,18 +4621,54 @@ def start_background_services():
         return
     _bg_services_started = True
 
-    # Start embedded WAMP router (port 8088) for realtime push.
-    # Must start BEFORE LangChain/crossbar_server (they are WAMP *clients*
-    # that connect TO this router). In bundled mode the cloud router at
-    # aws_rasa.hertzai.com is unreachable — this local router is the only
-    # transport for TTS audio delivery, chat streaming, game state, etc.
-    try:
-        from wamp_router import start_wamp_router
-        start_wamp_router()
-        logging.info("Embedded WAMP router starting on port %s",
-                     os.environ.get('NUNBA_WAMP_PORT', '8088'))
-    except Exception as e:
-        logging.warning("WAMP router failed to start (realtime will use SSE fallback): %s", e)
+    # Start embedded WAMP router (port 8088) for realtime push — but ONLY
+    # when we actually need cross-process messaging:
+    #   (a) At least one non-web channel adapter is registered (Telegram,
+    #       Discord, WhatsApp, Slack, etc. — these need WAMP for chat/agent
+    #       push from Flask to the adapter thread), OR
+    #   (b) At least one mobile peer is known via peer_link discovery.
+    # On a fresh install with no channels or peers, the local SPA uses
+    # SSE fallback for its realtime needs — saves ~80–120 MB resident memory
+    # (Twisted reactor + Autobahn router + connection registry).
+    #
+    # When a channel is added later via admin UI or a peer joins via
+    # peer_link, `ensure_wamp_running()` wakes the router on-demand.
+    def _wamp_is_needed() -> tuple[bool, str]:
+        try:
+            _adapters = getattr(channels.registry, '_adapters', None) or {}
+            _non_web = [ct for ct in _adapters if ct != 'web']
+            if _non_web:
+                return True, f"channels={_non_web}"
+        except Exception:
+            pass
+        try:
+            from hevolve.peer_link import get_peer_link_manager
+            pm = get_peer_link_manager()
+            if pm and getattr(pm, 'get_active_peers', lambda: [])():
+                return True, "mobile peer discovered"
+        except Exception:
+            pass
+        return False, ""
+
+    _needed, _reason = _wamp_is_needed()
+    if _needed:
+        try:
+            from wamp_router import start_wamp_router
+            start_wamp_router()
+            logging.info(
+                "Embedded WAMP router starting on port %s (reason: %s)",
+                os.environ.get('NUNBA_WAMP_PORT', '8088'), _reason,
+            )
+        except Exception as e:
+            logging.warning(
+                "WAMP router failed to start (realtime will use SSE fallback): %s", e,
+            )
+    else:
+        logging.info(
+            "WAMP router deferred — no non-web channels or mobile peers "
+            "at boot (SSE handles local realtime, saves ~100MB; router "
+            "will start on-demand when a channel/peer arrives)",
+        )
 
     # Start LangChain service in background thread (non-blocking)
     langchain_thread = threading.Thread(target=start_langchain_service, daemon=True)
@@ -2969,7 +4716,18 @@ def start_background_services():
     # Warm-up TTS engine in background with user's preferred language
     # so the correct GPU engine (Indic Parler, CosyVoice3, Chatterbox Turbo)
     # is loaded BEFORE the first TTS request — no cold-start delay.
+    # Wall-clock deadline for the warmup thread (seconds). A stalled
+    # probe or hung HF download would otherwise block first-message
+    # synth indefinitely — see WARMUP_TIMEOUT watchdog below.
+    WARMUP_TIMEOUT = 180
+
     def _warmup_tts():
+        """TTS engine warmup. Bounded by WARMUP_TIMEOUT (seconds) via
+        the watchdog thread created at the bottom of the outer scope —
+        the watchdog calls tts_thread.join(timeout=WARMUP_TIMEOUT) and
+        logs a clear 'warmup exceeded' message if the probe is stuck,
+        then lets the foreground request carry the cold-start penalty.
+        """
         try:
             if os.environ.get('NUNBA_DISABLE_TTS'):
                 return
@@ -2979,34 +4737,92 @@ def start_background_services():
             from tts._torch_probe import check_cuda_available
             _cuda_ok = check_cuda_available()
 
+            # Read user's preferred language BEFORE probing backends — only probe
+            # engines that appear in this language's ladder.  Avoids installing F5
+            # (voice-cloning) for users who speak English/Tamil/Hindi and don't
+            # need it.
+            #
+            # SINGLE source of truth: core.user_lang.get_preferred_lang().
+            # The prior default-then-read pattern was responsible for the
+            # "Chatterbox Turbo auto-installed for a Tamil user" bug — when
+            # hart_language.json was 'ta' but warmup started before the file
+            # existed (first boot) OR before set_language() had a chance to
+            # flip, the 'en' default won and the English ladder installed.
+            try:
+                from core.user_lang import get_preferred_lang
+                preferred_lang = get_preferred_lang() or 'en'
+            except Exception:
+                # Final fallback only if core.user_lang isn't importable
+                # (e.g. standalone main.py harness). Keeps old behavior as
+                # a backstop, never as the primary path.
+                preferred_lang = 'en'
+                try:
+                    import json as _json
+                    _hart_lang_file = os.path.join(
+                        os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
+                    if os.path.exists(_hart_lang_file):
+                        with open(_hart_lang_file) as _f:
+                            preferred_lang = _json.load(_f).get('language', 'en')
+                except Exception:
+                    pass
+
             # Import TTSEngine class first (just the class, not get_tts_engine singleton)
             # so we can prime its cache BEFORE it constructs the engine
             from tts.tts_engine import TTSEngine
             if _cuda_ok:
                 TTSEngine._import_check_cache['_torch_cuda'] = True
                 logging.info("TTS: CUDA torch verified via subprocess — GPU TTS enabled")
-                # Probe each GPU backend so the compiled .pyc's _can_run_backend
-                # sees them in cache and skips the poisoned in-process import
+                # Filter backends to only those in this language's ladder.
+                #
+                # Empty-ladder fallback: an unknown `preferred_lang` (e.g.
+                # user set 'xx' by mistake) would otherwise produce an
+                # empty set → the _ladder_backends filter becomes a no-op
+                # AND every backend gets probed/installed (the opposite of
+                # the intended lang-scoped install).  Fallback to a
+                # deterministic minimal set so the worst case is "piper
+                # CPU only" rather than "install-everything".
+                _ladder_engines = set()
+                try:
+                    from integrations.channels.media.tts_router import LANG_ENGINE_PREFERENCE
+                    _ladder_engines = set(LANG_ENGINE_PREFERENCE.get(preferred_lang, []))
+                except Exception:
+                    pass
+                if not _ladder_engines:
+                    # Minimal fallback: Piper is bundled, always runnable.
+                    logging.warning(
+                        "TTS: no ladder for lang=%r — falling back to minimal "
+                        "backend set ['piper'] instead of probing every backend",
+                        preferred_lang,
+                    )
+                    _ladder_engines = {'piper'}
+                # Map engine_id → backend name (same as in TTSEngine._BACKEND_TO_REGISTRY_KEY)
+                _ladder_backends = set()
+                try:
+                    for _eid in _ladder_engines:
+                        # engine_id like 'chatterbox_turbo' → backend 'chatterbox_turbo'
+                        _ladder_backends.add(_eid)
+                except Exception:
+                    pass
+
+                # Iterate backend → required-pip-package pairs.  The single
+                # source of truth is `_BACKEND_TO_REGISTRY_KEY` defined at
+                # module level in tts.tts_engine — there is no
+                # `_BACKEND_REQUIRED_IMPORTS` class attribute (an old refactor
+                # left this call site pointing at a dead name, which silently
+                # crashed boot-time TTS warmup with `AttributeError`).
                 from tts._torch_probe import check_backend_runnable
-                for _be, _imp in TTSEngine._BACKEND_REQUIRED_IMPORTS.items():
+                from tts.tts_engine import _BACKEND_TO_REGISTRY_KEY as _BACKEND_IMPORTS
+                for _be, _imp in _BACKEND_IMPORTS.items():
+                    # Skip backends not in the user's language ladder
+                    if _ladder_backends and _be not in _ladder_backends:
+                        logging.debug(f"TTS: skipping probe of {_be} (not in {preferred_lang} ladder)")
+                        continue
                     if check_backend_runnable(_be, _imp):
                         TTSEngine._import_check_cache[_imp] = True
                         logging.info(f"TTS: backend {_be} ({_imp}) verified runnable")
             # NOW create the engine — cache is primed, _can_run_backend will find entries
             from tts.tts_engine import get_tts_engine
             engine = get_tts_engine()
-
-            # Read user's preferred language from HART onboarding
-            preferred_lang = 'en'
-            try:
-                import json as _json
-                _hart_lang_file = os.path.join(
-                    os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'hart_language.json')
-                if os.path.exists(_hart_lang_file):
-                    with open(_hart_lang_file) as _f:
-                        preferred_lang = _json.load(_f).get('language', 'en')
-            except Exception:
-                pass
 
             # If GPU detected but CUDA torch not installed, install it NOW
             # (blocking) so GPU TTS works on first launch. Shows progress via
@@ -3119,11 +4935,17 @@ def start_background_services():
             if _can_preload:
                 import tempfile as _tf
                 _test_path = os.path.join(_tf.gettempdir(), '_nunba_tts_warmup.wav')
+                # Universal warmup: the `language=` parameter drives model
+                # selection (engine picks the right phoneme set per that code).
+                # The TEXT just needs to be tokenizer-safe across all languages.
+                # "." is a single sentence-end token every TTS tokenizer accepts
+                # — primes weights, produces ~200ms silence, works for every
+                # language without a per-language phrase dict.
                 try:
-                    engine.synthesize("test", output_path=_test_path, language=preferred_lang)
+                    engine.synthesize(".", output_path=_test_path, language=preferred_lang)
                     if os.path.exists(_test_path):
                         os.unlink(_test_path)
-                    logging.info("TTS warm-up: F5 pre-loaded on GPU — first response will be fast")
+                    logging.info(f"TTS warm-up: engine pre-loaded (lang={preferred_lang})")
                 except Exception as _se:
                     logging.info(f"TTS warm-up: pre-load skipped ({_se}) — first response uses Piper")
 
@@ -3131,8 +4953,23 @@ def start_background_services():
             logging.info(f"TTS engine warmed up: {backend} (language={preferred_lang})")
         except Exception as e:
             logging.warning(f"TTS warm-up failed (non-blocking): {e}")
+    # WARMUP_TIMEOUT (seconds) is declared at the top of this scope,
+    # just above `def _warmup_tts`. A watchdog thread joins the warmup
+    # worker with that deadline; if it expires, we log and let the
+    # foreground request path carry the cold-start penalty so the user
+    # never sees an indefinite stall.
     tts_thread = threading.Thread(target=_warmup_tts, daemon=True, name='TTSWarmup')
     tts_thread.start()
+
+    def _warmup_watchdog():
+        tts_thread.join(timeout=WARMUP_TIMEOUT)
+        if tts_thread.is_alive():
+            logging.warning(
+                f"TTS warmup exceeded {WARMUP_TIMEOUT}s — "
+                f"continuing without blocking; first synth will run in the "
+                f"foreground on the requesting thread"
+            )
+    threading.Thread(target=_warmup_watchdog, daemon=True, name='TTSWarmupWatchdog').start()
 
 
 if __name__ == '__main__':

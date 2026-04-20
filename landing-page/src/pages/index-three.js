@@ -1,16 +1,17 @@
-import React, {useState, useEffect, lazy, Suspense} from 'react';
-
-import ReactGA from 'react-ga';
-import Navbar from '../components/navbar';
-import BrandLogo from '../components/brandLogo';
-import AboutThree from '../components/aboutThree';
+import Signup from './signup';
 
 import AboutOne from '../components/aboutOne';
+import AboutThree from '../components/aboutThree';
 import AboutTwo from '../components/aboutTwo';
 import AiFeatures from '../components/aiFeatures';
+import BrandLogo from '../components/brandLogo';
 import Clients from '../components/clients';
 import Footer from '../components/footer';
-import Signup from './signup';
+import Navbar from '../components/navbar';
+
+import React, {useState, useEffect, lazy, Suspense} from 'react';
+import ReactGA from 'react-ga';
+
 
 const Features = lazy(() => import('../components/features'));
 export default function IndexThree() {

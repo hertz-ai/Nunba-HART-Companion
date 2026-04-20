@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen, fireEvent} from '@testing-library/react';
-import {renderWithProviders} from '../../testHelpers';
 import AdminLayout from '../../../components/Admin/AdminLayout';
+import {renderWithProviders} from '../../testHelpers';
+
+import {screen, fireEvent} from '@testing-library/react';
+import React from 'react';
 
 // Mock react-router-dom
 const mockNavigate = jest.fn();

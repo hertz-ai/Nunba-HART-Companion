@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../../testHelpers';
 import DragToZoneTemplate from '../../../../../components/Social/KidsLearning/templates/DragToZoneTemplate';
+import {renderWithProviders} from '../../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks

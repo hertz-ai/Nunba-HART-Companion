@@ -1,4 +1,14 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import {adApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
+
+import CloseIcon from '@mui/icons-material/Close';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
   Box,
   Card,
@@ -8,16 +18,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import {adApi} from '../../../services/socialApi';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 
 const DISMISSED_KEY = 'nunba_dismissed_ads';
 

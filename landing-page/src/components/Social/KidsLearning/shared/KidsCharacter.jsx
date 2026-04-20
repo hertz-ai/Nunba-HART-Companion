@@ -24,8 +24,8 @@
  *   onClick:    func
  */
 
-import React, {useMemo} from 'react';
 import {Box} from '@mui/material';
+import React, {useMemo} from 'react';
 
 // ── Color palettes ──────────────────────────────────────────────
 const PALETTES = {

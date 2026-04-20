@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import HALO from 'vanta/dist/vanta.halo.min.js';
 import './TeacherHome.css';
 import {useNavigate} from 'react-router-dom';
+
 import Header from './Header';
 import Body from './Body';
 import Footer from './Footer';
@@ -14,8 +15,8 @@ const TeacherHome = () => {
   const myRef = useRef(null);
 
   useEffect(() => {
-    let access_token = localStorage.getItem('hevolve_access_token');
-    //TODO - verify the access token
+    const access_token = localStorage.getItem('hevolve_access_token');
+    // TODO - verify the access token
     if (access_token != null) {
       if (access_token.trim().length == 0) {
         navigate('/teacher/signin');

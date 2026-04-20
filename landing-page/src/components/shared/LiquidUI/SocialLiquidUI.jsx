@@ -9,15 +9,17 @@
  *   <SocialLiquidUI layout={serverLayout} data={state} onAction={handleAction} />
  */
 
-import React, {useMemo} from 'react';
-import {useTheme} from '@mui/material';
 import SharedServerDrivenUI from './ServerDrivenUI';
+
 import {
   INTENT_COLORS,
   SHADOWS,
   SPACING,
   RADIUS,
 } from '../../../theme/socialTokens';
+
+import {useTheme} from '@mui/material';
+import React, {useMemo} from 'react';
 
 // Build social tokens from MUI theme + socialTokens
 function buildSocialTokens(theme) {

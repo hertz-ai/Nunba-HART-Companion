@@ -1,4 +1,24 @@
+import { useSocial } from '../../contexts/SocialContext';
+import { useRoleAccess } from '../RoleGuard';
 import ErrorBoundary from '../shared/ErrorBoundary';
+
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import BuildIcon from '@mui/icons-material/Build';
+import CloudIcon from '@mui/icons-material/Cloud';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import HubIcon from '@mui/icons-material/Hub';
+import MemoryIcon from '@mui/icons-material/Memory';
+import MenuIcon from '@mui/icons-material/Menu';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import PeopleIcon from '@mui/icons-material/People';
+import PersonIcon from '@mui/icons-material/Person';
+import ReportIcon from '@mui/icons-material/Report';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import StorageIcon from '@mui/icons-material/Storage';
+import SyncIcon from '@mui/icons-material/Sync';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import {
   Drawer,
   List,
@@ -15,27 +35,9 @@ import {
   Fade,
   CircularProgress,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import ReportIcon from '@mui/icons-material/Report';
-import SyncIcon from '@mui/icons-material/Sync';
-import StorageIcon from '@mui/icons-material/Storage';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import SettingsIcon from '@mui/icons-material/Settings';
-import PersonIcon from '@mui/icons-material/Person';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
-import BuildIcon from '@mui/icons-material/Build';
-import HubIcon from '@mui/icons-material/Hub';
-import MemoryIcon from '@mui/icons-material/Memory';
-import CloudIcon from '@mui/icons-material/Cloud';
 import React, {useState, useEffect} from 'react';
-import {useNavigate, useLocation, Navigate} from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { useSocial } from '../../contexts/SocialContext';
-import { useRoleAccess } from '../RoleGuard';
+import {useNavigate, useLocation, Navigate} from 'react-router-dom';
 
 const DRAWER_WIDTH = 260;
 
@@ -55,6 +57,7 @@ const adminNav = [
   {label: 'Models', path: '/admin/models', icon: <MemoryIcon />},
   {label: 'Providers', path: '/admin/providers', icon: <CloudIcon />},
   {label: 'Task Ledger', path: '/admin/task-ledger', icon: <BuildIcon />},
+  {label: 'Claude Code', path: '/admin/integrations/claude-code', icon: <TerminalIcon />},
 ];
 
 export default function AdminLayout({children}) {

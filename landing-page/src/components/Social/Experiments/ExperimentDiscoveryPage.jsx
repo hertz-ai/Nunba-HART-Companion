@@ -11,29 +11,31 @@
  * Route: /social/experiments
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import ExperimentMetricsPanel from './ExperimentMetricsPanel';
+
+import { useSocial } from '../../../contexts/SocialContext';
+import { experimentsApi, encountersApi } from '../../../services/socialApi';
+import { GRADIENTS, RADIUS, EASINGS, socialTokens, INTENT_COLORS } from '../../../theme/socialTokens';
+import { useRoleAccess } from '../../RoleGuard';
+import CreateThoughtExperimentDialog from '../Feed/CreateThoughtExperimentDialog';
+import ThoughtExperimentCard from '../Feed/ThoughtExperimentCard';
+import EmptyState from '../shared/EmptyState';
+import PostCardSkeleton from '../shared/PostCardSkeleton';
+
+import AddIcon from '@mui/icons-material/Add';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import CodeIcon from '@mui/icons-material/Code';
+import GroupIcon from '@mui/icons-material/Group';
+import HandymanIcon from '@mui/icons-material/Handyman';
+import ScienceIcon from '@mui/icons-material/Science';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Box, Tabs, Tab, Chip, Typography, Fab, Fade, Card, Skeleton,
   useTheme, useMediaQuery,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import ScienceIcon from '@mui/icons-material/Science';
-import AddIcon from '@mui/icons-material/Add';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import CodeIcon from '@mui/icons-material/Code';
-import HandymanIcon from '@mui/icons-material/Handyman';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import GroupIcon from '@mui/icons-material/Group';
-import ThoughtExperimentCard from '../Feed/ThoughtExperimentCard';
-import ExperimentMetricsPanel from './ExperimentMetricsPanel';
-import CreateThoughtExperimentDialog from '../Feed/CreateThoughtExperimentDialog';
-import PostCardSkeleton from '../shared/PostCardSkeleton';
-import EmptyState from '../shared/EmptyState';
-import { experimentsApi, encountersApi } from '../../../services/socialApi';
-import { useSocial } from '../../../contexts/SocialContext';
-import { useRoleAccess } from '../../RoleGuard';
-import { GRADIENTS, RADIUS, EASINGS, socialTokens, INTENT_COLORS } from '../../../theme/socialTokens';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 const TABS = [
   { label: 'For You', key: 'recommended', icon: <TrendingUpIcon sx={{ fontSize: 16 }} /> },

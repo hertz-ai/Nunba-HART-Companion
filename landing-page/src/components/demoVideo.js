@@ -102,7 +102,7 @@ class DemoVideo extends Component {
             style={{animationDelay: '4s'}}
           >
             {/* <img className="video-thumb" width="140" height="100"
-            src="//img.youtube.com/vi/myk22AuwizE/0.jpg">
+            src="//img.youtube.com/vi/myk22AuwizE/0.jpg" alt="" >
             </img> */}
             {/* <FontAwesomeIcon icon={faPlay} color={this.props.buttonColor} size="lg"/> */}
 

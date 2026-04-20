@@ -1,11 +1,15 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import CreateCommunityDialog from './CreateCommunityDialog';
 
-import { communitiesApi } from '../../../services/socialApi';
 import { useSocial } from '../../../contexts/SocialContext';
+import { communitiesApi } from '../../../services/socialApi';
+import { socialTokens, GRADIENTS, EASINGS, SHADOWS, RADIUS } from '../../../theme/socialTokens';
 import EmptyState from '../shared/EmptyState';
 import InfiniteScroll from '../shared/InfiniteScroll';
 
+import AddIcon from '@mui/icons-material/Add';
+import ArticleIcon from '@mui/icons-material/Article';
+import PeopleIcon from '@mui/icons-material/People';
 import {
   Card,
   CardContent,
@@ -19,12 +23,9 @@ import {
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import AddIcon from '@mui/icons-material/Add';
-import PeopleIcon from '@mui/icons-material/People';
-import ArticleIcon from '@mui/icons-material/Article';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { socialTokens, GRADIENTS, EASINGS, SHADOWS, RADIUS } from '../../../theme/socialTokens';
+
 
 /* ── Deterministic gradient header from community name ── */
 const HEADER_PALETTES = [

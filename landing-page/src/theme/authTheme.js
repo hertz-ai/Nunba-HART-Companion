@@ -1,7 +1,7 @@
+import Button from '@mui/material/Button';
 import {purple} from '@mui/material/colors';
 import {createTheme} from '@mui/material/styles';
 import {styled} from '@mui/material/styles';
-import Button from '@mui/material/Button';
 
 export const authTheme = createTheme({
   palette: {

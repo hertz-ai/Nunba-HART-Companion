@@ -1,5 +1,12 @@
-import React, {useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {campaignsApi} from '../../../services/socialApi';
+import {GRADIENTS} from '../../../theme/socialTokens';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import GroupIcon from '@mui/icons-material/Group';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Box,
   Typography,
@@ -17,14 +24,10 @@ import {
   Alert,
   useTheme,
 } from '@mui/material';
-import {GRADIENTS} from '../../../theme/socialTokens';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import GroupIcon from '@mui/icons-material/Group';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import {campaignsApi} from '../../../services/socialApi';
+import React, {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+
+
 
 const STEPS = ['Goal', 'Content', 'Audience', 'Budget', 'Preview & Launch'];
 

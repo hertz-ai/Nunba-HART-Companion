@@ -37,14 +37,17 @@
  * Ported from React Native DynamicGameRenderer.js (WebView -> sandboxed iframe).
  */
 
-import {logger} from '../../../utils/logger';
-import React, {useRef, useCallback, useEffect, useState, useMemo} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {Box, Typography, CircularProgress, Button, Fade} from '@mui/material';
-import {getRelatedGames} from '../../../hooks/useGameCatalog';
-import {useGameCompleteObserver} from '../../../hooks/useAgentObserver';
 import {kidsColors, kidsSpacing, kidsFontSizes} from './kidsTheme';
 import TTSManager from './shared/TTSManager';
+
+import {useGameCompleteObserver} from '../../../hooks/useAgentObserver';
+import {getRelatedGames} from '../../../hooks/useGameCatalog';
+import {logger} from '../../../utils/logger';
+
+import {Box, Typography, CircularProgress, Button, Fade} from '@mui/material';
+import React, {useRef, useCallback, useEffect, useState, useMemo} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 // ── Allowed sound events that can be triggered from the iframe bridge ────────
 

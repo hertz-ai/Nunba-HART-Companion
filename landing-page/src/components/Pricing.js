@@ -1,12 +1,13 @@
-import React, {useState, useEffect} from 'react';
 import {mailerApi} from '../services/socialApi';
-import {v4 as uuidv4} from 'uuid';
-import {useNavigate, useLocation} from 'react-router-dom';
-import ReactGA from 'react-ga';
-
-import {FiCheckCircle} from 'react-icons/fi';
-import {AiOutlineClose} from 'react-icons/ai';
 import {logger} from '../utils/logger';
+
+import React, {useState, useEffect} from 'react';
+import ReactGA from 'react-ga';
+import {AiOutlineClose} from 'react-icons/ai';
+import {FiCheckCircle} from 'react-icons/fi';
+import {useNavigate, useLocation} from 'react-router-dom';
+import {v4 as uuidv4} from 'uuid';
+
 
 export default function Pricing() {
   const navigate = useNavigate();
@@ -87,14 +88,14 @@ export default function Pricing() {
     setTransactionId(transactionid);
     if (hevolvedroid) {
       try {
-        var userDetails = window.Handy.getUserDetails();
+        const userDetails = window.Handy.getUserDetails();
         const userJson = JSON.parse(userDetails);
         DataForPricePage = userJson;
       } catch (error) {
         console.error('Error fetching user details:', error);
       }
 
-      var myVariable = {
+      const myVariable = {
         TRANSACTION_ID: transactionId,
       };
       const jsTransaction = JSON.stringify(myVariable);
@@ -109,7 +110,7 @@ export default function Pricing() {
       transaction_id: transactionid,
     };
 
-    //not for the payment
+    // not for the payment
     mailerApi
       .addSubscription(postData)
       .then(() => {

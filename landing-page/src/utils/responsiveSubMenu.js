@@ -1,14 +1,15 @@
 import jQuery from 'jquery';
+
 window.jQuery = jQuery;
 window.$ = jQuery;
 global.jQuery = jQuery;
 import {logger} from './logger';
-//const bootstrap = require('bootstrap');
-//logger.log(bootstrap)
+// const bootstrap = require('bootstrap');
+// logger.log(bootstrap)
 
 (function ($) {
   $.fn.menumaker = function (options) {
-    var cssmenu = $(this),
+    const cssmenu = $(this),
       settings = $.extend(
         {
           format: 'dropdown',
@@ -21,7 +22,7 @@ import {logger} from './logger';
         .find('.button')
         .on('click', function () {
           $(this).toggleClass('menu-opened');
-          var mainmenu = $(this).next('ul');
+          const mainmenu = $(this).next('ul');
           if (mainmenu.hasClass('open')) {
             mainmenu.slideToggle().removeClass('open');
           } else {
@@ -49,7 +50,7 @@ import {logger} from './logger';
       else cssmenu.addClass('dropdown');
       if (settings.sticky === true) cssmenu.css('position', 'fixed');
       const resizeFix = function () {
-        var mediasize = 1000;
+        const mediasize = 1000;
         if ($(window).width() > mediasize) {
           cssmenu.find('ul').show();
         }

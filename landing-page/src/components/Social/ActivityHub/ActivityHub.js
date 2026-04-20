@@ -1,4 +1,21 @@
-import React, {useState, useEffect} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {
+  gamesApi,
+  computeApi,
+  challengesApi,
+  resonanceApi,
+} from '../../../services/socialApi';
+import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import {animFadeInUp} from '../../../utils/animations';
+
+import BoltIcon from '@mui/icons-material/Bolt';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import GroupIcon from '@mui/icons-material/Group';
+import MemoryIcon from '@mui/icons-material/Memory';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
 import {
   Typography,
   Box,
@@ -14,24 +31,8 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import MemoryIcon from '@mui/icons-material/Memory';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import GroupIcon from '@mui/icons-material/Group';
-import BoltIcon from '@mui/icons-material/Bolt';
-import WhatshotIcon from '@mui/icons-material/Whatshot';
+import React, {useState, useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {
-  gamesApi,
-  computeApi,
-  challengesApi,
-  resonanceApi,
-} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import {socialTokens, RADIUS} from '../../../theme/socialTokens';
-import {animFadeInUp} from '../../../utils/animations';
 
 export default function ActivityHub() {
   const theme = useTheme();

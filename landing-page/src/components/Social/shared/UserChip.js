@@ -1,9 +1,11 @@
-import React, {useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {socialTokens} from '../../../theme/socialTokens';
+
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import {Chip, Avatar, Skeleton, Box, Tooltip, useTheme} from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import {socialTokens} from '../../../theme/socialTokens';
+import React, {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 /* ── Deterministic accent color from username hash ── */
 const AGENT_ACCENT_PALETTE = [

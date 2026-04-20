@@ -1,0 +1,141 @@
+name: Regression (all tiers)
+
+# Single workflow that invokes scripts/run_all_regression.sh so the
+# CI view matches what a developer runs locally. Aggregates every
+# tier's pass/fail into one job result.
+#
+# Intentionally does NOT replace quality.yml or defect-harness.yml —
+# those stay as lens-specific runs (hard gates for code quality,
+# dedicated harness tracking). This job is the consolidated view.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      include_live:
+        description: 'Run @live tier (requires GPU / bundle; fails on hosted runners)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  regression:
+    name: all-tiers / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    # Cypress tier inside run_all_regression.sh caps at 120min; add
+    # headroom for install + pytest + coverage combine.  Default GH
+    # job timeout is 360min (6h) — 150min here is an explicit signal
+    # that anything longer means the job is stuck, not just slow.
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      NUNBA_LIVE: ${{ (github.event_name == 'workflow_dispatch' && inputs.include_live == 'true') && '1' || '0' }}
+      # Run Cypress against a coverage-instrumented Flask so every
+      # frontend-driven backend route counts toward Python coverage.
+      # Expect a large jump in the aggregate % once this is live.
+      NUNBA_CYPRESS: '1'
+      NUNBA_STAGING: '0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'landing-page/package-lock.json'
+
+      - name: Install test tooling
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-timeout pytest-html pytest-xdist pytest-cov coverage
+
+      - name: Install Flask boot dependencies (enough for main.py + routes/*)
+        shell: bash
+        # main.py imports PIL + routes.chatbot_routes which pulls in a
+        # long chain. Without these, coverage_flask_run.py crashes at
+        # import time and Cypress never sees :5000 — the 120s Flask-boot
+        # beacon then fires FAILED and coverage stays at 0%.
+        # Heavy runtime deps (torch, transformers, opencv, chromadb,
+        # sentence-transformers) are intentionally SKIPPED — they are
+        # not needed to import routes.chatbot_routes thanks to lazy
+        # imports inside tool functions, and they would add ~8min +
+        # 4GB of install time.
+        run: |
+          pip install flask==3.1.2 flask-cors==6.0.2 werkzeug==3.1.5 \
+            waitress==3.0.2 pillow==12.1.1 requests==2.32.5 \
+            sqlalchemy==2.0.46 alembic==1.18.4 greenlet==3.3.1 \
+            pydantic==2.12.5 autobahn==25.12.2 crossbarhttp3==1.1 \
+            apscheduler==3.11.2 json-repair==0.57.1 PyJWT==2.11.0 \
+            python-jose==3.5.0 pytz==2025.2 coloredlogs==15.0.1 \
+            beautifulsoup4==4.14.3 websockets==16.0 \
+            python-multipart==0.0.22 python-dotenv==1.2.1 \
+            cryptography==46.0.5 redis==7.1.1 cachetools==7.0.1 \
+            certifi==2026.1.4 langchain-core==1.2.15 \
+            langchain-classic==1.0.1 langchain-community==0.4.1 \
+            langsmith==0.7.6 sentry-sdk[flask]==2.52.0
+
+      - name: Install HARTOS (hart-backend) from source
+        shell: bash
+        # pytest main / harness / e2e all import `from integrations....`
+        # and `from core....` (HARTOS packages) so without HARTOS
+        # installed every Python tier ImportError-collapses at collection.
+        # HARTOS is a separate private repo in the same org; clone with
+        # --depth=1 + --no-deps to keep install light (runtime ML deps
+        # stay lazy).  If the default GITHUB_TOKEN can't reach the
+        # other repo, the beacon below surfaces a clear failure in
+        # annotations so we can add a dedicated PAT.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::notice title=hartos install::attempting git clone hertz-ai/HARTOS"
+          if git clone --depth 1 \
+               https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git \
+               ../HARTOS 2>&1 | tail -20; then
+            pip install --no-deps ../HARTOS || true
+            echo "::notice title=hartos install::OK — hart-backend installed"
+          else
+            echo "::warning title=hartos install::FAILED — default GITHUB_TOKEN cannot reach hertz-ai/HARTOS; pytest main/harness/e2e will ImportError on integrations.*.  Add a NUNBA_HARTOS_TOKEN secret with repo read scope and wire it into env.GH_TOKEN."
+          fi
+
+      - name: Install React app + Cypress (landing-page)
+        shell: bash
+        run: |
+          cd landing-page
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          # Cypress binary is needed by `npx cypress run` — install lazily once.
+          npx cypress install
+
+      - name: Run all regression tiers (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x scripts/run_all_regression.sh
+          ./scripts/run_all_regression.sh
+
+      - name: Run all regression tiers (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: scripts\run_all_regression.bat
+
+      - name: Upload any produced test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-reports-${{ matrix.os }}
+          path: |
+            test-report-*.html
+            harness-results-*.xml
+          if-no-files-found: ignore
+          retention-days: 30

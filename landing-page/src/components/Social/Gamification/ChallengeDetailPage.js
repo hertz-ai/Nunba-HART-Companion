@@ -1,5 +1,12 @@
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
+import {useSocial} from '../../../contexts/SocialContext';
+import {challengesApi} from '../../../services/socialApi';
+import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PeopleIcon from '@mui/icons-material/People';
 import {
   Typography,
   Box,
@@ -17,14 +24,9 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PeopleIcon from '@mui/icons-material/People';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import {challengesApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import {useParams, useNavigate} from 'react-router-dom';
+
 
 const TYPE_COLORS = {
   daily: 'info',

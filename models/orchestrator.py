@@ -293,6 +293,118 @@ class TTSLoader(ModelLoader):
             return importlib.util.find_spec(pkg.replace('-', '_')) is not None
         return False
 
+    def validate(self, entry: ModelEntry) -> tuple:
+        """Canned TTS probe: synthesize the English greeting and verify
+        real audio came out (≥10KB + duration ≥0.5s).
+
+        Delegates to ``tts.tts_handshake.run_handshake`` — the SAME code
+        path that drives the first-run "Voice engine ready" banner, which
+        itself delegates to ``tts.verified_synth.verify_backend_synth``.
+        By reusing the canonical handshake we keep ONE definition of
+        "what counts as a real TTS signal":
+
+            install-validation here  ─┐
+                                      ├─► run_handshake(engine, backend,
+            first-run banner flip ────┤      lang='en', broadcast=False,
+                                      │      play_audio=False)
+            "Retry" + swap-backend ───┘
+
+        Any future tightening of the bar (e.g. phonetic-similarity,
+        SNR floor) lands in run_handshake once and every checkpoint
+        inherits it — no parallel probe to drift.
+
+        Deterministic input (canonical ``GREETINGS['en']`` phrase from
+        ``core.constants``), runs in-process (no network egress, no user
+        PII in the synth text), ``broadcast=False`` so the probe doesn't
+        emit SSE events to the UI, ``play_audio=False`` so the install
+        machine doesn't beep.  Invalidates any stale handshake cache for
+        this backend first so a pre-install negative verdict doesn't
+        spuriously fail the fresh probe.
+
+        Returns:
+            (True,  'synthesized {bytes}B, {duration:.2f}s') on pass
+            (False, reason) on fail
+        """
+        backend_name = self._backend_name(entry)
+        try:
+            from tts.tts_engine import get_tts_engine
+            from tts.tts_handshake import invalidate, run_handshake
+        except ImportError as e:
+            return (False, f'TTS imports failed: {e}')
+
+        try:
+            engine = get_tts_engine()
+        except Exception as e:
+            return (False, f'get_tts_engine raised: {e}')
+
+        # Clear any stale handshake verdict for this backend so the
+        # post-install probe reflects the FRESHLY-LOADED state, not a
+        # pre-install cached failure (e.g. from when the backend's
+        # packages weren't yet present).
+        try:
+            invalidate(backend_name)
+        except Exception:
+            pass
+
+        try:
+            result = run_handshake(
+                engine, backend_name, lang='en',
+                broadcast=False, play_audio=False,
+                timeout_s=60,
+            )
+        except Exception as e:
+            return (False, f'run_handshake raised: {e}')
+
+        if not result.ok:
+            return (False, f'handshake failed: {result.err}')
+
+        logger.info(
+            f"TTS validate OK for {entry.id}: "
+            f"{result.n_bytes}B, {result.duration_s:.2f}s"
+        )
+        return (
+            True,
+            f'synthesized {result.n_bytes}B, {result.duration_s:.2f}s'
+        )
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Classic iterative Levenshtein edit distance (no external dep).
+
+    Two-row DP, O(len(a) * len(b)) time, O(min(len(a), len(b))) space.
+    Used by ``STTLoader.validate`` to measure how much Whisper's
+    transcript drifts from the ground-truth phrase we synthesized.  We
+    deliberately keep the implementation inline rather than pulling in
+    rapidfuzz / python-Levenshtein — the install-time probe runs once
+    per STT install, handling a ~40-char phrase, so the native C dep
+    would pay its cost (wheel size, multi-OS matrix, cx_Freeze bundle
+    bloat) for no measurable win.
+
+    Returns the minimum number of single-character insertions,
+    deletions, or substitutions to turn ``a`` into ``b``.
+    """
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    # Ensure `a` is the shorter string so the inner row is smaller.
+    if len(a) > len(b):
+        a, b = b, a
+    prev = list(range(len(a) + 1))
+    for j, cb in enumerate(b, 1):
+        curr = [j] + [0] * len(a)
+        for i, ca in enumerate(a, 1):
+            cost = 0 if ca == cb else 1
+            curr[i] = min(
+                curr[i - 1] + 1,      # insertion
+                prev[i] + 1,          # deletion
+                prev[i - 1] + cost,   # substitution
+            )
+        prev = curr
+    return prev[-1]
+
 
 class STTLoader(ModelLoader):
     """Loader for STT models (faster-whisper, lazy-loaded on first use)."""
@@ -341,7 +453,8 @@ class STTLoader(ModelLoader):
         import os
         try:
             from integrations.service_tools.whisper_tool import (
-                _CATALOG_ID_TO_FASTER_WHISPER_SIZE, _stt_tool,
+                _CATALOG_ID_TO_FASTER_WHISPER_SIZE,
+                _stt_tool,
             )
         except ImportError:
             logger.warning("STT load: whisper_tool not importable")
@@ -400,6 +513,134 @@ class STTLoader(ModelLoader):
         except Exception:
             return False
 
+    def validate(self, entry: ModelEntry) -> tuple:
+        """Round-trip probe: synth known phrase → transcribe → assert match.
+
+        This is the L1.3 capability gate.  We synthesize the canonical
+        English greeting (``core.constants.GREETINGS['en']`` — the SAME
+        phrase L1.2 and first-run handshake use, keeping one source of
+        truth for "what counts as a probe phrase"), run the resulting
+        WAV back through ``whisper_transcribe``, and verify the
+        transcript's Levenshtein distance from the source is ≤ 40% of
+        the longer string's length.
+
+        Why 40% and not zero?  Whisper normalises punctuation, drops
+        sentence-final question marks, and occasionally mis-hears
+        "Nunba" (novel word, not in its training corpus) as "Nomba" or
+        "Namba".  The bar is "the transcript is recognisably the same
+        sentence", not "byte-identical" — the latter would false-fail
+        on working installs and dilute the signal.
+
+        TTS dependency — soft-pass policy:
+            If the TTS engine is unavailable or synthesis fails, we
+            return ``(True, 'soft-pass: no TTS available...')`` rather
+            than ``(False, ...)``.  STT install-validation must not
+            fail just because TTS isn't installed yet — that would
+            couple two independent checkpoints and block a perfectly
+            working Whisper install whenever the user picks
+            whisper-before-piper in the admin UI.  L1.2 is responsible
+            for catching TTS regressions; L1.3 is responsible for
+            catching STT regressions.  Keep them orthogonal.
+
+        Returns:
+            (True,  'round-trip Lev=D/L (ratio X.XX): "<transcript>"') on pass
+            (True,  'soft-pass: ...') when TTS is genuinely unavailable
+            (False, reason) on real STT failure (empty transcript, over-threshold)
+        """
+        import json
+        import os
+        import string
+        import tempfile
+
+        # 1. Ground-truth phrase — shared source of truth with L1.2.
+        try:
+            from core.constants import GREETINGS
+        except ImportError as e:
+            return (False, f'core.constants import failed: {e}')
+        expected = GREETINGS.get('en')
+        if not expected:
+            return (False, "GREETINGS['en'] missing from core.constants")
+
+        # 2. STT entry point — the canonical subprocess-isolated transcribe.
+        try:
+            from integrations.service_tools.whisper_tool import whisper_transcribe
+        except ImportError as e:
+            return (False, f'whisper_transcribe import failed: {e}')
+
+        # 3. TTS entry point — used to produce the probe WAV.  Soft-pass
+        # if TTS isn't available: STT health must not be coupled to TTS
+        # install ordering.
+        try:
+            from tts.tts_engine import get_tts_engine
+        except ImportError as e:
+            return (True, f'soft-pass: TTS module unavailable ({e})')
+        try:
+            engine = get_tts_engine()
+        except Exception as e:
+            return (True, f'soft-pass: get_tts_engine raised ({e})')
+
+        # 4. Allocate a tempfile for the synthesised WAV.  We manage it
+        # ourselves (rather than reusing HandshakeResult.audio_path) so
+        # the STT probe is decoupled from the handshake cache — a stale
+        # cached (backend, lang) entry from a prior TTS probe mustn't
+        # determine whether STT validates.
+        tmp_fd, wav_path = tempfile.mkstemp(
+            suffix='.wav', prefix=f'stt_validate_{entry.id}_'
+        )
+        os.close(tmp_fd)
+        try:
+            try:
+                synth_path = engine.synthesize(
+                    expected, wav_path, language='en'
+                )
+            except Exception as e:
+                return (True, f'soft-pass: synthesize raised ({e})')
+            if not synth_path or not os.path.exists(synth_path):
+                return (True, 'soft-pass: synthesize returned no audio')
+
+            # 5. Transcribe.  whisper_transcribe returns JSON; on error
+            # it embeds an 'error' key.
+            try:
+                raw = whisper_transcribe(synth_path, language='en')
+            except Exception as e:
+                return (False, f'whisper_transcribe raised: {e}')
+            try:
+                payload = json.loads(raw) if isinstance(raw, str) else raw
+            except (ValueError, TypeError) as e:
+                return (False, f'transcript not JSON: {e}')
+            if not isinstance(payload, dict):
+                return (False, f'transcript shape unexpected: {type(payload).__name__}')
+            if 'error' in payload:
+                return (False, f'transcribe failed: {payload["error"]}')
+            actual = (payload.get('text') or '').strip()
+            if not actual:
+                return (False, 'empty transcript')
+
+            # 6. Normalise both strings (lowercase + strip punctuation)
+            # then compute edit-distance ratio.
+            trans = str.maketrans('', '', string.punctuation)
+            exp_norm = expected.lower().translate(trans).strip()
+            act_norm = actual.lower().translate(trans).strip()
+            dist = _levenshtein(exp_norm, act_norm)
+            denom = max(len(exp_norm), len(act_norm), 1)
+            ratio = dist / denom
+            MAX_RATIO = 0.4
+
+            summary = (
+                f'round-trip Lev={dist}/{denom} (ratio {ratio:.2f}): "{actual}"'
+            )
+            if ratio > MAX_RATIO:
+                logger.warning(f"STT validate FAIL for {entry.id}: {summary}")
+                return (False, summary)
+            logger.info(f"STT validate OK for {entry.id}: {summary}")
+            return (True, summary)
+        finally:
+            try:
+                if os.path.exists(wav_path):
+                    os.unlink(wav_path)
+            except OSError:
+                pass
+
 
 class VLMLoader(ModelLoader):
     """Loader for VLM models (MiniCPM sidecar).
@@ -417,8 +658,8 @@ class VLMLoader(ModelLoader):
         hart_intelligence_entry.get_vision_service() lookup order so
         both loader and runtime see the same object."""
         try:
-            from integrations.vision.vision_service import VisionService
             import hart_intelligence_entry as _hie
+            from integrations.vision.vision_service import VisionService
         except ImportError as e:
             logger.error(f"VLM imports failed: {e}")
             return None
@@ -473,6 +714,48 @@ class VLMLoader(ModelLoader):
             return bool(svc is not None and getattr(svc, '_running', False))
         except Exception:
             return False
+
+    def validate(self, entry: ModelEntry) -> tuple:
+        """Canned VLM probe: describe a 32×32 red JPEG in ≤20 words.
+
+        Proves the full path works end-to-end: catalog entry →
+        VisionService → MiniCPM subprocess (or lightweight backend) →
+        description string.  A healthy VLM returns non-empty text.
+
+        Deterministic input (solid-red 32×32 JPEG, fixed prompt) so
+        repeated install validations give comparable signals.
+        Runs in-process, no network egress — respects the privacy
+        boundary (no user PII, no telemetry).  Times out at 10s
+        (VisionService._describe_frame sets the HTTP timeout itself).
+        """
+        svc = self._get_service()
+        if svc is None:
+            return (False, 'VisionService unavailable')
+        try:
+            import io
+
+            from PIL import Image
+            buf = io.BytesIO()
+            Image.new('RGB', (32, 32), color=(220, 40, 40)).save(buf, format='JPEG')
+            jpeg_bytes = buf.getvalue()
+        except Exception as e:
+            return (False, f'canned JPEG build failed: {e}')
+
+        try:
+            desc = svc._describe_frame(
+                '__install_validation__',
+                jpeg_bytes,
+                prompt='describe this image in 5 words',
+            )
+        except Exception as e:
+            return (False, f'describe_frame raised: {e}')
+
+        if not desc or not str(desc).strip():
+            return (False, 'empty description from VLM')
+        logger.info(
+            f"VLM validate OK for {entry.id}: {str(desc)[:60]!r}"
+        )
+        return (True, f'caption: {str(desc)[:60]}')
 
 
 # ── Singleton (shared with HARTOS module) ─────────────────────────

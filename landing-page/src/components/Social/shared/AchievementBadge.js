@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import LockIcon from '@mui/icons-material/Lock';
 import {
   Card,
   CardActionArea,
@@ -11,8 +12,7 @@ import {
   Zoom,
   keyframes,
 } from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import React, {useState} from 'react';
 
 const RARITY_COLORS = {
   common: '#95a5a6',

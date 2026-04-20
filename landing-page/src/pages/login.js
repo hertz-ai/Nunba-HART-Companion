@@ -1,30 +1,31 @@
-import React, {useEffect, useState} from 'react';
-import Avatar from '@mui/material/Avatar';
-import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
-import Grid from '@mui/material/Grid';
-import Box from '@mui/material/Box';
 // import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import Typography from '@mui/material/Typography';
-import Container from '@mui/material/Container';
-import {ThemeProvider} from '@mui/material/styles';
+// import MuiAlert from "@mui/lab/Alert";
+// redirect
+
+// import { useForm } from 'react-hook-form';
+import Footer from '../components/footer';
+import Navbar from '../components/navbar';
+import {useForm, Form} from '../components/useForm';
+import Controls from '../pages/Controls';
+import {mailerApi} from '../services/socialApi';
 import {authTheme, ColorButton} from '../theme/authTheme';
+import {logger} from '../utils/logger';
+
 import {faUser} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import Alert from '@mui/material/Alert';
-//import MuiAlert from "@mui/lab/Alert";
-//redirect
-
-//import { useForm } from 'react-hook-form';
-import {useForm, Form} from '../components/useForm';
-import Footer from '../components/footer';
-import Navbar from '../components/navbar';
-import Controls from '../pages/Controls';
-import {mailerApi} from '../services/socialApi';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import Checkbox from '@mui/material/Checkbox';
+import Container from '@mui/material/Container';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Grid from '@mui/material/Grid';
+import Link from '@mui/material/Link';
+import {ThemeProvider} from '@mui/material/styles';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import React, {useEffect, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {logger} from '../utils/logger';
 
 const sxStyles = {
   paper: {
@@ -51,14 +52,14 @@ const initialFValues = {
   otp: '',
 };
 
-//####
+// ####
 export default function Login() {
   const navigate = useNavigate();
   const [otpView, setOtpView] = useState(true);
   const [alert, setAlert] = useState(false);
   const [alertContent, setAlertContent] = useState('');
   useEffect(() => {
-    let access_token = localStorage.getItem('hevolve_access_token');
+    const access_token = localStorage.getItem('hevolve_access_token');
     if (access_token != null) {
       if (access_token.trim().length != 0) {
         navigate('/teacher/home');
@@ -66,12 +67,12 @@ export default function Login() {
     }
   }, []);
 
-  //Form validation!!
-  //===========================================================
+  // Form validation!!
+  // ===========================================================
   const validate = (fieldValues = values) => {
     logger.log('fieldValues !!');
     logger.log(fieldValues);
-    let temp = {...errors};
+    const temp = {...errors};
     if ('phoneNumber' in fieldValues)
       temp.phoneNumber =
         fieldValues.phoneNumber.length > 9
@@ -86,16 +87,16 @@ export default function Login() {
 
   const {values, setValues, errors, setErrors, handleInputChange, resetForm} =
     useForm(initialFValues, true, validate);
-  //===========================================================
+  // ===========================================================
 
   const [access_token, setAccessToken] = React.useState(
     localStorage.getItem('hevolve_access_token')
   );
   const postLogin = (event) => {
-    //function postLogin() {
+    // function postLogin() {
     event.preventDefault();
 
-    //call the db access app to verify user is valid
+    // call the db access app to verify user is valid
     mailerApi
       .verifyOtp({
         phone_number: document.getElementById('phoneNumber').value,
@@ -124,7 +125,7 @@ export default function Login() {
       logger.log('validation successful..');
     } else {
       return false;
-    } //call the db access app to verify user is valid
+    } // call the db access app to verify user is valid
     mailerApi
       .verifyTeacherByPhone({
         phone_number: document.getElementById('phoneNumber').value,

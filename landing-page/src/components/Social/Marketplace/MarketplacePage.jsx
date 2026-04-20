@@ -1,5 +1,22 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
-import React, {useState, useEffect, useCallback} from 'react';
+
+import {marketplaceApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  GRADIENTS,
+  EASINGS,
+  SHADOWS,
+  RADIUS,
+} from '../../../theme/socialTokens';
+import EmptyState from '../shared/EmptyState';
+import InfiniteScroll from '../shared/InfiniteScroll';
+
+import BoltIcon from '@mui/icons-material/Bolt';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import SearchIcon from '@mui/icons-material/Search';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import StarIcon from '@mui/icons-material/Star';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import {
   Box,
   Typography,
@@ -18,23 +35,7 @@ import {
   keyframes,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import SearchIcon from '@mui/icons-material/Search';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import BoltIcon from '@mui/icons-material/Bolt';
-import StarIcon from '@mui/icons-material/Star';
-
-import {marketplaceApi} from '../../../services/socialApi';
-import {
-  socialTokens,
-  GRADIENTS,
-  EASINGS,
-  SHADOWS,
-  RADIUS,
-} from '../../../theme/socialTokens';
-import EmptyState from '../shared/EmptyState';
-import InfiniteScroll from '../shared/InfiniteScroll';
+import React, {useState, useEffect, useCallback} from 'react';
 
 /* -- Category definitions -- */
 const CATEGORIES = [

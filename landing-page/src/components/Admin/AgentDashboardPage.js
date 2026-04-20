@@ -1,4 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { dashboardApi } from '../../services/socialApi';
+
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
+import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import {
   Typography,
   Grid,
@@ -13,15 +21,8 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
-import PauseCircleIcon from '@mui/icons-material/PauseCircle';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import React, { useState, useEffect, useRef } from 'react';
 
-import { dashboardApi } from '../../services/socialApi';
 
 const POLL_INTERVAL = 5000;
 

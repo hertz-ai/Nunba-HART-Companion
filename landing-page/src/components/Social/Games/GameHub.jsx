@@ -1,5 +1,14 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {useNavigate} from 'react-router-dom';
+import GameCard from './GameCard';
+
+import useGameCatalog from '../../../hooks/useGameCatalog';
+import {gamesApi} from '../../../services/socialApi';
+import {RADIUS, GRADIENTS, socialTokens} from '../../../theme/socialTokens';
+import {animFadeInUp, animFadeInScale} from '../../../utils/animations';
+
+import GroupIcon from '@mui/icons-material/Group';
+import SearchIcon from '@mui/icons-material/Search';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Box,
   Typography,
@@ -15,15 +24,8 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import SearchIcon from '@mui/icons-material/Search';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import GroupIcon from '@mui/icons-material/Group';
-import GameCard from './GameCard';
-import useGameCatalog from '../../../hooks/useGameCatalog';
-import {gamesApi} from '../../../services/socialApi';
-import {RADIUS, GRADIENTS, socialTokens} from '../../../theme/socialTokens';
-import {animFadeInUp, animFadeInScale} from '../../../utils/animations';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 // ── Quick-match category config ──────────────────────────────────────────────
 

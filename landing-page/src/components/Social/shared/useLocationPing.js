@@ -1,5 +1,6 @@
-import {useState, useEffect, useRef, useCallback} from 'react';
 import {encountersApi} from '../../../services/socialApi';
+
+import {useState, useEffect, useRef, useCallback} from 'react';
 
 export default function useLocationPing() {
   const [isTracking, setIsTracking] = useState(false);

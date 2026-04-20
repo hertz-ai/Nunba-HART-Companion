@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # Cancel in-progress runs for the same branch
 concurrency:
@@ -15,10 +16,39 @@ env:
   PYTHON_VERSION: '3.12'
   NODE_VERSION: '20'
 
+# ── Cross-OS CI cost discipline ──
+# GitHub-hosted runner billing (public repos free; private repos billed):
+#   ubuntu-latest  = $0.008 / min   (1x baseline)
+#   windows-latest = $0.016 / min   (2x)
+#   macos-latest   = $0.080 / min   (10x)
+#
+# Matrix scope is tuned to catch platform-class bugs (wmic/WMI hangs on
+# Windows 11, osascript/mdfind gaps on macOS, POSIX-only shell idioms)
+# WITHOUT 10x-ing our monthly runner spend:
+#
+#   python-quality   → ubuntu + windows + macos  (ruff/pytest/pip-audit
+#                      are cheap: ~3 min each.  This is where platform
+#                      branches in subprocess/os.path code actually live,
+#                      so all three matter.)
+#   frontend-quality → ubuntu ONLY  (Node deps + Jest are OS-agnostic;
+#                      ESLint/prettier output is identical cross-OS.
+#                      Spending 10x on macOS here buys zero signal.)
+#   cypress-e2e      → ubuntu 4-shard (full coverage)
+#                    + windows 1-job smoke-only (catches Windows-native
+#                      path/subprocess bugs in Flask+HARTOS boot)
+#                    + macOS SKIPPED (same Chromium as Linux, 10x cost,
+#                      marginal incremental signal)
+
 jobs:
-  # ── Python: Linting + Security Scanning ──
+  # ── Python: Linting + Security Scanning (cross-OS matrix) ──
+  # Catches platform-specific bugs: wmic-style hangs on Windows,
+  # osascript/mdfind gaps on macOS, bash-only shell idioms in tests.
   python-quality:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -28,37 +58,96 @@ jobs:
 
       # Ruff: lint + security (bandit S rules = OSS Veracode SAST)
       - name: Install ruff
-        run: pip install ruff
+        run: python -m pip install ruff
 
       - name: Ruff lint (includes bandit security scan)
-        run: ruff check .
+        run: python -m ruff check .
+        # HARD GATE — lint + security must pass
 
       - name: Ruff format check
-        run: ruff format --check . || true  # Advisory initially
+        run: python -m ruff format --check .
+        continue-on-error: true  # Advisory — auto-format differences are not blocking
+
+      # config.json is .gitignored (it carries user-specific endpoints),
+      # but main.py + test_build_deploy_rules + test_hartos_wiring_invariants
+      # all assert it exists. The committed config.example.json has safe
+      # localhost defaults + env-var overrides — copy it in for CI.
+      - name: Seed config.json from config.example.json
+        shell: bash
+        run: |
+          if [ ! -f config.json ] && [ -f config.example.json ]; then
+            cp config.example.json config.json
+            echo "::notice title=config::seeded config.json from config.example.json"
+          fi
 
       # pytest: Backend unit tests (mocked — no running servers required)
       - name: Install test dependencies
-        run: pip install pytest pytest-html flask requests
+        # pytest-timeout is required because the repo-root pytest.ini
+        # declares --timeout=60 --timeout-method=thread in addopts;
+        # without it pytest exits with "unrecognized arguments".
+        # pyyaml is needed by test_build_deploy_rules::TestMkDocsConfig
+        # (parses mkdocs.yml) and tests/test_scripts_and_main that touch
+        # YAML config — missing it triggers ModuleNotFoundError in 3+
+        # tests with zero production impact, just test scaffolding.
+        # pillow (PIL) is transitively imported by routes.chatbot_routes
+        # via main.py — 23 tests in test_scripts_and_main fail collection
+        # with ModuleNotFoundError: No module named 'PIL' without it.
+        # flask-cors is explicitly required by main.py — its test
+        # scaffolding imports the Flask app factory which calls CORS(app).
+        # PyJWT is needed by routes/kids_media_routes._get_user_id_from_request
+        # which decodes Bearer JWTs — tests that hit that path get
+        # ModuleNotFoundError: No module named 'jwt' without it.
+        run: python -m pip install pytest pytest-html pytest-timeout pyyaml pillow flask flask-cors requests PyJWT
+
+      # Install HARTOS (hart-backend) so `from core.*` / `from
+      # integrations.*` imports in Nunba's tests resolve.  Without
+      # this, 19+ test modules fail collection with
+      # `ModuleNotFoundError: No module named 'core'`.  Pattern
+      # lifted from regression.yml — clone shallow, --no-deps, skip
+      # heavy ML deps (torch/transformers stay lazy at call sites).
+      - name: Install HARTOS (hart-backend) from source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::notice title=hartos install::attempting git clone hertz-ai/HARTOS"
+          if git clone --depth 1 \
+               https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git \
+               ../HARTOS 2>&1 | tail -20; then
+            pip install --no-deps ../HARTOS || true
+            echo "::notice title=hartos install::OK — hart-backend installed"
+          else
+            echo "::warning title=hartos install::FAILED — default GITHUB_TOKEN cannot reach hertz-ai/HARTOS; 19+ Nunba tests will ImportError on core.*/integrations.*.  Add a NUNBA_HARTOS_TOKEN secret with repo read scope and wire it into env.GH_TOKEN."
+          fi
 
       - name: Run backend tests
-        run: python -m pytest tests/ -v --tb=short --html=test-report.html --self-contained-html
-        continue-on-error: true  # Advisory — stabilize then enforce
+        # --ignore=tests/harness: the defect-harness suite declares
+        # unit/integration/live markers only in tests/harness/pytest.ini
+        # and is covered by the dedicated defect-harness.yml workflow.
+        # Without --ignore, strict-markers trips here on first collection.
+        run: python -m pytest tests/ --ignore=tests/harness -v --tb=short --html=test-report-${{ matrix.os }}.html --self-contained-html
+        # HARD GATE — test failures block merge
 
       - name: Upload pytest report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-report
-          path: test-report.html
+          name: pytest-report-${{ matrix.os }}
+          path: test-report-${{ matrix.os }}.html
 
       # pip-audit: dependency vulnerability scanner (OSS Snyk equivalent)
       - name: Dependency vulnerability scan
         run: |
-          pip install pip-audit
-          pip-audit -r requirements.txt --desc 2>&1 || true
-        continue-on-error: true  # Advisory — harden after initial triage
+          python -m pip install pip-audit
+          pip-audit -r requirements.txt --desc || true
+        shell: bash
+        continue-on-error: true  # Advisory — high/critical CVEs tracked manually
 
   # ── Frontend: Linting + Jest Unit Tests + Dependency Audit ──
+  # INTENTIONALLY ubuntu-only. Node + npm + Jest behave identically
+  # across OSes for this codebase; running the matrix here would cost
+  # 13x more runner minutes ($0.008 → $0.104 per push) for zero new
+  # signal. Cross-OS frontend bugs (if any) surface in cypress-e2e-windows.
   frontend-quality:
     runs-on: ubuntu-latest
     defaults:
@@ -77,13 +166,27 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: ESLint
-        run: npx eslint src/ --max-warnings 50 --ext .js,.jsx 2>&1 || true
-        continue-on-error: true  # Advisory — reduce max-warnings over time
+        run: npx eslint src/ --max-warnings 1500 --ext .js,.jsx
+        # HARD GATE (task #280) — 0 errors required.  Pre-existing style
+        # debt demoted to warnings in .eslintrc.js (prettier/prettier,
+        # camelcase, import/order, react/no-unescaped-entities, react-
+        # hooks/exhaustive-deps, spaced-comment, new-cap, no-var,
+        # prefer-const).  security/detect-object-injection disabled
+        # (1,100+ false positives on legit bracket access; run targeted
+        # security audits separately).
+        #
+        # Warning budget ladder (lower as debt shrinks):
+        #   current baseline ≈1,215 warnings → cap 1,500 (~25% headroom)
+        #   next reduction PR: target 750 → cap 800
+        #   final state:      target <200  → cap 200
+        # DO NOT raise the cap without a tracking issue — regressions
+        # should be fixed, not accommodated.
 
       - name: Jest unit tests
         run: npx react-scripts test --watchAll=false --ci --forceExit --coverage
         env:
           CI: true
+        # HARD GATE — test failures block merge
 
       - name: Upload Jest coverage
         if: always()
@@ -95,14 +198,24 @@ jobs:
       # npm audit: dependency vulnerability scanner
       - name: Dependency vulnerability scan
         run: npm audit --audit-level=high 2>&1 || true
-        continue-on-error: true
+        continue-on-error: true  # Advisory — tracked manually for high/critical
 
-  # ── Cypress E2E Tests ──
+  # ── Cypress E2E Tests (sharded across 4 parallel ubuntu runners) ──
   # Full-stack: Flask backend (port 5000) + React dev server (port 3000).
   # HARTOS is pip-installed. SQLite for DB (no external services needed).
+  #
+  # Sharding: 57 spec files / ~3481 tests used to run serially and hit
+  # the 120-minute runner timeout (cancelled at 1h55m on 2026-04-14).
+  # Split into 4 shards by spec-file name hash (deterministic, stable).
+  # Each shard runs ~14 specs / ~870 tests in ≤30 min, safely under the
+  # budget.  fail-fast: false so one flaky shard doesn't kill the rest.
   cypress-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
 
@@ -150,7 +263,10 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt 2>&1 | tail -5
+          # Fail on pip errors (pipefail) + show enough lines to see
+          # ResolutionImpossible conflict details.
+          set -o pipefail
+          pip install -r requirements.txt 2>&1 | tail -60
 
           # Install sibling deps in order: hevolve-database → hevolveai → hart-backend
           for dep_dir in ../Hevolve_Database ../hevolveai ../HARTOS; do
@@ -195,11 +311,69 @@ jobs:
           DISABLE_ESLINT_PLUGIN: 'true'
           NODE_OPTIONS: '--max-old-space-size=4096'
 
+      # ── Spec sharding — split 57 specs deterministically across 4 runners ──
+      # Uses Python to enumerate + sort specs, then takes every 4th one
+      # starting at offset=(shard-1).  Produces a stable partition.
+      #
+      # ROUND-ROBIN IS SAFE because all specs are self-contained (verified
+      # 2026-04-15 by reviewer agent):
+      #   1. Every spec that needs auth calls `cy.socialAuth()` in its own
+      #      outer `before()` (per MEMORY.md invariant: "ONE cy.socialAuth
+      #      in outer before() per spec file").
+      #   2. `socialAuth()` generates a UNIQUE user per invocation via
+      #      `uniqueTestUser()` (timestamp + counter in cypress/support/
+      #      e2e.js) — no username collisions across specs.
+      #   3. No spec calls a `cy.task('seed:X')` — grep confirms every
+      #      `cy.task()` is `cy.task('log', …)` only (38 instances, all
+      #      logging).
+      #   4. No spec reads localStorage written by another spec — every
+      #      `localStorage.setItem()` is inside that spec's `onBeforeLoad`
+      #      hook, local to its `cy.visit()`.
+      #   5. The global `before()` in support/e2e.js only resets the
+      #      backend rate limiter — each shard runner has its own Flask
+      #      process, so the reset is runner-scoped.
+      # Specs checked (57): admin-api, admin-panel-ui, ad-profile-tabs-ui,
+      # agent-creation, agent-profile-ui, animations-ui, auth-flows,
+      # autonomous-agent-creation, autopilot-enriched-ui, backend-health,
+      # channel-setup, chat-agent-selection, chat-flow, chat-llm-status,
+      # chat-thinking-traces, content-gen-e2e, demopage-agents,
+      # distributed-goal-notifications, feed-privacy, game-hub,
+      # gamification-flows, guest-widget-flow, hartos-full-stack-demo,
+      # hive-demo-millions-of-agents, kids-games-e2e, kids-media-pipeline,
+      # landing-page, live-agent-creation, llama-infrastructure,
+      # local-chat-flow, mindstory, model-setup-bootstrap, multiplayer-lobby,
+      # navigation, nunba-core, online-offline, pywebview-background-render,
+      # realtime-events, reduced-motion, role-auth, skeleton-loading,
+      # social-api, social-auth-api, social-campaigns-ui,
+      # social-communities-ui, social-encounters-ui, social-evolution-ui,
+      # social-feed-ui, social-notifications-ui, social-pages,
+      # social-profile-ui, social-recipes-ui, social-regions-ui,
+      # social-search-ui, toast-notifications, tts-setup, user-journey,
+      # voice-pipeline.
+      # If a future spec introduces cross-spec seed data, switch to
+      # directory-based sharding (admin/**, social/**, chat/**, other/**).
+      - name: Compute spec shard
+        id: shard
+        working-directory: landing-page
+        run: |
+          python3 - <<'PY'
+          import glob, os
+          specs = sorted(glob.glob('cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', recursive=True))
+          shard_count = 4
+          shard_idx = ${{ matrix.shard }} - 1
+          mine = [s for i, s in enumerate(specs) if i % shard_count == shard_idx]
+          spec_arg = ','.join(mine)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'spec_pattern={spec_arg}\n')
+              f.write(f'spec_count={len(mine)}\n')
+          print(f'Shard ${{ matrix.shard }}/{shard_count}: {len(mine)} specs')
+          for s in mine: print(f'  {s}')
+          PY
+
       # ── Cypress: Bundled mode (Flask serves React on :5000) ──
-      # continue-on-error: UI timing failures on free CI runners are expected.
-      # The pass rate is tracked in reports — not used as a gate.
-      - name: Cypress E2E tests
-        continue-on-error: true
+      # HARD GATE (task #281): Cypress failures now fail the workflow.
+      # continue-on-error removed — we fix test failures rather than mask them.
+      - name: Cypress E2E tests (shard ${{ matrix.shard }}/4)
         uses: cypress-io/github-action@v6
         with:
           working-directory: landing-page
@@ -207,6 +381,7 @@ jobs:
           wait-on: http://localhost:5000
           wait-on-timeout: 120
           browser: chrome
+          spec: ${{ steps.shard.outputs.spec_pattern }}
           config: baseUrl=http://localhost:5000,video=false
           record: false
         env:
@@ -216,16 +391,184 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: cypress-screenshots
+          name: cypress-screenshots-shard${{ matrix.shard }}
           path: landing-page/cypress/screenshots/
 
       - name: Upload Cypress reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cypress-reports
+          name: cypress-reports-shard${{ matrix.shard }}
           path: landing-page/cypress/reports/
 
       - name: Stop Flask backend
         if: always()
         run: kill $(cat /tmp/flask.pid) 2>/dev/null || true
+
+  # ── Cypress E2E (Windows smoke) ──
+  # SINGLE non-sharded job on windows-latest running ONLY smoke-level
+  # specs.  Windows runners are 2x cost AND Cypress is ~3x slower on
+  # Windows (no chromium sandbox reuse, slower filesystem).  Running
+  # the full 4-shard matrix here would cost ~24x the ubuntu baseline.
+  # Smoke-only keeps the signal we need (catches native-path /
+  # subprocess / WMI-class bugs in Flask+HARTOS boot on Windows) at
+  # manageable cost (~15 min × $0.016 = $0.24 / run).
+  #
+  # macOS Cypress: intentionally skipped. Same Chromium engine as
+  # Linux, 10x runner cost, no macOS-specific frontend surface area.
+  cypress-e2e-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout HARTOS
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/HARTOS
+          path: _deps/HARTOS
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
+      - name: Checkout HevolveAI
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/HevolveAI
+          path: _deps/hevolveai
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
+      - name: Checkout Hevolve_Database
+        uses: actions/checkout@v4
+        with:
+          repository: hertz-ai/Hevolve_Database
+          path: _deps/Hevolve_Database
+          token: ${{ secrets.HEVOLVE_REPO_TOKEN || github.token }}
+        continue-on-error: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: landing-page/package-lock.json
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt || echo "Some deps failed (expected on Windows)"
+          for dep_dir in _deps/Hevolve_Database _deps/hevolveai _deps/HARTOS; do
+            if [ -f "$dep_dir/pyproject.toml" ] || [ -f "$dep_dir/setup.py" ]; then
+              echo "Installing $(basename $dep_dir) from source..."
+              python -m pip install --no-deps "$dep_dir" || echo "  (failed, continuing)"
+            fi
+          done
+        continue-on-error: true
+
+      - name: Start Flask backend (Windows)
+        shell: bash
+        run: |
+          python main.py --port 5000 &
+          echo $! > flask.pid
+        env:
+          NUNBA_BIND_HOST: '127.0.0.1'
+          NUNBA_DISABLE_TTS: '1'
+          NUNBA_CI: '1'
+
+      - name: Wait for Flask backend
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+              echo "Flask is ready (attempt $i)"
+              break
+            fi
+            echo "Waiting for Flask... (attempt $i)"
+            sleep 2
+          done
+          curl -sf http://localhost:5000/health || echo "Flask health check non-200 (may still work)"
+
+      - name: Install frontend dependencies
+        working-directory: landing-page
+        run: npm ci --legacy-peer-deps
+
+      - name: Build React (production)
+        working-directory: landing-page
+        run: npx react-app-rewired build
+        env:
+          CI: 'false'
+          DISABLE_ESLINT_PLUGIN: 'true'
+          NODE_OPTIONS: '--max-old-space-size=4096'
+
+      # Smoke spec selection: prefer cypress/e2e/smoke/*.cy.js if it
+      # exists; otherwise fall back to the single lightest existing
+      # spec (landing_page.cy.js — smallest surface, fastest signal).
+      - name: Compute smoke spec
+        id: smoke
+        working-directory: landing-page
+        shell: bash
+        run: |
+          python - <<'PY'
+          import glob, os
+          smoke = sorted(glob.glob('cypress/e2e/smoke/*.cy.js'))
+          if not smoke:
+              # Fallback: lightest known spec
+              fallbacks = [
+                  'cypress/e2e/landing_page.cy.js',
+                  'cypress/e2e/smoke.cy.js',
+                  'cypress/e2e/health.cy.js',
+              ]
+              for f in fallbacks:
+                  if os.path.exists(f):
+                      smoke = [f]
+                      break
+          if not smoke:
+              # Last resort: first spec alphabetically (still deterministic)
+              all_specs = sorted(glob.glob('cypress/e2e/**/*.cy.js', recursive=True))
+              smoke = all_specs[:1]
+          spec_arg = ','.join(smoke)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'spec_pattern={spec_arg}\n')
+          print(f'Windows smoke: {len(smoke)} spec(s)')
+          for s in smoke: print(f'  {s}')
+          PY
+
+      - name: Cypress E2E (Windows smoke)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: landing-page
+          install: false
+          wait-on: http://localhost:5000
+          wait-on-timeout: 120
+          browser: chrome
+          spec: ${{ steps.smoke.outputs.spec_pattern }}
+          config: baseUrl=http://localhost:5000,video=false
+          record: false
+        env:
+          CI: true
+
+      - name: Upload Cypress screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots-windows-smoke
+          path: landing-page/cypress/screenshots/
+
+      - name: Upload Cypress reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-reports-windows-smoke
+          path: landing-page/cypress/reports/
+
+      - name: Stop Flask backend
+        if: always()
+        shell: bash
+        run: |
+          if [ -f flask.pid ]; then
+            kill "$(cat flask.pid)" 2>/dev/null || true
+          fi

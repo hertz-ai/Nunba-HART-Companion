@@ -17,13 +17,14 @@
  * Visual language matches NunbaChatPill: glass morphism, rounded corners,
  * purple (#6C63FF) accent.
  */
-import React, {useEffect, useMemo, useState, useCallback} from 'react';
-import {Box, Chip, Tooltip, IconButton, Collapse} from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {listPages, iconFor} from '../../../config/pageRegistry';
+
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {Box, Chip, Tooltip, IconButton, Collapse} from '@mui/material';
+import React, {useEffect, useMemo, useState, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
 
-import {listPages, iconFor} from '../../../config/pageRegistry';
 
 export const UI_ACTIONS_EVENT = 'nunba:ui_actions';
 

@@ -1,0 +1,32 @@
+{
+  "_comment": "Sample config.json shipped to support CI + fresh-clone setup. Copy to config.json and fill in real URLs / secrets for your deployment. The real config.json is .gitignored because it may carry user-specific endpoints; this sample is safe to commit (all localhost defaults + env-var overrides, no secrets).",
+  "IP_ADDRESS": {
+    "haystack_url": "${HAYSTACK_URL:-http://localhost:8000/haystack/}",
+    "albert_url": "${ALBERT_URL:-http://localhost:5000}",
+    "database_url": "${DATABASE_URL:-http://localhost:6006}",
+    "similarity_chacker_url": "${SIMILARITY_URL:-http://localhost:5020}",
+    "qgen_url": "${QGEN_URL:-http://localhost:8000/qgen}",
+    "revision_bot_url": "${REVISION_BOT_URL:-http://localhost:5009}",
+    "zeroshot_url": "${ZEROSHOT_URL:-http://localhost:8000/zeroshot3}",
+    "zeroshot_2_url": "${ZEROSHOT_2_URL:-http://localhost:8000/zeroshot}",
+    "makeittalk_url": "${MAKEITTALK_URL:-http://localhost:8000/makeitLoad}",
+    "gpt3_url": "${GPT3_URL:-http://localhost:5459/}",
+    "analogy_url": "${ANALOGY_URL:-http://localhost:5459/analogy}",
+    "summarizer_url": "${SUMMARIZER_URL:-http://localhost:5459/summarizer}",
+    "gpt_4_url": "${GPT4_URL:-http://localhost:5459/gpt-4}",
+    "crossbar_pub": "${CROSSBAR_PUB_URL:-http://localhost:8088/publish}",
+    "vicuna_url": "${VICUNA_URL:-http://localhost:6777/chat}",
+    "gpt_langchain": "${LANGCHAIN_URL:-http://localhost:8000/langchain/chat}",
+    "crossbar": "${CROSSBAR_WS_URL:-ws://localhost:8088/ws}",
+    "history_langchain": "${HISTORY_LANGCHAIN_URL:-http://localhost:6777/add_history}",
+    "intentSetfit": "${INTENT_SETFIT_URL:-http://localhost:8443/intent/setfit}",
+    "langSetfit": "${LANG_SETFIT_URL:-http://localhost:8000/langsetfit/setfit}",
+    "video_redis": "${VIDEO_REDIS_HOST:-localhost}",
+    "pipeline_image": "${PIPELINE_IMAGE_URL:-http://localhost:5454/}",
+    "minicpm_url": "${MINICPM_URL:-http://localhost:8000/minicpm/upload}"
+  },
+  "prefix_2nd_grader": "Summarize this for a second-grade student:\n\n",
+  "intent_recognition": "Please classify the following text into one of the given categories and provide only one category as your response\n\nText: {}\n\nCategories:{}",
+  "teachme": "You are a highly intelligent teaching bot. who teaches the user role using the Text from the system role, your tone should be (Teaching tone, imparting knowledge tone)",
+  "newTeachme": "As an intelligent teaching bot, my purpose is to impart knowledge and help you learn. Just give me the text you'd like me to teach you about, and I'll provide you with valuable insights and information in a teaching tone."
+}

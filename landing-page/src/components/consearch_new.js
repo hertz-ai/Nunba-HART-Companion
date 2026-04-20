@@ -153,14 +153,14 @@ class recap extends Component {
                                                 "top":"0",
                                                 "left":"0",
                                                 "animationDelay":"0.2s"
-                                                }}/>
+                                                }} alt="" />
                                                 <img src="/kids_learning.jpg" className="fadeInUp" style={{"animation-duration" : "0.55s",
                                                 "position":"absolute",
                                                 "top":"27   0px",
                                                 "left":"250px",
                                                 "animationDelay":"0.4s",
                                                 "width" : "30%"
-                                            }}/>
+                                            }} alt="" />
                                             </div>
                                         </div>
                                     </div> */}

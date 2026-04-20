@@ -1,9 +1,10 @@
+import Footer from '../components/footer';
+import Navbar from '../components/navbar';
+import Pricing from '../components/Pricing';
+
 import React, {useEffect, useState} from 'react';
 import {Link} from 'react-router-dom';
 
-import Pricing from '../components/Pricing';
-import Footer from '../components/footer';
-import Navbar from '../components/navbar';
 
 export default function Pricings() {
   const [hevolvedroid, setIshevolvedroid] = useState(true);

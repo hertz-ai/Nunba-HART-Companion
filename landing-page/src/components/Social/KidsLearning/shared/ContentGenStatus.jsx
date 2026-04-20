@@ -1,4 +1,7 @@
-import React, {useState, useEffect} from 'react';
+import {kidsColors, kidsRadius} from '../data/kidsTheme';
+
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Box,
   Typography,
@@ -7,9 +10,8 @@ import {
   Collapse,
   IconButton,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import {kidsColors, kidsRadius} from '../data/kidsTheme';
+import React, {useState, useEffect} from 'react';
+
 
 /**
  * ContentGenStatus — shows content generation progress for a game.

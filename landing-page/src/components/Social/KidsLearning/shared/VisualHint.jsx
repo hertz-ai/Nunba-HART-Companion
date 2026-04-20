@@ -11,8 +11,8 @@
  *   onDismiss: () => void
  */
 
-import React, {useEffect} from 'react';
 import {Box, Fade} from '@mui/material';
+import React, {useEffect} from 'react';
 
 const HINT_CONFIGS = {
   tap: {

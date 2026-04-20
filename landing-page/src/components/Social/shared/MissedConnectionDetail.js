@@ -1,4 +1,7 @@
-import React, {useState, useEffect, useRef} from 'react';
+import {encountersApi} from '../../../services/socialApi';
+
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PeopleIcon from '@mui/icons-material/People';
 import {
   Typography,
   Box,
@@ -9,9 +12,8 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import PeopleIcon from '@mui/icons-material/People';
-import {encountersApi} from '../../../services/socialApi';
+import React, {useState, useEffect, useRef} from 'react';
+
 
 export default function MissedConnectionDetail({missedId, onBack}) {
   const mapRef = useRef(null);

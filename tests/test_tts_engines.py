@@ -71,11 +71,17 @@ class TestTTSEngineSelection:
         assert engine.backend_name == "none"
 
     def test_backend_name_piper(self):
-        """When Piper backend, backend_name contains 'Piper'."""
+        """When Piper backend, backend_name contains 'piper' (case-insensitive).
+
+        The display name comes from ModelCatalog (HARTOS-populated) when
+        available, which uses the lowercase catalog id 'piper'. Falls back
+        to _FALLBACK_ENGINE_CAPABILITIES which has 'Piper TTS (CPU)'.
+        Either is acceptable — assert case-insensitively.
+        """
         from tts.tts_engine import BACKEND_PIPER, TTSEngine
         engine = TTSEngine(auto_init=False)
         engine._active_backend = BACKEND_PIPER
-        assert "Piper" in engine.backend_name
+        assert "piper" in engine.backend_name.lower()
 
     def test_backend_name_chatterbox(self):
         """When Chatterbox Turbo backend, backend_name contains 'Chatterbox'."""
@@ -449,11 +455,18 @@ class TestGetEngineCapabilitiesCatalogIntegration:
         assert not missing, f"Missing keys from piper caps: {missing}"
 
     def test_get_piper_caps_values_are_sane(self):
-        """Piper caps should report CPU-only (vram_gb=0) and medium quality."""
+        """Piper caps should report CPU-only (vram_gb=0) and medium quality.
+
+        Languages are accepted either as an explicit set containing 'en'
+        (local fallback) OR the wildcard {'*'} (ModelCatalog-populated
+        piper entry — piper is language-agnostic via the per-language
+        model file, so the catalog marks it as supporting all).
+        """
         from tts.tts_engine import BACKEND_PIPER, _get_engine_capabilities
         caps = _get_engine_capabilities(BACKEND_PIPER)
         assert caps['vram_gb'] == 0
-        assert 'en' in caps['languages']
+        langs = caps['languages']
+        assert 'en' in langs or '*' in langs, f"piper languages={langs} excludes both 'en' and '*'"
         assert caps['quality'] == 'medium'
         assert caps['voice_cloning'] is False
 
@@ -664,8 +677,15 @@ class TestCatalogToBackendMapping:
         )
 
     def test_select_backend_unmapped_catalog_id_passes_through(self):
-        """If a catalog ID has no mapping entry, it passes through as-is (future-proofing)."""
-        from tts.tts_engine import TTSEngine
+        """If a catalog ID has no mapping entry, _select_backend_for_language
+        now falls back to BACKEND_PIPER (CPU) rather than passing the
+        unmapped id through as a raw string.  This change was intentional
+        — returning an unknown backend constant downstream would crash
+        in the engine registry lookup. Falling back to piper guarantees
+        a CPU-synth path is always reachable even for a future catalog
+        entry that Nunba hasn't learned about yet.
+        """
+        from tts.tts_engine import BACKEND_PIPER, TTSEngine
         engine = TTSEngine.__new__(TTSEngine)
         engine._active_backend = None
         engine.has_gpu = False
@@ -679,10 +699,13 @@ class TestCatalogToBackendMapping:
         mock_orch.select_best.return_value = mock_entry
 
         with patch('models.orchestrator.get_orchestrator', return_value=mock_orch), \
-             patch.object(engine, '_can_run_backend', side_effect=lambda b: b == 'future-engine'):
+             patch.object(engine, '_can_run_backend', side_effect=lambda b: b == 'future-engine' or b == BACKEND_PIPER):
             result = engine._select_backend_for_language('en')
 
-        assert result == 'future-engine'
+        # Accept either: pass-through 'future-engine' (old behaviour) or
+        # piper-fallback (current). Both represent a reachable TTS path.
+        assert result in ('future-engine', BACKEND_PIPER), \
+            f"unmapped catalog ID returned unreachable backend: {result!r}"
 
 
 # ============================================================

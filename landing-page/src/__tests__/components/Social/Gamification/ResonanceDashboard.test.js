@@ -1,6 +1,6 @@
 import React from 'react';
 import {screen, waitFor} from '@testing-library/react';
-import {renderWithProviders} from '../../../testHelpers';
+
 import ResonanceDashboard from '../../../../components/Social/Gamification/ResonanceDashboard';
 
 // Define mock data BEFORE using in mocks
@@ -83,6 +83,7 @@ jest.mock('../../../../services/socialApi', () => ({
 }));
 
 import {resonanceApi} from '../../../../services/socialApi';
+import {renderWithProviders} from '../../../testHelpers';
 
 describe('ResonanceDashboard Component', () => {
   beforeEach(() => {

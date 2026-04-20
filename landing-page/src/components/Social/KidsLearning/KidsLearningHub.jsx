@@ -1,5 +1,27 @@
-import React, {useState, useMemo, useEffect, useRef, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+
+import gameConfigs from './data/gameConfigs';
+import {getProgress} from './data/kidsLearningStore';
+import {
+  kidsColors,
+  kidsShadows,
+  kidsRadius,
+  CATEGORIES,
+} from './data/kidsTheme';
+import ContentGenStatus from './shared/ContentGenStatus';
+import MediaPreloader from './shared/MediaPreloader';
+import TeachYourselfAgentCard from './shared/TeachYourselfAgentCard';
+
+import {useReducedMotion} from '../../../hooks/useAnimations';
+import {socialTokens} from '../../../theme/socialTokens';
+import {animFadeInDown, pressDown} from '../../../utils/animations';
+
+import AddIcon from '@mui/icons-material/Add';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import SchoolIcon from '@mui/icons-material/School';
+import SearchIcon from '@mui/icons-material/Search';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import {
   Box,
   Typography,
@@ -14,28 +36,8 @@ import {
   CardActionArea,
   CircularProgress,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import AddIcon from '@mui/icons-material/Add';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import SchoolIcon from '@mui/icons-material/School';
-
-import {
-  kidsColors,
-  kidsShadows,
-  kidsRadius,
-  CATEGORIES,
-} from './data/kidsTheme';
-import gameConfigs from './data/gameConfigs';
-import {getProgress} from './data/kidsLearningStore';
-import TeachYourselfAgentCard from './shared/TeachYourselfAgentCard';
-import ContentGenStatus from './shared/ContentGenStatus';
-import MediaPreloader from './shared/MediaPreloader';
-import {useReducedMotion} from '../../../hooks/useAnimations';
-import {animFadeInDown, pressDown} from '../../../utils/animations';
-import {socialTokens} from '../../../theme/socialTokens';
+import React, {useState, useMemo, useEffect, useRef, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 /* ---- CSS keyframes injected once ---- */
 const HUB_ANIM_ID = 'kids-hub-keyframes';

@@ -6,21 +6,23 @@
  *   <IntentBadge category="community" size="large" />
  */
 
-import React from 'react';
-import {Chip, Box} from '@mui/material';
-import {alpha} from '@mui/material/styles';
-import PeopleIcon from '@mui/icons-material/People';
-import ParkIcon from '@mui/icons-material/Park';
-import SchoolIcon from '@mui/icons-material/School';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import BalanceIcon from '@mui/icons-material/Balance';
-import MemoryIcon from '@mui/icons-material/Memory';
 import {
   INTENT_COLORS,
   INTENT_LABELS,
   INTENT_GRADIENT_MAP,
   RADIUS,
 } from '../../../theme/socialTokens';
+
+import BalanceIcon from '@mui/icons-material/Balance';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import MemoryIcon from '@mui/icons-material/Memory';
+import ParkIcon from '@mui/icons-material/Park';
+import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
+import {Chip, Box} from '@mui/material';
+import {alpha} from '@mui/material/styles';
+import React from 'react';
+
 
 const ICON_MAP = {
   community: PeopleIcon,

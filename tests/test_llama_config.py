@@ -470,12 +470,14 @@ class TestIsLlmServerRunning:
             assert cfg.is_llm_available() is False
 
     def test_available_true_for_200(self, tmp_config_dir):
+        # is_llm_available was refactored (2026-04-16) to delegate to
+        # core.verified_llm.is_llm_inference_verified — a real
+        # POST /v1/chat/completions probe that asserts non-empty
+        # content.  The old /v1/models shallow check was a legacy
+        # fallback.  Mock the new function directly.
         cfg = self._make_cfg(tmp_config_dir)
-        mock_resp = MagicMock()
-        mock_resp.status = 200
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch('urllib.request.urlopen', return_value=mock_resp):
+        with patch('core.verified_llm.is_llm_inference_verified',
+                   return_value=True):
             assert cfg.is_llm_available() is True
 
     def test_cloud_configured_skips_local(self, tmp_config_dir):

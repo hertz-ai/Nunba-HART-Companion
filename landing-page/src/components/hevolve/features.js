@@ -1,10 +1,11 @@
-import React from 'react';
 import FirstGif from '../../Gif/2.16.gif';
 import SecondGif from '../../Gif/3.20.gif';
 import ThirdGif from '../../Gif/3.40.gif';
-import verncular from '../../Gif/verncular.gif';
-import TeachemeBook from '../../Gif/teachmeBook.gif';
 import six from '../../Gif/six.gif';
+import TeachemeBook from '../../Gif/teachmeBook.gif';
+import verncular from '../../Gif/verncular.gif';
+
+import React from 'react';
 
 export default function Features({classlist}) {
   const featuresData = [

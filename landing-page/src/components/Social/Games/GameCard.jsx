@@ -1,11 +1,12 @@
-import React from 'react';
-import {Box, Typography, Chip, Avatar, useTheme} from '@mui/material';
-import {alpha} from '@mui/material/styles';
+import {RADIUS} from '../../../theme/socialTokens';
+import {animFadeInScale} from '../../../utils/animations';
+
 import GroupIcon from '@mui/icons-material/Group';
 import PersonIcon from '@mui/icons-material/Person';
 import StarIcon from '@mui/icons-material/Star';
-import {RADIUS} from '../../../theme/socialTokens';
-import {animFadeInScale} from '../../../utils/animations';
+import {Box, Typography, Chip, Avatar, useTheme} from '@mui/material';
+import {alpha} from '@mui/material/styles';
+import React from 'react';
 
 const CATEGORY_COLORS = {
   trivia: '#6C63FF',

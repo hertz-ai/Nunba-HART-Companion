@@ -32,6 +32,15 @@ def _resolve_paths():
     _usp = os.path.join(os.path.expanduser('~'), '.nunba', 'site-packages')
     _tlib = os.path.join(_usp, 'torch', 'lib')
 
+    # CUDA torch may live on a secondary drive (D:) when C: is too small
+    # for the 2.5GB torch + CUDA DLLs.  Check D:/.nunba/site-packages as
+    # fallback — mirrors sitecustomize.py's D: path injection.
+    if not os.path.isdir(_tlib):
+        _alt = os.path.join('D:\\', '.nunba', 'site-packages', 'torch', 'lib')
+        if os.path.isdir(_alt):
+            _tlib = _alt
+            _usp = os.path.join('D:\\', '.nunba', 'site-packages')
+
     if sys.platform != 'win32' or not getattr(sys, 'frozen', False):
         return False
 
@@ -138,6 +147,16 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
         return _backend_cache[backend]
 
     if not _resolve_paths():
+        _backend_cache[backend] = False
+        return False
+
+    # Guard: if torch/lib doesn't exist (CUDA torch never installed),
+    # the subprocess would crash on os.add_dll_directory before it
+    # could even attempt the import.  Return False cleanly so the
+    # caller routes to install instead of seeing a FileNotFoundError
+    # in probe_<backend>.err every probe call.  Mirrors the guard at
+    # check_cuda_available() above — single behavior for both probes.
+    if not os.path.isdir(_tlib):
         _backend_cache[backend] = False
         return False
 

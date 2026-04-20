@@ -20,14 +20,16 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {Box, Typography, Button, Fade, Grow} from '@mui/material';
-import MicIcon from '@mui/icons-material/Mic';
-import {kidsColors} from '../kidsTheme';
-import {GameSounds} from '../shared/SoundManager';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
 import useMicAmplitude from '../../../../hooks/useMicAmplitude';
+import {kidsColors} from '../kidsTheme';
+import InlineCelebration from '../shared/InlineCelebration';
+import {GameSounds} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
+
+import MicIcon from '@mui/icons-material/Mic';
+import {Box, Typography, Button, Fade, Grow} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+
 
 const CANVAS_WIDTH = 360;
 const CANVAS_HEIGHT = 400;

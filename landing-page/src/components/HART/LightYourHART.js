@@ -18,10 +18,11 @@
  * "Every word spoken matters." — The human who built this.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Typography, Fade, Grow, ButtonBase } from '@mui/material';
 import { API_BASE_URL } from '../../config/apiBase';
 import VoiceVisualizer from '../VoiceVisualizer';
+
+import { Box, Typography, Fade, Grow, ButtonBase } from '@mui/material';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 // ════════════════════════════════════════════════════════════════════
 // CONSTANTS

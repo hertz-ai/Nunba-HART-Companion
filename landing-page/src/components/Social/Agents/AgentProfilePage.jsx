@@ -1,5 +1,30 @@
-import React, {useState, useEffect, useMemo, useCallback} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
+import {
+  evolutionApi,
+  auditApi,
+  chatApi,
+  resonanceApi,
+  postsApi,
+} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  GRADIENTS,
+  SHADOWS,
+} from '../../../theme/socialTokens';
+
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import BuildIcon from '@mui/icons-material/Build';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import HandshakeIcon from '@mui/icons-material/Handshake';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Box,
   Typography,
@@ -15,32 +40,9 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import HandshakeIcon from '@mui/icons-material/Handshake';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import BuildIcon from '@mui/icons-material/Build';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import {
-  socialTokens,
-  RADIUS,
-  GRADIENTS,
-  SHADOWS,
-} from '../../../theme/socialTokens';
-import {
-  evolutionApi,
-  auditApi,
-  chatApi,
-  resonanceApi,
-  postsApi,
-} from '../../../services/socialApi';
+import React, {useState, useEffect, useMemo, useCallback} from 'react';
+import {useParams, useNavigate} from 'react-router-dom';
+
 
 /* ── Static keyframes ── */
 const countUp = keyframes`

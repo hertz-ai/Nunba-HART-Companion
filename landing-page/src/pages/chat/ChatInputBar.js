@@ -1,5 +1,4 @@
 /* eslint-disable no-unused-vars */
-import React from 'react';
 import {
   SendHorizontal,
   Image,
@@ -12,6 +11,7 @@ import {
   Brain,
   Ear,
 } from 'lucide-react';
+import React from 'react';
 
 /**
  * ChatInputBar -- message input area with queue, file uploads, TTS, mic, and send.
@@ -117,7 +117,8 @@ const ChatInputBar = ({
                       prev.filter((item) => item.id !== q.id)
                     );
                   }}
-                  className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs ml-1"
+                  className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all text-xs ml-1"
+                  aria-label="Remove queued message"
                 >
                   ✕
                 </button>
@@ -128,7 +129,7 @@ const ChatInputBar = ({
       )}
       {pdfFile && (
         <div className="relative inline-block mt-4">
-          <span className="text-gray-700">Uploaded PDF: {pdfFile.name}</span>
+          <span className="text-gray-400">Uploaded PDF: {pdfFile.name}</span>
           <button
             onClick={handleRemovePdf}
             className="text-red-600 hover:text-red-800 p-1 ml-2"
@@ -240,6 +241,7 @@ const ChatInputBar = ({
         <button
           onClick={() => document.getElementById('fileInput').click()}
           className="text-gray-400 hover:text-gray-600 p-1"
+          aria-label="Upload image"
         >
           <Image className="w-5 h-5" />
         </button>
@@ -247,6 +249,7 @@ const ChatInputBar = ({
         <button
           onClick={() => document.getElementById('pdfInput').click()}
           className="text-gray-400 hover:text-gray-600 p-1"
+          aria-label="Upload PDF"
         >
           <FileText className="w-5 h-5" />
         </button>
@@ -292,7 +295,8 @@ const ChatInputBar = ({
         {/* Clipboard paste */}
         {onClipboardPaste && (
           <button onClick={onClipboardPaste}
-            className="text-gray-400 hover:text-purple-400 p-1 btn-press" title="Paste from clipboard">
+            className="text-gray-400 hover:text-purple-400 p-1 btn-press" title="Paste from clipboard"
+            aria-label="Paste from clipboard">
             <ClipboardPaste className="w-4 h-4" />
           </button>
         )}
@@ -300,7 +304,8 @@ const ChatInputBar = ({
         {/* Camera capture */}
         {onCameraCapture && (
           <button onClick={onCameraCapture}
-            className="text-gray-400 hover:text-blue-400 p-1 btn-press" title="Take photo">
+            className="text-gray-400 hover:text-blue-400 p-1 btn-press" title="Take photo"
+            aria-label="Take photo">
             <Camera className="w-4 h-4" />
           </button>
         )}
@@ -308,7 +313,8 @@ const ChatInputBar = ({
         {/* Memory panel */}
         {onMemoryOpen && (
           <button onClick={onMemoryOpen}
-            className="text-gray-400 hover:text-pink-400 p-1 btn-press" title="Memories">
+            className="text-gray-400 hover:text-pink-400 p-1 btn-press" title="Memories"
+            aria-label="Open memories">
             <Brain className="w-4 h-4" />
           </button>
         )}
@@ -320,7 +326,7 @@ const ChatInputBar = ({
             title={alwaysListening ? 'Stop listening for "Hey Nunba"' : 'Listen for "Hey Nunba"'}>
             <Ear className="w-4 h-4" />
             {alwaysListening && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse motion-reduce:animate-none" />
             )}
           </button>
         )}
@@ -329,7 +335,8 @@ const ChatInputBar = ({
           data-send-btn
           disabled={!isAuthenticated}
           onClick={handleSend}
-          className="p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-90"
+          aria-label="Send message"
+          className="p-1 rounded-lg transition-all duration-200 hover:scale-110 active:scale-90 motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
           style={{
             background: inputMessage.trim()
               ? 'linear-gradient(135deg, #6C63FF, #9B94FF)'

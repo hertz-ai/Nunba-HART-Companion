@@ -6,7 +6,20 @@
  * Expanding a card reveals individual tools with "Use in Chat" action.
  */
 
-import React, {useState, useEffect, useMemo} from 'react';
+import {mcpApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  GRADIENTS,
+  SHADOWS,
+} from '../../../theme/socialTokens';
+
+import BuildIcon from '@mui/icons-material/Build';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PersonIcon from '@mui/icons-material/Person';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
   Card,
@@ -24,19 +37,8 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import SearchIcon from '@mui/icons-material/Search';
-import BuildIcon from '@mui/icons-material/Build';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import PersonIcon from '@mui/icons-material/Person';
-import {
-  socialTokens,
-  RADIUS,
-  GRADIENTS,
-  SHADOWS,
-} from '../../../theme/socialTokens';
-import {mcpApi} from '../../../services/socialApi';
+import React, {useState, useEffect, useMemo} from 'react';
+
 
 /* -- Keyframes -- */
 const cardReveal = keyframes`

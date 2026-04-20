@@ -5,16 +5,17 @@
  * Uses trackerApi.inject(postId, {variable, injection_type}).
  */
 
-import React, { useState } from 'react';
+import { trackerApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS } from '../../../theme/socialTokens';
+
+import TuneIcon from '@mui/icons-material/Tune';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Select, MenuItem, FormControl, InputLabel,
   Typography, Box, CircularProgress, useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import TuneIcon from '@mui/icons-material/Tune';
-import { trackerApi } from '../../../services/socialApi';
-import { socialTokens, RADIUS } from '../../../theme/socialTokens';
+import React, { useState } from 'react';
 
 const INJECTION_TYPES = [
   { value: 'constraint', label: 'Constraint', desc: 'Add a hard boundary the agent must respect' },

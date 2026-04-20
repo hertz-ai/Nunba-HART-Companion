@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Box, Typography, CircularProgress, Avatar, Chip, Button, Card, CardContent, Divider, IconButton, Fade,
-} from '@mui/material';
+import { encountersApi } from '../../../services/socialApi';
+
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ChatIcon from '@mui/icons-material/Chat';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import { encountersApi } from '../../../services/socialApi';
+import {
+  Box, Typography, CircularProgress, Avatar, Chip, Button, Card, CardContent, Divider, IconButton, Fade,
+} from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+
 
 export default function EncounterDetailPage() {
   const { encounterId } = useParams();

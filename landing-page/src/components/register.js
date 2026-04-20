@@ -693,15 +693,7 @@ export default function Register() {
               </Grid>
             </Grid>
             <Spacer h={40} />
-            {/* <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              color="primary"
-              /* submit style removed */
-            >
-              Sign Up
-            </Button> */}
+            {/* Legacy submit Button removed — replaced by ColorButton below */}
 
             <ColorButton
               variant="contained"

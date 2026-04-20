@@ -1,6 +1,6 @@
-import React from 'react';
-import {Snackbar, Box, Typography} from '@mui/material';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import {Snackbar, Box, Typography} from '@mui/material';
+import React from 'react';
 
 const confettiKeyframes = `
 @keyframes confetti-fall {

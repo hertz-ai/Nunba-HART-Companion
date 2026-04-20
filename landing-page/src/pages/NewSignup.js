@@ -1,15 +1,18 @@
+import OTPModal from './OTPModal';
+
+import {mailerApi} from '../services/socialApi';
+import {encrypt} from '../utils/encryption';
+
+import Alert from '@mui/material/Alert';
+import {getCountries, getCountryCallingCode} from 'libphonenumber-js';
+import {ChevronDown} from 'lucide-react';
 import React, {useEffect, useState, useRef} from 'react';
+import ReactGA from 'react-ga';
 import {Link} from 'react-router-dom';
 import {useNavigate} from 'react-router-dom';
-import ReactGA from 'react-ga';
-import Alert from '@mui/material/Alert';
 
-import OTPModal from './OTPModal';
-import {ChevronDown} from 'lucide-react';
-import {getCountries, getCountryCallingCode} from 'libphonenumber-js';
-import {mailerApi} from '../services/socialApi';
 
-import {encrypt} from '../utils/encryption';
+
 
 const PhoneNumberInput = ({
   phoneNumber,

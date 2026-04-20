@@ -1,5 +1,10 @@
 import {identityApi} from '../../services/socialApi';
 
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import EditIcon from '@mui/icons-material/Edit';
+import PersonIcon from '@mui/icons-material/Person';
+import SaveIcon from '@mui/icons-material/Save';
 import {
   Typography,
   Card,
@@ -15,11 +20,6 @@ import {
   Grow,
   IconButton,
 } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
-import SaveIcon from '@mui/icons-material/Save';
-import EditIcon from '@mui/icons-material/Edit';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import React, {useState, useEffect} from 'react';
 
 // Card style

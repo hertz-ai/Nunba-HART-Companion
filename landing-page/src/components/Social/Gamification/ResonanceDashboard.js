@@ -1,4 +1,11 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import {useSocial} from '../../../contexts/SocialContext';
+import {resonanceApi} from '../../../services/socialApi';
+import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import ResonanceWallet, {
+  ResonanceWalletSkeleton,
+} from '../shared/ResonanceWallet';
+
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import {
   Typography,
   Box,
@@ -12,13 +19,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import ResonanceWallet, {
-  ResonanceWalletSkeleton,
-} from '../shared/ResonanceWallet';
-import {resonanceApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import {socialTokens, RADIUS} from '../../../theme/socialTokens';
+import React, {useState, useEffect, useMemo} from 'react';
 
 // Loading skeleton for the entire dashboard
 function DashboardSkeleton() {

@@ -1,12 +1,11 @@
-import React, {useEffect} from 'react';
-import {Link} from 'react-router-dom';
 
 import contactImg from '../assets/images/contact.svg';
-
-import Navbar from '../components/navbar';
 import Footer from '../components/footer';
+import Navbar from '../components/navbar';
 
+import React, {useEffect} from 'react';
 import {FiHexagon, FiPhone, FiMail, FiMapPin} from 'react-icons/fi';
+import {Link} from 'react-router-dom';
 
 export default function Contact() {
   useEffect(() => {

@@ -1,5 +1,9 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useSocial} from '../../../contexts/SocialContext';
+import {campaignsApi} from '../../../services/socialApi';
+
+import AddIcon from '@mui/icons-material/Add';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Box,
   Typography,
@@ -23,11 +27,9 @@ import {
   Avatar,
   Tooltip,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import {campaignsApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
+import React, {useState, useEffect, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 const STATUS_COLORS = {
   draft: 'default',

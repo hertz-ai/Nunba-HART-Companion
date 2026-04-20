@@ -38,12 +38,14 @@ Developer Setup — Clone repos (sibling directories):
     for private repos).
 """
 import argparse
+import datetime
 import os
 import platform as plat
 import re
 import shutil
 import subprocess
 import sys
+import threading
 
 # Force unbuffered output so build logs appear in real time (not held until exit).
 # Critical when running from IDEs, CI, or piped environments.
@@ -120,18 +122,157 @@ def print_error(text):
     print(f"[ERROR] {text}", flush=True)
 
 
-def run_command(cmd, description=None, check=True):
-    """Run a command and optionally check for errors"""
+def _nunba_build_log_path(name):
+    """Return the absolute path to a build-category log file under
+    ~/Documents/Nunba/logs/.
+
+    Matches the convention CLAUDE.md calls out ("~/Documents/Nunba/logs"
+    for all user-writable logs) so a single `tail -f` across that
+    directory surfaces both build-time and runtime events.  The dir is
+    created if missing so callers never have to guard for it.
+    """
+    _dir = os.path.join(
+        os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
+    )
+    try:
+        os.makedirs(_dir, exist_ok=True)
+    except Exception:
+        pass
+    return os.path.join(_dir, name)
+
+
+def _tee_subprocess_to_log(cmd, log_path, description=None, timeout_s=None):
+    """Run a subprocess and stream (tee) stdout+stderr in real time to
+    both the console AND `log_path` — so a `tail -f log_path` shows
+    progress live even when the subprocess emits nothing to its own
+    internal log files.
+
+    Returns True on exit-code 0, False on failure / timeout / kill.
+    On timeout the process is hard-killed and a clear marker is written
+    to the log so operators can tell "wedged" from "errored".
+    """
+    if description:
+        print_info(description)
+    _cmd_str = cmd if isinstance(cmd, str) else ' '.join(cmd)
+    print(f"  > {_cmd_str}", flush=True)
+
+    try:
+        _log = open(log_path, 'a', encoding='utf-8', buffering=1)  # line-buffered
+    except OSError:
+        _log = None
+
+    _session_hdr = (
+        f"\n===== build subprocess {datetime.datetime.now().isoformat()} "
+        f"timeout={timeout_s}s =====\n  cmd: {_cmd_str}\n"
+    )
+    if _log:
+        _log.write(_session_hdr)
+        _log.flush()
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+    except Exception as e:
+        _msg = f"[tee] failed to spawn: {e}"
+        if _log:
+            _log.write(_msg + '\n')
+            _log.close()
+        print_error(_msg)
+        return False
+
+    _timed_out = {'hit': False}
+
+    def _killer():
+        try:
+            proc.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            _timed_out['hit'] = True
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    _killer_thread = None
+    if timeout_s:
+        _killer_thread = threading.Thread(target=_killer, daemon=True)
+        _killer_thread.start()
+
+    try:
+        assert proc.stdout is not None
+        for _line in proc.stdout:
+            _line = _line.rstrip('\n')
+            _ts = datetime.datetime.now().strftime('%H:%M:%S')
+            _out = f"[{_ts}] {_line}"
+            print(_out, flush=True)
+            if _log:
+                try:
+                    _log.write(_out + '\n')
+                    _log.flush()
+                except Exception:
+                    pass
+    except Exception as e:
+        print_error(f"[tee] read failed: {e}")
+
+    try:
+        _rc = proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        _timed_out['hit'] = True
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        _rc = -1
+
+    _footer = (
+        f"===== build subprocess exit rc={_rc} timed_out={_timed_out['hit']} "
+        f"@ {datetime.datetime.now().isoformat()} =====\n"
+    )
+    if _log:
+        _log.write(_footer)
+        _log.close()
+
+    if _timed_out['hit']:
+        print_error(
+            f"Subprocess TIMED OUT after {timeout_s}s (killed). "
+            f"Full live log: {log_path}"
+        )
+        return False
+    if _rc != 0:
+        print_warn(
+            f"Subprocess exited rc={_rc}.  Live log: {log_path}"
+        )
+        return False
+    return True
+
+
+def run_command(cmd, description=None, check=True, timeout_s=None):
+    """Run a command and optionally check for errors.
+
+    timeout_s: if set, kill the subprocess after this many seconds and
+    return False instead of blocking forever.  Used by acceptance gates
+    that historically have wedged (e.g. the langchain-fix infinite-loop
+    on some dev machines, 2026-04-19) — the bundle itself is usable but
+    the verify step loops for 80+ min of CPU with no log output.
+    """
     if description:
         print_info(description)
     print(f"  > {cmd if isinstance(cmd, str) else ' '.join(cmd)}", flush=True)
 
     try:
         if isinstance(cmd, str):
-            result = subprocess.run(cmd, shell=True, check=check)
+            result = subprocess.run(cmd, shell=True, check=check, timeout=timeout_s)
         else:
-            result = subprocess.run(cmd, check=check)
+            result = subprocess.run(cmd, check=check, timeout=timeout_s)
         return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        _cmd_str = cmd if isinstance(cmd, str) else ' '.join(cmd)
+        print_error(f"Command TIMED OUT after {timeout_s}s: {_cmd_str}")
+        return False
     except subprocess.CalledProcessError as e:
         print_error(f"Command failed with exit code {e.returncode}")
         return False
@@ -346,7 +487,8 @@ def generate_build_hashes():
 
     Queried at runtime via GET /api/harthash (@HARTHASH magic word).
     """
-    import json, datetime
+    import datetime
+    import json
     scripts_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(scripts_dir)
     repos = {
@@ -548,6 +690,11 @@ def build_react_landing_page():
         return True
 
     print_header("Building React landing-page")
+    # Unconditional `npm run build` — no mtime heuristic, no
+    # "if _stale" guard.  Stale landing-page/build/ has shipped twice
+    # in this session; every build run rebuilds the React bundle so the
+    # installer always reflects HEAD.
+    print_info("React bundle: running `npm run build` unconditionally.")
 
     # Install npm packages
     npm_cmd = 'npm.cmd' if IS_WINDOWS else 'npm'
@@ -567,12 +714,18 @@ def build_react_landing_page():
             print_warn("npm install failed. Using existing landing-page/build.")
             return True
 
-    # Build — increase Node.js heap to prevent OOM on large bundles
+    # Build — increase Node.js heap to prevent OOM on large bundles.
+    # 4GB was insufficient on the current landing-page bundle size
+    # (webpack + tailwind + all lazy-split chunks): saw `FATAL ERROR:
+    # CALL_AND_RETRY_LAST Allocation failed - JavaScript heap out of
+    # memory` at 4096MB on 2026-04-15.  Bumped to 8192MB.  If CI runners
+    # have less than 8GB available, scale via env override.
     env = os.environ.copy()
     env['CI'] = 'false'
     env['ESLINT_NO_DEV_ERRORS'] = 'true'
     env['DISABLE_ESLINT_PLUGIN'] = 'true'  # skip ESLint entirely during build
-    env['NODE_OPTIONS'] = '--max-old-space-size=4096'
+    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', '8192')
+    env['NODE_OPTIONS'] = f'--max-old-space-size={_node_heap_mb}'
 
     result = subprocess.run(
         [npm_cmd, 'run', 'build'],
@@ -677,14 +830,34 @@ def slim_python_embed():
             removed_mb += size
             print_info(f"Removed {pkg}/ ({size:.1f} MB)")
 
-    # Remove .dist-info, tests, __pycache__
+    # Dead-code removal (2026-04-17): the former allowlist-based strip
+    # approach kept biting — transformers' runtime dep graph reaches
+    # filelock, tqdm, regex, and others that the allowlist repeatedly
+    # missed.  Policy now: keep ALL .dist-info (~5 MB total, negligible
+    # vs installer size).  The dist-info branch in the walker below is
+    # a no-op `continue`; the whole set is gone.
+
+    # Remove tests, __pycache__ always; dist-info is kept (not stripped) per
+    # runtime-metadata consumers.
     for root, dirs, files in os.walk(site_packages, topdown=False):
         for d in list(dirs):
             full_path = os.path.join(root, d)
-            if d.endswith('.dist-info') or d in ('tests', 'test', '__pycache__'):
+            if d in ('tests', 'test', '__pycache__'):
                 size = _dir_size_mb(full_path)
                 shutil.rmtree(full_path, ignore_errors=True)
                 removed_mb += size
+            elif d.endswith('.dist-info'):
+                # KEEP ALL dist-info in python-embed.  Total size is ~5MB.
+                # transformers.dependency_versions_check calls
+                # importlib.metadata.version() for tqdm, filelock, regex,
+                # numpy, tokenizers, safetensors, accelerate, packaging,
+                # pyyaml at import time.  ANY missing dist-info crashes
+                # the entire parler_tts import chain.  An earlier
+                # allowlist approach failed repeatedly — tqdm, filelock,
+                # and others kept getting stripped because the set
+                # couldn't keep up with transformers' dep checks.
+                # 5MB of metadata is not worth the ongoing breakage.
+                continue
 
     # Remove Scripts directory (CLI tools not needed at runtime)
     scripts_dir = os.path.join(embed_dir, 'Scripts')
@@ -727,11 +900,17 @@ def slim_python_embed():
     # Tier 2: Remove confirmed-unused large packages.
     # Verified: zero imports in Nunba core or HARTOS core code.
     # Packages like torch, cv2, numpy, faiss, transformers ARE used and kept.
+    # sympy was previously listed here but is LOAD-BEARING: torch 2.10's
+    # torch._dynamo / torch.fx.experimental.symbolic_shapes / torch.utils._sympy
+    # all import sympy at torch import time.  Indic Parler TTS (and every
+    # transformers-backed generator) crashes with `ModuleNotFoundError:
+    # No module named 'sympy'` when it's stripped from python-embed.
+    # It now lives in EMBED_DEPS (deps.py) so the presence gate reinstalls
+    # it on every build; do NOT re-add it to unused_packages.
     unused_packages = [
         # Not imported anywhere in core code (0 references)
         'scipy', 'scipy.libs',           # 137 MB - not imported
         'pandas',                          # 60 MB  - not imported
-        'sympy',                           # 56 MB  - transitive dep only
         'chromadb_rust_bindings',          # 57 MB  - chromadb not used in core
         'sklearn',                         # 41 MB  - not imported
         'kubernetes', 'kubernetes_asyncio',# 34 MB  - server-only, not desktop
@@ -785,20 +964,86 @@ def build_windows(python_exe, app_only=False, installer_only=False):
             except Exception as e:
                 print_warn(f"Failed to remove {item_path}: {e}")
 
-    # Auto-create python-embed if missing (GPU TTS/STT/VLM need it)
+    # Auto-create / refresh python-embed.
+    #
+    # Two invalidation gates — BOTH had to be added (2026-04-16) because
+    # the original "only rebuild if dir missing" check turned every
+    # EMBED_DEPS edit into a silent no-op: the `regex` pin landed in
+    # deps.py (commits 481f25a, 31e480e, 0c6274f) but the stale snapshot
+    # from an earlier build kept being reused, so every Indic Parler
+    # load failed with `ModuleNotFoundError: No module named 'regex'`.
+    #
+    #   Gate A (hash): compare compute_embed_deps_hash() against the
+    #   hash stored in python-embed.hash — mismatch triggers a full
+    #   rebuild.  Any addition / removal / version bump in EMBED_DEPS
+    #   flips the hash.
+    #
+    #   Gate B (presence): even on hash match, verify every package
+    #   has a directory under site-packages and top-up any missing
+    #   ones.  Survives the case where someone slimmed the snapshot
+    #   manually or a prior build's slim step deleted too much.
+    from deps import compute_embed_deps_hash, get_embed_install_list, missing_embed_packages
     embed_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'python-embed')
-    if not os.path.isdir(embed_src) or not os.listdir(embed_src):
-        print_header("Creating python-embed (first time — downloads ~2GB)")
-        rebuild_script = os.path.join('scripts', 'rebuild_python_embed.py')
+    hash_file = embed_src + '.hash'
+    current_hash = compute_embed_deps_hash()
+    stored_hash = None
+    if os.path.isfile(hash_file):
+        try:
+            with open(hash_file, encoding='utf-8') as _hf:
+                stored_hash = _hf.read().strip()
+        except OSError:
+            stored_hash = None
+
+    _needs_full_rebuild = (
+        not os.path.isdir(embed_src)
+        or not os.listdir(embed_src)
+        or stored_hash != current_hash
+    )
+    rebuild_script = os.path.join('scripts', 'rebuild_python_embed.py')
+
+    if _needs_full_rebuild:
+        _reason = ('missing' if not os.path.isdir(embed_src) or not os.listdir(embed_src)
+                    else f'EMBED_DEPS hash changed ({stored_hash} -> {current_hash})')
+        print_header(f"Rebuilding python-embed ({_reason})")
         if os.path.isfile(rebuild_script):
-            if not run_command([python_exe, rebuild_script],
-                               "Building python-embed from scratch..."):
+            if run_command([python_exe, rebuild_script],
+                            "Building python-embed from scratch..."):
+                # Stamp the new hash so subsequent builds skip the rebuild
+                try:
+                    with open(hash_file, 'w', encoding='utf-8') as _hf:
+                        _hf.write(current_hash)
+                    print_info(f"Wrote python-embed.hash = {current_hash}")
+                except OSError as _e:
+                    print_warn(f"Failed to write {hash_file}: {_e}")
+            else:
                 print_warn("python-embed creation failed — TTS/STT/VLM features will be unavailable")
                 print_warn("You can run 'python scripts/rebuild_python_embed.py' manually later")
         else:
             print_warn("rebuild_python_embed.py not found — skipping python-embed")
     else:
-        print_info(f"python-embed exists ({embed_src})")
+        print_info(f"python-embed exists and hash matches ({embed_src}, {current_hash})")
+
+    # Gate B — presence check for each EMBED_DEPS package.  Fires even
+    # when the hash matched, because a slim step or manual edit can
+    # remove a directory without bumping the hash.  Top up just the
+    # missing packages via an incremental pip install — no full rebuild.
+    _embed_sp = os.path.join(embed_src, 'Lib', 'site-packages')
+    if os.path.isdir(_embed_sp):
+        _missing = missing_embed_packages(_embed_sp)
+        if _missing:
+            print_header(f"Topping up {len(_missing)} missing embed package(s): {_missing}")
+            # Resolve pinned specs for just the missing names
+            _all_specs = get_embed_install_list(include_torch=True)
+            _by_name = {spec.split('==', 1)[0].lower(): spec for spec in _all_specs}
+            _missing_specs = [_by_name[n.lower()] for n in _missing if n.lower() in _by_name]
+            if _missing_specs:
+                _embed_py = os.path.join(embed_src, 'python.exe' if sys.platform == 'win32' else 'bin/python')
+                if os.path.isfile(_embed_py):
+                    run_command(
+                        [_embed_py, '-m', 'pip', 'install', *_missing_specs,
+                         '--no-warn-script-location', '--no-deps'],
+                        "Installing missing embed packages",
+                    )
 
     print_header("Building Nunba executable with cx_Freeze")
 
@@ -846,6 +1091,28 @@ def build_windows(python_exe, app_only=False, installer_only=False):
         return False
 
     print_info(f"Build successful: {exe_path}")
+
+    # Record build provenance: write the current git HEAD sha into
+    # build/Nunba/BUILD_INFO.txt so a stale/reused build dir can be
+    # detected (compare stored sha vs `git rev-parse HEAD`).  Without
+    # this, the installer that ships out of build/ cannot be traced
+    # to a specific source commit (see 2026-04-16 session: a Nunba.exe
+    # built 24 minutes before a critical fix shipped and the stale
+    # binary hid the fix for hours).
+    try:
+        import datetime as _bi_dt
+        _head = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            capture_output=True, text=True, check=False,
+        ).stdout.strip() or 'unknown'
+        _bi_path = os.path.join('build', 'Nunba', 'BUILD_INFO.txt')
+        with open(_bi_path, 'w', encoding='utf-8') as _bi:
+            _bi.write(f"BUILD_SHA={_head}\n")
+            _bi.write(f"BUILD_TIME={_bi_dt.datetime.utcnow().isoformat(timespec='seconds')}Z\n")
+            _bi.write(f"BUILD_PLATFORM={sys.platform}\n")
+        print_info(f"Wrote {_bi_path} (sha={_head[:12]})")
+    except Exception as _bi_err:
+        print_warn(f"Could not write BUILD_INFO.txt: {_bi_err}")
 
     # -- Sync HARTOS source into python-embed --
     # The source python-embed/ is a snapshot that may contain stale HARTOS
@@ -920,6 +1187,83 @@ def build_windows(python_exe, app_only=False, installer_only=False):
     else:
         print_info("HARTOS compile script not found — HevolveAI source strip skipped")
 
+    # ── Build-time patch for transformers __init__.py ──────────────────
+    # transformers 5.x uses `import_structure[frozenset({})].update(...)`
+    # which crashes under cx_Freeze because dict-key resolution for
+    # `frozenset({})` doesn't match at frozen-module import time.
+    # Previous approach: rewrite the file at runtime on every boot
+    # (app.py:648) — caused Defender-scan contention, needed a sentinel
+    # to be idempotent.  Proper fix: patch it ONCE during build so the
+    # runtime never touches the file.
+    def _patch_transformers_at_build():
+        """Patch transformers/__init__.py atomically.  A mid-write ENOSPC
+        on `open('w')` + `f.write` leaves the file truncated/zero-byte
+        and bricks every future boot with ImportError.  Mitigation: write
+        to `.tmp` then `os.replace` (atomic on both POSIX and Win32).
+        The original bytes remain in-memory as `_src`; if replace fails
+        we restore from memory before raising."""
+        _bad_line = 'import_structure[frozenset({})].update(_import_structure)'
+        _fixed_line = (
+            'import_structure.setdefault(frozenset({}), {})'
+            '.update(_import_structure)'
+        )
+        _patched_any = False
+        for _sp_candidate in [
+            os.path.join('build', 'Nunba', 'python-embed', 'Lib', 'site-packages'),
+            os.path.join('python-embed', 'Lib', 'site-packages'),
+        ]:
+            _tf_init = os.path.join(_sp_candidate, 'transformers', '__init__.py')
+            if not os.path.isfile(_tf_init):
+                continue
+            try:
+                with open(_tf_init, encoding='utf-8') as _f:
+                    _src = _f.read()
+                if _bad_line not in _src:
+                    continue  # already patched or not the vulnerable line
+                _patched = _src.replace(_bad_line, _fixed_line)
+                _tmp_path = _tf_init + '.nunba-patch.tmp'
+                # Write tmp file with explicit fsync so the bytes hit
+                # disk before os.replace — crash-safety across ENOSPC.
+                try:
+                    with open(_tmp_path, 'w', encoding='utf-8') as _tf:
+                        _tf.write(_patched)
+                        _tf.flush()
+                        try:
+                            os.fsync(_tf.fileno())
+                        except OSError:
+                            pass
+                    os.replace(_tmp_path, _tf_init)
+                    # Log pre/post hashes for build reproducibility
+                    import hashlib as _hl
+                    _pre_h = _hl.sha256(_src.encode('utf-8')).hexdigest()[:12]
+                    _post_h = _hl.sha256(_patched.encode('utf-8')).hexdigest()[:12]
+                    print_info(
+                        f"Patched transformers __init__ at {_tf_init} "
+                        f"(sha256 {_pre_h} -> {_post_h})",
+                    )
+                    _patched_any = True
+                except OSError as _we:
+                    # Write failed — try to clean up the tmp file.  The
+                    # original _tf_init is still untouched (os.replace
+                    # hadn't run yet), so the build remains recoverable.
+                    try:
+                        if os.path.isfile(_tmp_path):
+                            os.remove(_tmp_path)
+                    except OSError:
+                        pass
+                    print_info(
+                        f"Could not atomically patch {_tf_init}: {_we} — "
+                        "original untouched, boot will retry via runtime",
+                    )
+            except OSError as _pe:
+                print_info(f"Could not read {_tf_init}: {_pe}")
+        if not _patched_any:
+            print_info(
+                "transformers __init__ already patched (or not found) — "
+                "no build-time change needed",
+            )
+    _patch_transformers_at_build()
+
     # Slim python-embed (remove pip, setuptools, tests, etc.)
     slim_python_embed()
 
@@ -943,6 +1287,87 @@ def build_windows(python_exe, app_only=False, installer_only=False):
                         _extracted += 1
         if _extracted:
             print_info(f"Extracted {_extracted} missing stdlib .pyc from python312.zip to lib/")
+
+    # ── Acceptance gate — HARD-FAIL by default (2026-04-19 restore) ─
+    # Runs Nunba.exe --acceptance-test to verify Stage-A/Stage-B fixes
+    # survived the freeze.  Three modes:
+    #
+    #   Default (STRICT): runs with 180s timeout; failure/timeout →
+    #            returns False, installer packaging blocked.  This is
+    #            the restored pre-regression behavior — a build that
+    #            can't boot its own verify subprocess is NOT shippable.
+    #            The 240s-cold-boot stall that motivated downgrading
+    #            this to warn-only (see commit 5dec11da) has been
+    #            fixed in the 2026-04-19 deferred-init refactor, so
+    #            strict is safe again.
+    #
+    #   NUNBA_SKIP_ACCEPTANCE=1 or --skip-acceptance: entire block is
+    #            bypassed (INFO log, no subprocess spawn).  Intended for
+    #            rapid local iteration when the tester already knows
+    #            the bundle boots.  `build.bat` prepends this flag by
+    #            default for dev-loop ergonomics.  CI workflows must
+    #            NOT set this — CI's whole job is to catch what local
+    #            devs might skip.
+    #
+    #   NUNBA_WARN_ACCEPTANCE=1 or --warn-acceptance: downgrade failures
+    #            to warnings (the old default).  Use only as a temporary
+    #            escape hatch while debugging a flaky verify step —
+    #            NOT a long-term mode, since it masks real regressions.
+    _skip_acc = (
+        os.environ.get('NUNBA_SKIP_ACCEPTANCE', '').strip().lower()
+        in ('1', 'true', 'yes')
+    )
+    # Strict is now the DEFAULT.  Only flip to warn-only when the
+    # operator explicitly opts in via --warn-acceptance / env.
+    _warn_acc = (
+        os.environ.get('NUNBA_WARN_ACCEPTANCE', '').strip().lower()
+        in ('1', 'true', 'yes')
+    )
+    _strict_acc = not _warn_acc
+    _built_exe = os.path.join('build', 'Nunba', 'Nunba.exe')
+    if _skip_acc:
+        print_info(
+            "Acceptance test SKIPPED (NUNBA_SKIP_ACCEPTANCE set). "
+            "Bundle at build/Nunba/Nunba.exe was NOT verified — do "
+            "not ship without re-running with acceptance enabled."
+        )
+    elif os.path.isfile(_built_exe):
+        print_header("Acceptance test — verifying built bundle (optional)")
+        # Tee the subprocess stdout+stderr LIVE to
+        # ~/Documents/Nunba/logs/build_acceptance.log so the operator
+        # can `tail -f` it and see exactly which check is wedged even
+        # when --acceptance-test itself emits nothing to its own log
+        # (the langchain-fix infinite-loop symptom, 2026-04-19).
+        _acc_log = _nunba_build_log_path('build_acceptance.log')
+        print_info(f"Live log: {_acc_log}   (tail -f to watch progress)")
+        _ac_ok = _tee_subprocess_to_log(
+            [_built_exe, '--acceptance-test'],
+            log_path=_acc_log,
+            description="Running Nunba --acceptance-test (180s timeout)...",
+            timeout_s=180,
+        )
+        if not _ac_ok:
+            if _strict_acc:
+                print_error(
+                    "Acceptance test FAILED (strict mode — the default as "
+                    "of 2026-04-19).  Installer packaging BLOCKED.  See "
+                    f"{_acc_log} for the tee'd subprocess output.  To "
+                    "unblock temporarily (NOT for CI), rerun with "
+                    "--warn-acceptance or set NUNBA_WARN_ACCEPTANCE=1."
+                )
+                return False
+            print_warn(
+                "Acceptance test FAILED or TIMED OUT — continuing "
+                "because NUNBA_WARN_ACCEPTANCE is set.  This masks a "
+                "real boot regression; investigate before shipping."
+            )
+        else:
+            print_info("Acceptance test PASSED")
+    else:
+        print_warn(
+            f"Nunba.exe not found at {_built_exe} — acceptance test skipped. "
+            "cx_Freeze build likely failed earlier."
+        )
 
     if app_only:
         return True
@@ -1457,8 +1882,39 @@ def main():
                         help='Skip configuration wizard')
     parser.add_argument('--sentry-dsn', type=str, metavar='DSN',
                         help='Set Sentry DSN directly (non-interactive)')
+    parser.add_argument('--skip-acceptance', action='store_true',
+                        help='Skip the post-freeze acceptance-test subprocess '
+                        'entirely.  Fastest for local dev iteration; build.bat '
+                        'prepends this by default.  Do NOT use in CI.')
+    parser.add_argument('--strict-acceptance', action='store_true',
+                        help='[DEPRECATED — strict is now the DEFAULT as of '
+                        '2026-04-19.]  Kept for backward compat with existing '
+                        'invocations; has no additional effect.')
+    parser.add_argument('--warn-acceptance', action='store_true',
+                        help='Downgrade acceptance-test failures from HARD-FAIL '
+                        'to WARN.  Temporary escape hatch while diagnosing a '
+                        'flaky verify step; must NOT be used in CI or release '
+                        'builds (it masks boot regressions).')
 
     args = parser.parse_args()
+
+    # Plumb acceptance-gate flags to env vars so build_windows() can
+    # read them without threading kwargs through every build function.
+    # `--strict-acceptance` is deprecated (strict is now the default);
+    # we keep the flag so existing invocations still parse but the
+    # env var it used to set (NUNBA_STRICT_ACCEPTANCE) is no longer
+    # read by build_windows().
+    if args.skip_acceptance:
+        os.environ['NUNBA_SKIP_ACCEPTANCE'] = '1'
+    if args.warn_acceptance:
+        os.environ['NUNBA_WARN_ACCEPTANCE'] = '1'
+    if args.strict_acceptance:
+        # No-op (strict is default) — log a one-line migration hint so
+        # script callers know they can drop the flag.
+        print_info(
+            "--strict-acceptance is now a no-op (strict is the default "
+            "as of 2026-04-19).  Safe to remove from invocations."
+        )
 
     # Change to project directory (build.py lives in scripts/)
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1466,6 +1922,67 @@ def main():
 
     print(f"\nNunba Desktop App Build Script v{VERSION}", flush=True)
     print(f"Platform: {plat.system()} {plat.machine()}\n", flush=True)
+
+    # ── Pre-flight resource check ────────────────────────────────────
+    # A mid-build `pip install hart-backend` with [Errno 28] No space
+    # left on device or `WinError 1455 paging file too small` leaves
+    # python-embed partially populated, site-packages corrupt, and the
+    # installer in a non-reproducible state.  Fail loud *before* we
+    # start, not 20 minutes in after eight wheels downloaded.
+    if args.mode != 'clean':
+        import shutil as _shutil_pf
+        import tempfile as _tf_pf
+        _free_gb_cwd = _shutil_pf.disk_usage(project_dir).free / (1 << 30)
+        _free_gb_tmp = _shutil_pf.disk_usage(_tf_pf.gettempdir()).free / (1 << 30)
+        _MIN_DISK_GB = 2.5  # conservative: torch wheel + python-embed + build/
+        if _free_gb_cwd < _MIN_DISK_GB:
+            sys.exit(
+                f"[PREFLIGHT] Refusing to build: CWD drive has only "
+                f"{_free_gb_cwd:.1f}GB free (need {_MIN_DISK_GB}GB). "
+                f"Clear %TEMP%\\pip-* and ~/.cache/pip then retry.",
+            )
+        if _free_gb_tmp < _MIN_DISK_GB:
+            sys.exit(
+                f"[PREFLIGHT] Refusing to build: %TEMP% drive has only "
+                f"{_free_gb_tmp:.1f}GB free (need {_MIN_DISK_GB}GB). "
+                f"pip uses it for build isolation (pip-build-env-*).",
+            )
+        # RAM check — WinError 1455 paging file too small is a commit-
+        # limit issue, not disk.  Require 8GB available committed.
+        try:
+            import psutil as _psutil_pf
+            _avail_gb = _psutil_pf.virtual_memory().available / (1 << 30)
+            if _avail_gb < 4:
+                print(
+                    f"[PREFLIGHT] Warning: only {_avail_gb:.1f}GB RAM "
+                    f"available; git clone --filter and torch wheel "
+                    f"build may OOM.  Recommend closing apps.",
+                    flush=True,
+                )
+        except ImportError:
+            pass  # psutil not installed — skip soft check
+        # Stale pip-build-env cleanup — prevents cumulative %TEMP% bloat
+        try:
+            import glob as _glob_pf
+            _stale = _glob_pf.glob(
+                os.path.join(_tf_pf.gettempdir(), 'pip-build-env-*'),
+            ) + _glob_pf.glob(
+                os.path.join(_tf_pf.gettempdir(), 'pip-ephem-wheel-cache-*'),
+            )
+            _freed = 0
+            for _d in _stale:
+                try:
+                    _shutil_pf.rmtree(_d, ignore_errors=True)
+                    _freed += 1
+                except Exception:
+                    pass
+            if _freed:
+                print(
+                    f"[PREFLIGHT] Cleared {_freed} stale pip-build-env dirs",
+                    flush=True,
+                )
+        except Exception:
+            pass
 
     # Clean mode
     if args.mode == 'clean':

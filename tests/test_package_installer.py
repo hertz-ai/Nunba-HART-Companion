@@ -117,6 +117,68 @@ class TestGetEmbedSitePackages:
             assert pi.get_embed_site_packages() is None
 
 
+# ========================== _canonical_import_name ========================
+
+class TestCanonicalImportName:
+    """J67 regression guard — every pip requirement spec must resolve
+    to the BARE importable module name before it reaches
+    `importlib.util.find_spec`.  `find_spec` raises
+    ModuleNotFoundError on strings containing '==', '>=', etc.
+    """
+
+    def test_strips_gte_version(self):
+        assert pi._canonical_import_name('huggingface_hub>=0') == 'huggingface_hub'
+
+    def test_strips_gte_with_upper_bound(self):
+        assert pi._canonical_import_name(
+            'huggingface_hub>=0.27.0,<0.29.0'
+        ) == 'huggingface_hub'
+
+    def test_strips_lt_version(self):
+        assert pi._canonical_import_name('numpy<2.0.0') == 'numpy'
+
+    def test_strips_eq_version(self):
+        assert pi._canonical_import_name('torch==2.4.1') == 'torch'
+
+    def test_strips_ne_version(self):
+        assert pi._canonical_import_name('foo!=1.2.3') == 'foo'
+
+    def test_strips_compat_spec(self):
+        assert pi._canonical_import_name('bar~=1.0') == 'bar'
+
+    def test_applies_pip_to_import_alias(self):
+        # chatterbox-tts (pip) → chatterbox (import)
+        assert pi._canonical_import_name('chatterbox-tts') == 'chatterbox'
+
+    def test_applies_alias_with_version(self):
+        assert pi._canonical_import_name('parler-tts==0.2.2') == 'parler_tts'
+
+    def test_dash_to_underscore_fallback(self):
+        # piper-tts has no alias → dash→underscore fallback
+        assert pi._canonical_import_name('piper-tts') == 'piper_tts'
+
+    def test_bare_name_passes_through(self):
+        assert pi._canonical_import_name('torchaudio') == 'torchaudio'
+
+    def test_no_pip_operator_ever_returned(self):
+        # Belt-and-suspenders: whatever we throw at this helper, the
+        # return value must be a valid Python identifier-ish string —
+        # never contains pip version operators.
+        samples = [
+            'huggingface_hub>=0',
+            'numpy<2.0.0',
+            'torch==2.4.1',
+            'piper-tts',
+            'chatterbox-tts>=1.0.0',
+            'foo!=1.2.3',
+            'bar~=1.0',
+        ]
+        for s in samples:
+            out = pi._canonical_import_name(s)
+            for op in ('==', '>=', '<=', '!=', '>', '<', '~'):
+                assert op not in out, f'{s!r} → {out!r} leaked {op!r}'
+
+
 # ========================== is_package_installed ==========================
 
 class TestIsPackageInstalled:
@@ -143,14 +205,26 @@ class TestIsCudaTorch:
             assert pi.is_cuda_torch() is True
 
     def test_cuda_not_available(self):
+        # is_cuda_torch checks a torch/version.py file on disk FIRST before
+        # falling back to `import torch`. Mock os.path.isfile to force the
+        # file-check branch to miss so we actually exercise the import
+        # fallback. On CI the file does not exist, but on dev machines
+        # with real ~/.nunba/site-packages/torch/version.py containing
+        # '+cu', this test would otherwise return True regardless of the
+        # torch module mock.
         fake_torch = types.ModuleType('torch')
         fake_torch.cuda = MagicMock()
         fake_torch.cuda.is_available.return_value = False
-        with patch.dict(sys.modules, {'torch': fake_torch}):
+        with patch('os.path.isfile', return_value=False), \
+             patch.dict(sys.modules, {'torch': fake_torch}):
             assert pi.is_cuda_torch() is False
 
     def test_torch_not_installed(self):
-        with patch.dict(sys.modules, {'torch': None}):
+        # Same file-check caveat as test_cuda_not_available — force the
+        # on-disk version.py probe to miss, then the import-torch fallback
+        # raises ImportError which returns False.
+        with patch('os.path.isfile', return_value=False), \
+             patch.dict(sys.modules, {'torch': None}):
             # importing torch when it's None in sys.modules raises ImportError
             assert pi.is_cuda_torch() is False
 
@@ -257,21 +331,92 @@ class TestEnsureUserSiteOnPath:
 
 
 # ========================== _run_pip ======================================
+#
+# _run_pip was refactored from subprocess.run() to subprocess.Popen() +
+# streaming drain thread so pip output could be surfaced line-by-line to
+# the UI (stall detection, heartbeat progress, etc.).  The original
+# patches on subprocess.run silently no-op'd and the tests started
+# executing the real binary, which of course fails with
+# "[Errno 2] No such file or directory: '/fake/python.exe'".  The
+# fixture + _FakePopen below restore proper isolation while preserving
+# every assertion the original tests made.
+
+class _FakePopen:
+    """Minimal Popen stand-in covering the exact surface _run_pip uses:
+    stdout iteration in the drain thread, poll() to exit the wait loop,
+    wait(), kill().  Returncode is seeded by the test; stdout yields the
+    provided lines then EOF.
+    """
+
+    def __init__(self, stdout_lines=None, returncode=0, wait_exc=None):
+        self._lines = list(stdout_lines or ['ok'])
+        self._rc = returncode
+        self._wait_exc = wait_exc
+        # Use a stream-like wrapper so the drain thread's iteration +
+        # potential .close() call both work without AttributeError.
+        self.stdout = _FakePopen._Stdout(self._lines)
+        self._polls = 0
+
+    def poll(self):
+        # Let the drain thread deliver all lines before we signal exit.
+        self._polls += 1
+        if self._polls >= 3:
+            return self._rc
+        return None
+
+    def wait(self, timeout=None):
+        if self._wait_exc is not None:
+            raise self._wait_exc
+        return self._rc
+
+    def kill(self):
+        return None
+
+    @property
+    def returncode(self):
+        return self._rc
+
+    # list_iterator has no close(); the drain thread calls stdout.close()
+    # in some code paths — give it a no-op to silence the warning and
+    # avoid the AttributeError spam in pytest output.
+    class _Stdout:
+        def __init__(self, lines):
+            self._iter = iter(lines)
+        def __iter__(self):
+            return self._iter
+        def __next__(self):
+            return next(self._iter)
+        def close(self):
+            return None
+        def read(self):
+            return ''
+
 
 class TestRunPip:
 
-    def _make_run_result(self, returncode=0, stdout='ok', stderr=''):
-        return subprocess.CompletedProcess(
-            args=[], returncode=returncode, stdout=stdout, stderr=stderr)
+    @staticmethod
+    def _common_patches(popen_return=None, popen_side_effect=None):
+        """Return the context-manager stack every _run_pip test needs."""
+        return [
+            patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'),
+            patch.object(pi, 'get_user_site_packages', return_value='/user/sp'),
+            patch.object(pi, 'ensure_user_site_on_path'),
+            patch('subprocess.Popen',
+                  **({'return_value': popen_return} if popen_return is not None
+                     else {'side_effect': popen_side_effect})),
+        ]
+
+    def _run_with(self, popen, call_args=('install', 'pkg'), **kwargs):
+        """Apply the common patches + return (ok, msg)."""
+        import contextlib
+        with contextlib.ExitStack() as stack:
+            for p in self._common_patches(popen_return=popen):
+                stack.enter_context(p)
+            return pi._run_pip(list(call_args), **kwargs)
 
     def test_success(self):
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/fake/sp'), \
-             patch('subprocess.run', return_value=self._make_run_result()), \
-             patch.object(pi, 'ensure_user_site_on_path'):
-            ok, msg = pi._run_pip(['install', 'some-pkg'])
-            assert ok is True
-            assert msg == 'ok'
+        ok, msg = self._run_with(_FakePopen(['installed ok'], returncode=0))
+        assert ok is True
 
     def test_no_python_embed(self):
         with patch.object(pi, 'get_embed_python', return_value=None):
@@ -280,75 +425,116 @@ class TestRunPip:
             assert 'python-embed not found' in msg
 
     def test_pip_failure(self):
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/fake/sp'), \
-             patch('subprocess.run', return_value=self._make_run_result(
-                 returncode=1, stderr='error msg')):
-            ok, msg = pi._run_pip(['install', 'bad-pkg'])
-            assert ok is False
-            assert 'error msg' in msg
+        ok, msg = self._run_with(_FakePopen(['error msg'], returncode=1))
+        assert ok is False
+        assert 'error msg' in msg
 
     def test_timeout(self):
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/fake/sp'), \
-             patch('subprocess.run', side_effect=subprocess.TimeoutExpired('cmd', 600)):
-            ok, msg = pi._run_pip(['install', 'pkg'], timeout=600)
-            assert ok is False
-            assert 'timed out' in msg
+        # Sim a wall-clock timeout by forcing poll() to never return and
+        # the subprocess.Popen to have a 0 timeout budget — we assert
+        # _run_pip returns with 'timed out' in the message.
+        import contextlib
+        class _ForeverPopen(_FakePopen):
+            def poll(self):
+                return None
+            def wait(self, timeout=None):
+                raise subprocess.TimeoutExpired('cmd', timeout or 0)
+
+        with contextlib.ExitStack() as stack:
+            for p in self._common_patches(popen_return=_ForeverPopen()):
+                stack.enter_context(p)
+            ok, msg = pi._run_pip(['install', 'pkg'], timeout=0, stall_timeout=0)
+        assert ok is False
+        assert 'timed out' in msg or 'stalled' in msg
 
     def test_exception(self):
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/fake/sp'), \
-             patch('subprocess.run', side_effect=OSError('boom')):
+        import contextlib
+        with contextlib.ExitStack() as stack:
+            for p in self._common_patches(popen_side_effect=OSError('boom')):
+                stack.enter_context(p)
             ok, msg = pi._run_pip(['install', 'pkg'])
-            assert ok is False
-            assert 'boom' in msg
+        assert ok is False
+        assert 'boom' in msg
 
     def test_install_adds_target_flag(self):
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/user/sp'), \
-             patch('subprocess.run', return_value=self._make_run_result()) as mock_run, \
-             patch.object(pi, 'ensure_user_site_on_path'):
+        import contextlib
+        fake = _FakePopen(['ok'], returncode=0)
+        with contextlib.ExitStack() as stack:
+            popen_patch = patch('subprocess.Popen', return_value=fake)
+            stack.enter_context(patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'))
+            stack.enter_context(patch.object(pi, 'get_user_site_packages', return_value='/user/sp'))
+            stack.enter_context(patch.object(pi, 'ensure_user_site_on_path'))
+            mock_popen = stack.enter_context(popen_patch)
             pi._run_pip(['install', 'pkg'])
-            cmd = mock_run.call_args[0][0]
+            cmd = mock_popen.call_args[0][0]
             assert '--target' in cmd
             assert '/user/sp' in cmd
 
     def test_non_install_no_target(self):
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/user/sp'), \
-             patch('subprocess.run', return_value=self._make_run_result()) as mock_run, \
-             patch.object(pi, 'ensure_user_site_on_path'):
+        import contextlib
+        fake = _FakePopen(['ok'], returncode=0)
+        with contextlib.ExitStack() as stack:
+            popen_patch = patch('subprocess.Popen', return_value=fake)
+            stack.enter_context(patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'))
+            stack.enter_context(patch.object(pi, 'get_user_site_packages', return_value='/user/sp'))
+            stack.enter_context(patch.object(pi, 'ensure_user_site_on_path'))
+            mock_popen = stack.enter_context(popen_patch)
             pi._run_pip(['uninstall', '-y', 'pkg'])
-            cmd = mock_run.call_args[0][0]
+            cmd = mock_popen.call_args[0][0]
             assert '--target' not in cmd
 
     def test_progress_callback_called(self):
         cb = MagicMock()
-        with patch.object(pi, 'get_embed_python', return_value='/fake/python.exe'), \
-             patch.object(pi, 'get_user_site_packages', return_value='/fake/sp'), \
-             patch('subprocess.run', return_value=self._make_run_result()), \
-             patch.object(pi, 'ensure_user_site_on_path'):
-            pi._run_pip(['install', 'pkg'], progress_cb=cb)
-            cb.assert_called_once()
+        self._run_with(_FakePopen(['ok'], returncode=0), progress_cb=cb)
+        cb.assert_called()
 
 
-# ========================== install_cuda_torch ============================
+# ========================== install_gpu_torch =============================
+# Renamed from install_cuda_torch when ROCm + Metal variants landed —
+# the function name dropped the CUDA-specific prefix, but this test
+# class name keeps TestInstallCudaTorch as a historical anchor for
+# grep searches.  The *function calls* inside all use install_gpu_torch.
 
 class TestInstallCudaTorch:
 
+    # install_gpu_torch now prefers vram_manager.detect_gpu() over
+    # has_nvidia_gpu() and acquires a file lock at the top — both must
+    # be mocked.  Tests previously only patched has_nvidia_gpu which was
+    # the SECONDARY path; stubbing vram_manager properly + neutralising
+    # the lock keeps them hermetic.
+
+    @staticmethod
+    def _mock_gpu_detect(vendor='nvidia'):
+        """Return a MagicMock vram_manager whose detect_gpu reports the
+        requested vendor. ``vendor`` ∈ {'nvidia','amd',None}."""
+        fake = MagicMock()
+        if vendor == 'nvidia':
+            fake.detect_gpu.return_value = {'cuda_available': True, 'name': 'Fake NVIDIA'}
+        elif vendor == 'amd':
+            fake.detect_gpu.return_value = {'cuda_available': False, 'name': 'AMD Radeon'}
+        else:
+            fake.detect_gpu.return_value = {'cuda_available': False, 'name': ''}
+        return fake
+
     def test_no_nvidia_gpu(self):
-        with patch.object(pi, 'has_nvidia_gpu', return_value=False):
-            ok, msg = pi.install_cuda_torch()
+        vm_mod = types.ModuleType('integrations.service_tools.vram_manager')
+        vm_mod.vram_manager = self._mock_gpu_detect(vendor=None)
+        with patch.object(pi, '_acquire_file_lock', return_value=True), \
+             patch.dict(sys.modules, {'integrations.service_tools.vram_manager': vm_mod}), \
+             patch.object(pi, 'has_nvidia_gpu', return_value=False):
+            ok, msg = pi.install_gpu_torch()
             assert ok is False
-            assert 'No NVIDIA GPU' in msg
+            assert 'No GPU detected' in msg
 
     def test_already_cuda(self):
-        with patch.object(pi, 'has_nvidia_gpu', return_value=True), \
+        vm_mod = types.ModuleType('integrations.service_tools.vram_manager')
+        vm_mod.vram_manager = self._mock_gpu_detect(vendor='nvidia')
+        with patch.object(pi, '_acquire_file_lock', return_value=True), \
+             patch.dict(sys.modules, {'integrations.service_tools.vram_manager': vm_mod}), \
              patch.object(pi, 'get_torch_variant', return_value='cu124'):
-            ok, msg = pi.install_cuda_torch()
+            ok, msg = pi.install_gpu_torch()
             assert ok is True
-            assert 'already has CUDA' in msg
+            assert 'already has GPU' in msg or 'already has CUDA' in msg
 
     def test_successful_swap(self):
         fake_torch = types.ModuleType('torch')
@@ -356,22 +542,30 @@ class TestInstallCudaTorch:
         fake_torch.cuda = MagicMock()
         fake_torch.cuda.is_available.return_value = True
         fake_torch.cuda.get_device_name.return_value = 'RTX 3090'
+        vm_mod = types.ModuleType('integrations.service_tools.vram_manager')
+        vm_mod.vram_manager = self._mock_gpu_detect(vendor='nvidia')
 
-        with patch.object(pi, 'has_nvidia_gpu', return_value=True), \
+        with patch.object(pi, '_acquire_file_lock', return_value=True), \
+             patch.dict(sys.modules, {
+                 'integrations.service_tools.vram_manager': vm_mod,
+                 'torch': fake_torch,
+             }), \
              patch.object(pi, 'get_torch_variant', return_value='cpu'), \
              patch.object(pi, '_run_pip', return_value=(True, 'ok')), \
-             patch.object(pi, '_invalidate_import_cache'), \
-             patch.dict(sys.modules, {'torch': fake_torch}):
+             patch.object(pi, '_invalidate_import_cache', create=True):
             cb = MagicMock()
-            ok, msg = pi.install_cuda_torch(progress_cb=cb)
+            ok, msg = pi.install_gpu_torch(progress_cb=cb)
             assert ok is True
             assert cb.call_count >= 1
 
     def test_pip_failure(self):
-        with patch.object(pi, 'has_nvidia_gpu', return_value=True), \
+        vm_mod = types.ModuleType('integrations.service_tools.vram_manager')
+        vm_mod.vram_manager = self._mock_gpu_detect(vendor='nvidia')
+        with patch.object(pi, '_acquire_file_lock', return_value=True), \
+             patch.dict(sys.modules, {'integrations.service_tools.vram_manager': vm_mod}), \
              patch.object(pi, 'get_torch_variant', return_value='cpu'), \
              patch.object(pi, '_run_pip', return_value=(False, 'network error')):
-            ok, msg = pi.install_cuda_torch()
+            ok, msg = pi.install_gpu_torch()
             assert ok is False
 
 
@@ -390,7 +584,13 @@ class TestInstallBackendPackages:
         assert 'No packages needed' in msg
 
     def test_all_already_installed(self):
-        with patch.object(pi, 'is_package_installed', return_value=True):
+        # Also stub is_cuda_torch=True so the GPU-backend CUDA-torch
+        # gate (added 2026-04-16) doesn't try to install CUDA torch
+        # on top of "all packages already installed".  Without this
+        # stub, the test would only pass on a machine that genuinely
+        # has CUDA torch installed.
+        with patch.object(pi, 'is_package_installed', return_value=True), \
+             patch.object(pi, 'is_cuda_torch', return_value=True):
             ok, msg = pi.install_backend_packages('f5')
             assert ok is True
             assert 'already installed' in msg
@@ -719,8 +919,14 @@ class TestGetRecommendedBackends:
 class TestConstants:
 
     def test_backend_packages_keys(self):
+        # Kokoro (82M CPU/GPU TTS), luxtts (frozen-HARTOS compat), and
+        # pocket_tts (promoted from Piper alias to first-class backend)
+        # were added after this test was authored.  Keep the full current
+        # set here so the assertion stays meaningful — a new backend
+        # failing to register a package list should still trip this.
         expected = {'chatterbox_turbo', 'chatterbox_multilingual',
-                    'indic_parler', 'cosyvoice3', 'f5', 'piper'}
+                    'indic_parler', 'cosyvoice3', 'f5', 'piper',
+                    'kokoro', 'luxtts', 'pocket_tts'}
         assert set(pi.BACKEND_PACKAGES.keys()) == expected
 
     def test_display_names_match_backends(self):

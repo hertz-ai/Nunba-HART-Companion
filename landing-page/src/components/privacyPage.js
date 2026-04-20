@@ -1,40 +1,45 @@
-import React, {Component} from 'react';
-import {Link} from 'react-router-dom';
+import Footer from '../pages/Layouts/footer';
+import HeaderNano from '../pages/Layouts/header';
+import HeaderMulti from '../pages/Layouts/header-multi';
+import AboutUs from '../pages/SubPages/Multipurpose/about-us';
+import Client from '../pages/SubPages/Multipurpose/client';
+import Contact from '../pages/SubPages/Multipurpose/contact';
+import Cta from '../pages/SubPages/Multipurpose/cta';
+import DiscoverPotential from '../pages/SubPages/Multipurpose/discoverPotential';
+import Features from '../pages/SubPages/Multipurpose/features';
+import Security from '../pages/SubPages/Multipurpose/Security';
+import Services from '../pages/SubPages/Multipurpose/services';
+import Team from '../pages/SubPages/Multipurpose/team';
+import Testimonial from '../pages/SubPages/Multipurpose/testimonial';
 
+import React, {Component} from 'react';
+import ModalVideo from 'react-modal-video';
+import {Link} from 'react-router-dom';
 import {ScrollTo} from 'react-scroll-to';
 import styled from 'styled-components';
 // Layouts
-import HeaderMulti from '../pages/Layouts/header-multi';
-import HeaderNano from '../pages/Layouts/header';
-import Footer from '../pages/Layouts/footer';
 
 // Shared
-import AboutUs from '../pages/SubPages/Multipurpose/about-us';
-import Features from '../pages/SubPages/Multipurpose/features';
-import Services from '../pages/SubPages/Multipurpose/services';
-import Cta from '../pages/SubPages/Multipurpose/cta';
-import Testimonial from '../pages/SubPages/Multipurpose/testimonial';
-import Team from '../pages/SubPages/Multipurpose/team';
-import Client from '../pages/SubPages/Multipurpose/client';
-import Contact from '../pages/SubPages/Multipurpose/contact';
 // import DemoVideo from '../pages/SubPages/Multipurpose/demoVideo';
-import DiscoverPotential from '../pages/SubPages/Multipurpose/discoverPotential';
-import Security from '../pages/SubPages/Multipurpose/Security';
+
 // Modal Video
-import ModalVideo from 'react-modal-video';
 import '../../node_modules/react-modal-video/scss/modal-video.scss';
 import '../css/pe-icon-7.css';
 import '../css/style.css';
 import '../css/style.css.map';
 import '../_helper.scss';
 // import '../css/bootstrap.min.css';
-//import '../css/materialdesignicons.min.css';
+// import '../css/materialdesignicons.min.css';
 // import M from 'materialize-css';
 import {stackOffsetNone} from 'd3';
+
 import DemoVideo from './demoVideo';
 import HevolveDemo from './hevolveDemo';
+
 import Typography from '@mui/material/Typography';
+
 import Spacer from './Spacer';
+
 import MetaTags from 'react-meta-tags';
 
 class PrivacyPage extends Component {
@@ -51,7 +56,7 @@ class PrivacyPage extends Component {
   }
 
   render() {
-    let body = this.showPage();
+    const body = this.showPage();
 
     return (
       <React.Fragment>

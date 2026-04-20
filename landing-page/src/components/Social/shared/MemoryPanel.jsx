@@ -1,4 +1,9 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {RADIUS, SHADOWS} from '../../../theme/socialTokens';
+
+import CloseIcon from '@mui/icons-material/Close';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
   Typography,
@@ -9,11 +14,8 @@ import {
   Drawer,
   CircularProgress,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import CloseIcon from '@mui/icons-material/Close';
-import {RADIUS, SHADOWS} from '../../../theme/socialTokens';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
+
 
 const PANEL_WIDTH = 360;
 

@@ -20,7 +20,25 @@
  *  - ageGroup        '4-6' | '6-8' | '8-10'
  */
 
-import React, {useMemo, useState, useEffect} from 'react';
+import {useReducedMotion} from '../../../../hooks/useAnimations';
+import {
+  kidsColors,
+  kidsShadows,
+  kidsRadius,
+  kidsAnimations,
+  kidsMixins,
+  CATEGORY_MAP,
+} from '../kidsTheme';
+
+import AddIcon from '@mui/icons-material/Add';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import HistoryIcon from '@mui/icons-material/History';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Box,
   Typography,
@@ -32,25 +50,8 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import AddIcon from '@mui/icons-material/Add';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import HistoryIcon from '@mui/icons-material/History';
+import React, {useMemo, useState, useEffect} from 'react';
 
-import {
-  kidsColors,
-  kidsShadows,
-  kidsRadius,
-  kidsAnimations,
-  kidsMixins,
-  CATEGORY_MAP,
-} from '../kidsTheme';
-import {useReducedMotion} from '../../../../hooks/useAnimations';
 
 // ─── CSS Keyframes (injected once) ───────────────────────────────────────────
 

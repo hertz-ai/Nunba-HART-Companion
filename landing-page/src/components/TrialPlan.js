@@ -1,11 +1,12 @@
-import React, {useState, useEffect} from 'react';
-import {v4 as uuidv4} from 'uuid';
 import {mailerApi} from '../services/socialApi';
-import {useNavigate, useLocation} from 'react-router-dom';
+
+import React, {useState, useEffect} from 'react';
 import ReactGA from 'react-ga';
-import {FiCheckCircle} from 'react-icons/fi';
 import {AiOutlineClose} from 'react-icons/ai';
+import {FiCheckCircle} from 'react-icons/fi';
+import {useNavigate, useLocation} from 'react-router-dom';
 import {Swiper as SwiperComponent, SwiperSlide} from 'swiper/react';
+import {v4 as uuidv4} from 'uuid';
 import 'swiper/css';
 
 export default function TrialPlan() {
@@ -76,13 +77,13 @@ export default function TrialPlan() {
     setTransactionId(transactionid);
     if (hevolvedroid) {
       try {
-        var userDetails = window.Handy.getUserDetails();
+        const userDetails = window.Handy.getUserDetails();
         const userJson = JSON.parse(userDetails);
         DataForPricePage = userJson;
       } catch (error) {
         console.error('Error fetching user details:', error);
       }
-      var myVariable = {
+      const myVariable = {
         TRANSACTION_ID: transactionId,
       };
       const jsTransaction = JSON.stringify(myVariable);

@@ -1,10 +1,12 @@
-import React from 'react';
-import {render, screen, act} from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import {
   ToastProvider,
   useToast,
 } from '../../../components/shared/ToastProvider';
+
+import {render, screen, act} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import React from 'react';
+
 
 // Helper component that exposes showToast for testing
 function ToastTrigger({

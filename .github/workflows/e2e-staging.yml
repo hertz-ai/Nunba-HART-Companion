@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+# e2e-staging.yml -- full-stack live HTTP probe job
+# ---------------------------------------------------------------------------
+# Spins up docker-compose.staging.yml (Flask + llama.cpp + crossbar), waits
+# for healthy, runs scripts/staging_e2e_probe.sh against real endpoints, and
+# uploads docker logs on failure.
+#
+# Catches the class of regression unit tests can't -- cross-process auth,
+# bearer token flow, HF supply-chain gate, thread-dump endpoint, WAMP wire.
+# ---------------------------------------------------------------------------
+name: e2e-staging
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"    # nightly 06:00 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: e2e-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq + curl (probe deps)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq curl
+
+      - name: Docker compose version
+        run: docker compose version
+
+      - name: Start staging stack
+        run: |
+          docker compose -f docker-compose.staging.yml up -d --pull always
+          echo "Stack launched. PID table:"
+          docker compose -f docker-compose.staging.yml ps
+
+      - name: Wait for nunba healthy (max 8 min)
+        run: |
+          for i in $(seq 1 48); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' nunba-staging-app 2>/dev/null || echo starting)
+            echo "  [$i/48] nunba: $status"
+            if [ "$status" = "healthy" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::nunba never reached healthy state"
+          exit 1
+
+      - name: Run live HTTP probes
+        env:
+          NUNBA_BASE: http://localhost:5000
+          NUNBA_MCP_BEARER: staging-e2e-token-do-not-use-in-prod
+        run: |
+          chmod +x scripts/staging_e2e_probe.sh
+          ./scripts/staging_e2e_probe.sh
+
+      - name: Capture logs on failure
+        if: failure()
+        run: |
+          mkdir -p _logs
+          docker compose -f docker-compose.staging.yml logs --no-color --timestamps > _logs/compose.log 2>&1 || true
+          docker inspect nunba-staging-app   > _logs/nunba.inspect.json   2>&1 || true
+          docker inspect nunba-staging-llama > _logs/llama.inspect.json   2>&1 || true
+          docker inspect nunba-staging-crossbar > _logs/crossbar.inspect.json 2>&1 || true
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-staging-logs-${{ github.run_id }}
+          path: _logs/
+          retention-days: 14
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v --remove-orphans

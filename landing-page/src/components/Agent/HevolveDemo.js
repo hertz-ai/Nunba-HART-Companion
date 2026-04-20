@@ -1,14 +1,17 @@
-import React, {useEffect, useState} from 'react';
-import {Link, useLocation} from 'react-router-dom';
-import Container from '@mui/material/Container';
-import ModalVideo from 'react-modal-video';
-import {Modal, ModalHeader, ModalBody} from 'reactstrap';
-import Snackbar from '@mui/material/Snackbar';
 import {SnackbarContent} from '@mui/material';
+import Container from '@mui/material/Container';
+import Snackbar from '@mui/material/Snackbar';
+import React, {useEffect, useState} from 'react';
+import ModalVideo from 'react-modal-video';
+import {Link, useLocation} from 'react-router-dom';
+import {Modal, ModalHeader, ModalBody} from 'reactstrap';
+
 import './font-awesome.min.css';
 import './hevolvestyle.css';
 import {CHATBOT_API_URL} from '../../config/apiBase';
+
 import {v4 as uuidv4} from 'uuid';
+
 import {logger} from '../../utils/logger';
 
 const HevolveDemo = () => {
@@ -65,7 +68,7 @@ const HevolveDemo = () => {
         logger.log(dataJson);
         setAssessment(dataJson.assessment);
         setQuestionNo(dataJson.question_no);
-        let botReply = dataJson['text'];
+        const botReply = dataJson['text'];
         botResponse(botReply);
       })
       .catch((err) => {

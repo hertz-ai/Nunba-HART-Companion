@@ -6,31 +6,35 @@
  * Polling at 5s, WAMP fallback when available.
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import AgentInterviewPanel from './AgentInterviewPanel';
+import SwarmCanvas from './SwarmCanvas';
+import VariableInjectionDialog from './VariableInjectionDialog';
+
+import { trackerApi, dashboardApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS, EASINGS, DURATIONS, SHADOWS } from '../../../theme/socialTokens';
+
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import BubbleChartIcon from '@mui/icons-material/BubbleChart';
+import ChatIcon from '@mui/icons-material/Chat';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import GridViewIcon from '@mui/icons-material/GridView';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ScienceIcon from '@mui/icons-material/Science';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import TuneIcon from '@mui/icons-material/Tune';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Box, Typography, Paper, Chip, IconButton, Button, Tooltip, Divider,
   Avatar, Skeleton, useTheme, useMediaQuery, Grid, Menu, MenuItem,
   ListItemIcon, ListItemText, Snackbar, Alert, CircularProgress, keyframes,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import GridViewIcon from '@mui/icons-material/GridView';
-import BubbleChartIcon from '@mui/icons-material/BubbleChart';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import ScienceIcon from '@mui/icons-material/Science';
-import TuneIcon from '@mui/icons-material/Tune';
-import ChatIcon from '@mui/icons-material/Chat';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import { trackerApi, dashboardApi } from '../../../services/socialApi';
-import { socialTokens, RADIUS, EASINGS, DURATIONS, SHADOWS } from '../../../theme/socialTokens';
-import SwarmCanvas from './SwarmCanvas';
-import VariableInjectionDialog from './VariableInjectionDialog';
-import AgentInterviewPanel from './AgentInterviewPanel';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+
 
 // ---- Keyframes ----
 

@@ -15,13 +15,14 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React from 'react';
 import {logger} from '../../../../utils/logger';
+import {kidsColors} from '../kidsTheme';
 import CanvasGameBridge from '../shared/CanvasGameBridge';
 import ParticlePool from '../shared/CanvasParticles';
 import {drawCircle, drawText, drawRoundedRect} from '../shared/CanvasSprites';
 import {GameSounds, GameCommentary} from '../shared/SoundManager';
-import {kidsColors} from '../kidsTheme';
+
+import React from 'react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -1188,7 +1189,7 @@ class LetterTraceGame {
     const dotR = 5;
     const gap = 14;
     const totalWidth = this.total * (dotR * 2) + (this.total - 1) * gap;
-    let startX = (this.w - totalWidth) / 2 + dotR;
+    const startX = (this.w - totalWidth) / 2 + dotR;
     const y = this.h - 14;
 
     for (let i = 0; i < this.total; i++) {

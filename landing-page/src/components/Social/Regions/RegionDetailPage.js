@@ -1,5 +1,15 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
+import CreateProposalDialog from './CreateProposalDialog';
+
+import {useSocial} from '../../../contexts/SocialContext';
+import {regionsApi} from '../../../services/socialApi';
+import ProposalCard from '../shared/ProposalCard';
+import RegionBadge from '../shared/RegionBadge';
+
+import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import GavelIcon from '@mui/icons-material/Gavel';
+import PeopleIcon from '@mui/icons-material/People';
+import PublicIcon from '@mui/icons-material/Public';
 import {
   Typography,
   Box,
@@ -20,16 +30,10 @@ import {
   Grid,
   Fade,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import PeopleIcon from '@mui/icons-material/People';
-import PublicIcon from '@mui/icons-material/Public';
-import GavelIcon from '@mui/icons-material/Gavel';
-import AddIcon from '@mui/icons-material/Add';
-import {regionsApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import RegionBadge from '../shared/RegionBadge';
-import ProposalCard from '../shared/ProposalCard';
-import CreateProposalDialog from './CreateProposalDialog';
+import React, {useState, useEffect, useCallback} from 'react';
+import {useParams, useNavigate} from 'react-router-dom';
+
+
 
 export default function RegionDetailPage() {
   const {regionId} = useParams();

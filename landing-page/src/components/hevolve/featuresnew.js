@@ -1,9 +1,11 @@
-import React from 'react';
 import Imageposter from '../../assets/images/AgentPoster.png';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {faArrowRight} from '@fortawesome/free-solid-svg-icons';
-import {useNavigate} from 'react-router-dom';
 import {logger} from '../../utils/logger';
+
+import {faArrowRight} from '@fortawesome/free-solid-svg-icons';
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import React from 'react';
+import {useNavigate} from 'react-router-dom';
+
 
 export default function Features({classlist}) {
   const navigate = useNavigate();

@@ -1,4 +1,6 @@
-import React, {useState, useEffect} from 'react';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PeopleIcon from '@mui/icons-material/People';
 import {
   Card,
   CardActionArea,
@@ -12,9 +14,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import PeopleIcon from '@mui/icons-material/People';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import React, {useState, useEffect} from 'react';
 
 const TYPE_COLORS = {
   daily: 'info',

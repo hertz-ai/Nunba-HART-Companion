@@ -1,19 +1,21 @@
-import React, {useState, useRef, useCallback, useEffect} from 'react';
-import {Box, Typography, IconButton, Slider, Fade} from '@mui/material';
-import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
-import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
-import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
-import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
-import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
-import VideocamOffIcon from '@mui/icons-material/VideocamOff';
+import MediaLoadingIndicator from './MediaLoadingIndicator';
+
+import {useReducedMotion} from '../../../../hooks/useAnimations';
 import {
   kidsColors,
   kidsRadius,
   kidsShadows,
   kidsTransitions,
 } from '../data/kidsTheme';
-import MediaLoadingIndicator from './MediaLoadingIndicator';
-import {useReducedMotion} from '../../../../hooks/useAnimations';
+
+import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
+import VideocamOffIcon from '@mui/icons-material/VideocamOff';
+import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
+import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
+import {Box, Typography, IconButton, Slider, Fade} from '@mui/material';
+import React, {useState, useRef, useCallback, useEffect} from 'react';
 
 /**
  * KidsVideoPlayer

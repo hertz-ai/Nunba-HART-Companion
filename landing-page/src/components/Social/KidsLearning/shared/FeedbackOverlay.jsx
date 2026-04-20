@@ -1,10 +1,12 @@
-import React, {useEffect, useState} from 'react';
-import {Box, Typography} from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import {kidsColors} from '../data/kidsTheme';
 import {GameSounds} from './SoundManager';
+
 import {useReducedMotion} from '../../../../hooks/useAnimations';
+import {kidsColors} from '../data/kidsTheme';
+
+import CancelIcon from '@mui/icons-material/Cancel';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import {Box, Typography} from '@mui/material';
+import React, {useEffect, useState} from 'react';
 
 /**
  * FeedbackOverlay

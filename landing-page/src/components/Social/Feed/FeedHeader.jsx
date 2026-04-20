@@ -4,7 +4,11 @@
  * Displays a gradient title, animated subtitle, and quick stats row.
  */
 
-import React from 'react';
+import {feedsApi} from '../../../services/socialApi';
+import {GRADIENTS, EASINGS} from '../../../theme/socialTokens';
+import {animFadeInUp} from '../../../utils/animations';
+
+import RssFeedIcon from '@mui/icons-material/RssFeed';
 import {
   Box,
   Typography,
@@ -13,10 +17,8 @@ import {
   useTheme,
   keyframes,
 } from '@mui/material';
-import RssFeedIcon from '@mui/icons-material/RssFeed';
-import {GRADIENTS, EASINGS} from '../../../theme/socialTokens';
-import {animFadeInUp} from '../../../utils/animations';
-import {feedsApi} from '../../../services/socialApi';
+import React from 'react';
+
 
 const brandGlow = keyframes`
   0%, 100% { text-shadow: 0 0 20px rgba(108,99,255,0.3), 0 0 40px rgba(255,107,107,0.1); }

@@ -1,4 +1,8 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import {contentGenApi} from '../../services/socialApi';
+
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ReplayIcon from '@mui/icons-material/Replay';
 import {
   Typography,
   Card,
@@ -12,11 +16,8 @@ import {
   Button,
   Grid,
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import ReplayIcon from '@mui/icons-material/Replay';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import React, {useState, useEffect, useCallback} from 'react';
 
-import {contentGenApi} from '../../services/socialApi';
 
 const cardStyle = {
   background:

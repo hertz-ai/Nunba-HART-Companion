@@ -1,5 +1,6 @@
-import React, {useEffect, useState, useCallback} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
+import ShareConsentDialog from '../components/Social/shared/ShareConsentDialog';
+import {shareApi} from '../services/socialApi';
+
 import {
   Box,
   CircularProgress,
@@ -7,8 +8,8 @@ import {
   Card,
   CardContent,
 } from '@mui/material';
-import {shareApi} from '../services/socialApi';
-import ShareConsentDialog from '../components/Social/shared/ShareConsentDialog';
+import React, {useEffect, useState, useCallback} from 'react';
+import {useParams, useNavigate} from 'react-router-dom';
 
 /**
  * ShareLandingPage — resolves /s/:token and redirects to the actual resource.

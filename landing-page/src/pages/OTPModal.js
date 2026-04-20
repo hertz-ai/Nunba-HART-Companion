@@ -1,6 +1,7 @@
-import React from 'react';
-import {X} from 'lucide-react';
 import {logger} from '../utils/logger';
+
+import {X} from 'lucide-react';
+import React from 'react';
 
 export default function OTPModal({isOpen, onClose, otp, setOtp, onVerify}) {
   if (!isOpen) return null;

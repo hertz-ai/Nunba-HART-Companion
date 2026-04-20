@@ -1,4 +1,8 @@
-import React, {useState, useCallback} from 'react';
+import {shareApi} from '../../../services/socialApi';
+import {RADIUS} from '../../../theme/socialTokens';
+
+import LockIcon from '@mui/icons-material/Lock';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Dialog,
   DialogTitle,
@@ -11,10 +15,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import LockIcon from '@mui/icons-material/Lock';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import {shareApi} from '../../../services/socialApi';
-import {RADIUS} from '../../../theme/socialTokens';
+import React, {useState, useCallback} from 'react';
 
 /**
  * ShareConsentDialog — Consent gate for private/sensitive shared content.

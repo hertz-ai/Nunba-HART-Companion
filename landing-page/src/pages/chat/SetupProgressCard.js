@@ -1,5 +1,5 @@
+import { Box, Typography, LinearProgress, Fade, Button, Stack } from '@mui/material';
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, LinearProgress, Fade } from '@mui/material';
 
 /**
  * SetupProgressCard — dreamy progress card for long-running setup jobs
@@ -10,10 +10,25 @@ import { Box, Typography, LinearProgress, Fade } from '@mui/material';
  * - Animated progress bar with purple accent
  * - Step-by-step log with fade-in animation
  *
+ * The "Ready" banner is ONLY shown when the backend also passes the
+ * first-run TTS handshake (audio bytes + audible duration produced
+ * by real synth).  A bare isComplete=true without a verified
+ * handshake shows "Verifying voice..." rather than the green banner.
+ * See tts/tts_handshake.py for the gating contract.
+ *
  * Props:
  *   steps: Array<{step, message, timestamp}>  — progress steps received via SSE
  *   jobType: string — e.g. 'tts_setup_chatterbox_turbo'
  *   isComplete: boolean — true when job finishes
+ *   handshake: {
+ *     status: 'ready'|'failed'|'pending',
+ *     engine: string, lang: string,
+ *     err?: string, fallbacks?: string[],
+ *   }  — verified voice-check outcome from tts_handshake SSE.
+ *        Defaults to {status:'pending'}; banner stays yellow until
+ *        this flips to 'ready' or 'failed'.
+ *   onRetry?: () => void         — user clicked Retry on failed handshake
+ *   onSwitchEngine?: (engine: string) => void — user picked a fallback
  */
 
 const JOB_LABELS = {
@@ -29,22 +44,42 @@ const ACCENT = '#6C63FF';
 const SURFACE_BG = 'rgba(15, 14, 23, 0.85)';
 const BORDER_GRADIENT = 'linear-gradient(135deg, rgba(108,99,255,0.4), rgba(255,107,107,0.2))';
 
-export default function SetupProgressCard({ steps = [], jobType = '', isComplete = false }) {
+export default function SetupProgressCard({
+  steps = [],
+  jobType = '',
+  isComplete = false,
+  handshake = { status: 'pending' },
+  onRetry,
+  onSwitchEngine,
+}) {
   const [showComplete, setShowComplete] = useState(false);
   const scrollRef = useRef(null);
 
   const label = JOB_LABELS[jobType] || jobType.replace(/^tts_setup_/, '').replace(/_/g, ' ');
   const latestStep = steps[steps.length - 1];
+  const installFailed = steps.some(s => s.message?.includes('failed') || s.message?.includes('error'));
+  // Authoritative banner state. "Ready" is ONLY reached via a
+  // verified handshake — install-complete alone keeps us yellow.
+  const handshakeReady = handshake?.status === 'ready';
+  const handshakeFailed = handshake?.status === 'failed';
+  const isFailed = installFailed || handshakeFailed;
   // Estimate progress: most installs have 6-10 steps
   const estimatedTotal = 8;
-  const progressPercent = isComplete ? 100 : Math.min(95, (steps.length / estimatedTotal) * 100);
+  const progressPercent = handshakeReady
+    ? 100
+    : Math.min(95, (steps.length / estimatedTotal) * 100);
 
   useEffect(() => {
-    if (isComplete) {
+    // Delay the completion message until we have a definite
+    // verdict — isComplete alone is a proxy signal; only the
+    // handshake (or a hard install failure) is terminal.
+    if (handshakeReady || handshakeFailed || installFailed) {
       const timer = setTimeout(() => setShowComplete(true), 300);
       return () => clearTimeout(timer);
     }
-  }, [isComplete]);
+    setShowComplete(false);
+    return undefined;
+  }, [handshakeReady, handshakeFailed, installFailed]);
 
   // Auto-scroll to latest step
   useEffect(() => {
@@ -84,8 +119,13 @@ export default function SetupProgressCard({ steps = [], jobType = '', isComplete
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <Box sx={{
             width: 8, height: 8, borderRadius: '50%',
-            background: isComplete ? '#2ECC71' : ACCENT,
-            animation: isComplete ? 'none' : 'pulse 1.5s infinite',
+            background: handshakeReady
+              ? '#2ECC71'
+              : (isFailed ? '#E74C3C' : ACCENT),
+            // Keep pulsing until we have a terminal verdict — either
+            // verified-ready or a confirmed failure. Install-complete
+            // alone is not terminal.
+            animation: (handshakeReady || isFailed) ? 'none' : 'pulse 1.5s infinite',
             '@keyframes pulse': {
               '0%, 100%': { opacity: 1 },
               '50%': { opacity: 0.4 },
@@ -97,7 +137,13 @@ export default function SetupProgressCard({ steps = [], jobType = '', isComplete
             fontSize: '0.85rem',
             letterSpacing: '0.02em',
           }}>
-            {isComplete ? `${label} Ready` : `Setting up ${label}...`}
+            {handshakeReady
+              ? `${label} Ready`
+              : isFailed
+                ? `${label} Failed`
+                : isComplete
+                  ? `Verifying ${label} voice...`
+                  : `Setting up ${label}...`}
           </Typography>
         </Box>
 
@@ -112,7 +158,7 @@ export default function SetupProgressCard({ steps = [], jobType = '', isComplete
             backgroundColor: 'rgba(108,99,255,0.15)',
             '& .MuiLinearProgress-bar': {
               borderRadius: 2,
-              background: isComplete
+              background: handshakeReady
                 ? 'linear-gradient(90deg, #2ECC71, #27AE60)'
                 : `linear-gradient(90deg, ${ACCENT}, #9B59B6)`,
               transition: 'transform 0.6s ease',
@@ -159,15 +205,64 @@ export default function SetupProgressCard({ steps = [], jobType = '', isComplete
         {/* Completion message */}
         {showComplete && (
           <Fade in timeout={600}>
-            <Typography sx={{
-              color: '#2ECC71',
-              fontSize: '0.8rem',
-              fontWeight: 500,
-              mt: 1,
-              textAlign: 'center',
-            }}>
-              Voice engine ready — next message will use {label}
-            </Typography>
+            <Box>
+              <Typography sx={{
+                color: handshakeReady
+                  ? '#2ECC71'
+                  : '#E74C3C',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                mt: 1,
+                textAlign: 'center',
+              }}>
+                {handshakeReady
+                  ? `Voice engine ready — next message will use ${label}`
+                  : handshakeFailed
+                    // Surface the ACTUAL engine error rather than a
+                    // green lie.  Truncated so the banner stays small.
+                    ? `Voice check failed — ${label}: ${(handshake?.err || 'no audio produced').slice(0, 120)}`
+                    : `${label} unavailable — using fallback voice engine`}
+              </Typography>
+
+              {/* Retry / Switch engine buttons on handshake failure. */}
+              {handshakeFailed && (
+                <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 1 }}>
+                  {typeof onRetry === 'function' && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={onRetry}
+                      sx={{
+                        color: '#fff',
+                        borderColor: 'rgba(255,255,255,0.3)',
+                        textTransform: 'none',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  )}
+                  {typeof onSwitchEngine === 'function'
+                    && Array.isArray(handshake?.fallbacks)
+                    && handshake.fallbacks.slice(0, 2).map((fb) => (
+                    <Button
+                      key={fb}
+                      size="small"
+                      variant="outlined"
+                      onClick={() => onSwitchEngine(fb)}
+                      sx={{
+                        color: '#fff',
+                        borderColor: ACCENT,
+                        textTransform: 'none',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      Use {fb}
+                    </Button>
+                  ))}
+                </Stack>
+              )}
+            </Box>
           </Fade>
         )}
       </Box>

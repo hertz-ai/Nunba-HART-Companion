@@ -1,4 +1,6 @@
-import React, {useState, useRef, useEffect} from 'react';
+import {encountersApi} from '../../../services/socialApi';
+
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import {
   TextField,
   Paper,
@@ -7,8 +9,8 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import {encountersApi} from '../../../services/socialApi';
+import React, {useState, useRef, useEffect} from 'react';
+
 
 export default function AutoSuggestInput({
   value,

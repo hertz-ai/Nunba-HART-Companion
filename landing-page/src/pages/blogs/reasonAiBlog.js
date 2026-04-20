@@ -1,34 +1,36 @@
-import React from 'react';
-import Grid from '@mui/material/Grid';
-import Container from '@mui/material/Container';
-import GitHubIcon from '@mui/icons-material/GitHub';
 // import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import HeaderNano from '../Layouts/header';
 // import Header from './Header';
-import MainFeaturedPost from './MainFeaturedPost';
+import post2 from './blog-post.2.md';
 import FeaturedPost from './FeaturedPost';
 import Main from './Main';
-import Sidebar from './Sidebar';
-import Footer from '../Layouts/footer';
+import MainFeaturedPost from './MainFeaturedPost';
 import post1 from './Resoning.md';
-import post2 from './blog-post.2.md';
+import Sidebar from './Sidebar';
 import post3 from './wpp.md';
+
 import Spacer from '../../components/Spacer';
 import FooterLight from '../../pages/Layouts/footer-light';
 
-//color button styles - starts
-import {withStyles} from '@mui/material/styles';
-import {purple} from '@mui/material/colors';
-import Button from '@mui/material/Button';
-//color button styles - ends
+// color button styles - starts
+// color button styles - ends
+
+import {logger} from '../../utils/logger';
+import Footer from '../Layouts/footer';
+import HeaderNano from '../Layouts/header';
 
 import {
   faLinkedin,
   faTwitter,
   faYoutube,
 } from '@fortawesome/free-brands-svg-icons';
-import {logger} from '../../utils/logger';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import Button from '@mui/material/Button';
+import {purple} from '@mui/material/colors';
+import Container from '@mui/material/Container';
+import Grid from '@mui/material/Grid';
+import {withStyles} from '@mui/material/styles';
+import React from 'react';
 
 const sxStyles = {
   mainGrid: {
@@ -131,7 +133,7 @@ export default function ReasonAiBlog() {
 
   React.useEffect(() => {
     logger.log('Blog is fully loaded');
-    //getAllAssessmentNames();
+    // getAllAssessmentNames();
     fetch(post1)
       .then((res) => res.text())
       .then((postContent) => setPosts([postContent]))

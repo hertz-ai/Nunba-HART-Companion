@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import ChannelPresenceIndicator from './ChannelPresenceIndicator';
+import ChannelSetupWizard from './ChannelSetupWizard';
+
+import { channelUserApi } from '../../services/socialApi';
+
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 import {
   Box, Typography, Card, CardContent, Grid, IconButton, Tooltip, Fab,
   CircularProgress, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Fade, Grow,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
-import { channelUserApi } from '../../services/socialApi';
-import ChannelPresenceIndicator from './ChannelPresenceIndicator';
-import ChannelSetupWizard from './ChannelSetupWizard';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const cardStyle = {
   background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',

@@ -1,9 +1,11 @@
-import React from 'react';
+import {RADIUS} from '../../../theme/socialTokens';
+
+import CloseIcon from '@mui/icons-material/Close';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import {Box, Typography, Fade, IconButton, useTheme} from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import CloseIcon from '@mui/icons-material/Close';
-import {RADIUS} from '../../../theme/socialTokens';
+import React from 'react';
+
 
 /**
  * HealthNudge — Guardrail-respecting gentle suggestion.

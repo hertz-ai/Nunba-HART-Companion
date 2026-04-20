@@ -1,7 +1,8 @@
-import React from 'react';
-import {screen} from '@testing-library/react';
-import {renderWithProviders} from '../../../testHelpers';
 import ResonanceWallet from '../../../../components/Social/shared/ResonanceWallet';
+import {renderWithProviders} from '../../../testHelpers';
+
+import {screen} from '@testing-library/react';
+import React from 'react';
 
 describe('ResonanceWallet Component', () => {
   const mockWallet = {

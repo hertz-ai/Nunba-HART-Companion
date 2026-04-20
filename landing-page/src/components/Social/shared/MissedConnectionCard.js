@@ -1,7 +1,7 @@
-import React from 'react';
-import {Box, Typography, Chip} from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PeopleIcon from '@mui/icons-material/People';
+import {Box, Typography, Chip} from '@mui/material';
+import React from 'react';
 
 export default function MissedConnectionCard({missed, onClick}) {
   return (

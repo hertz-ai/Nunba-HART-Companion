@@ -13,25 +13,27 @@
  *  - Support button micro-animation (scale bounce + ripple)
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import IntentBadge from './IntentBadge';
+import PledgeSummaryBar from './PledgeSummaryBar';
+
+import { useInView } from '../../../hooks/useAnimations';
+import { postsApi } from '../../../services/socialApi';
+import { socialTokens, RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import { useRoleAccess } from '../../RoleGuard';
+import LevelBadge from '../shared/LevelBadge';
+import UserChip from '../shared/UserChip';
+
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
+import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Card, CardContent, Typography, Box, Tooltip, keyframes, useTheme, ButtonBase,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
-import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import IntentBadge from './IntentBadge';
-import PledgeSummaryBar from './PledgeSummaryBar';
-import UserChip from '../shared/UserChip';
-import LevelBadge from '../shared/LevelBadge';
-import { postsApi } from '../../../services/socialApi';
-import { useRoleAccess } from '../../RoleGuard';
-import { useInView } from '../../../hooks/useAnimations';
-import { socialTokens, RADIUS, EASINGS, DURATIONS } from '../../../theme/socialTokens';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // ─── Keyframes ───────────────────────────────────────────────────────────────
 

@@ -24,9 +24,11 @@ from tts.tts_engine import (
     _BACKEND_TO_CATALOG,
     _CATALOG_TO_BACKEND,
     _DEFAULT_PREFERENCE,
+    _DEFAULT_SPEED_PROFILE,
     _FALLBACK_ENGINE_CAPABILITIES,
     _FALLBACK_LANG_ENGINE_PREFERENCE,
     _INDIC_LANGS,
+    _SPEED_PROFILES,
     BACKEND_CHATTERBOX_ML,
     BACKEND_CHATTERBOX_TURBO,
     BACKEND_COSYVOICE3,
@@ -40,8 +42,12 @@ from tts.tts_engine import (
     SentencePipeline,
     TTSEngine,
     _entry_to_legacy_caps,
+    _get_current_speed_profile,
+    _get_default_speed,
     _get_engine_capabilities,
     _get_lang_preference,
+    _invalidate_speed_cache,
+    _set_speed_profile,
     get_tts_engine,
     get_tts_status,
     synthesize_text,
@@ -191,11 +197,17 @@ class TestCatalogMapping:
             assert _CATALOG_TO_BACKEND[cat_id] == be
 
     def test_backend_to_catalog_contains_all_backends(self):
+        # _BACKEND_TO_CATALOG carries the 7 primary backends PLUS two
+        # string-only keys ('luxtts', 'pocket_tts') that are retained
+        # for frozen-HARTOS compatibility — they have no top-level
+        # BACKEND_* constant because they never ship as their own
+        # backend, they fall through to the CPU in-process path.
         from tts.tts_engine import BACKEND_KOKORO
-        expected = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
-                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
-                    BACKEND_PIPER}
-        assert set(_BACKEND_TO_CATALOG.keys()) == expected
+        primary = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
+                   BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
+                   BACKEND_PIPER}
+        compat = {'luxtts', 'pocket_tts'}
+        assert set(_BACKEND_TO_CATALOG.keys()) == primary | compat
 
 
 class TestKokoroEnglishLadder:
@@ -206,8 +218,9 @@ class TestKokoroEnglishLadder:
 
     def test_kokoro_in_english_preference_before_piper(self):
         from tts.tts_engine import (
-            BACKEND_KOKORO, BACKEND_PIPER,
             _FALLBACK_LANG_ENGINE_PREFERENCE,
+            BACKEND_KOKORO,
+            BACKEND_PIPER,
         )
         prefs = _FALLBACK_LANG_ENGINE_PREFERENCE['en']
         assert BACKEND_KOKORO in prefs
@@ -216,11 +229,11 @@ class TestKokoroEnglishLadder:
         assert prefs.index(BACKEND_KOKORO) < prefs.index(BACKEND_PIPER)
 
     def test_kokoro_registry_key_wired(self):
-        from tts.tts_engine import BACKEND_KOKORO, _BACKEND_TO_REGISTRY_KEY
+        from tts.tts_engine import _BACKEND_TO_REGISTRY_KEY, BACKEND_KOKORO
         assert _BACKEND_TO_REGISTRY_KEY[BACKEND_KOKORO] == 'kokoro'
 
     def test_kokoro_catalog_id_wired(self):
-        from tts.tts_engine import BACKEND_KOKORO, _BACKEND_TO_CATALOG
+        from tts.tts_engine import _BACKEND_TO_CATALOG, BACKEND_KOKORO
         # _registry_key_to_catalog_id('kokoro') == 'kokoro' (no underscores)
         assert _BACKEND_TO_CATALOG[BACKEND_KOKORO] == 'kokoro'
 
@@ -820,12 +833,27 @@ class TestSubprocessTTSBackend:
             _SubprocessTTSBackend('totally_not_a_real_engine')
 
     def test_cpu_only_engine_raises(self):
-        """CPU-only engines (luxtts, espeak) have no tool_worker_attr
-        so the adapter refuses to construct — it's for subprocess
-        workers only."""
+        """An engine registered with tool_module + tool_function but NO
+        tool_worker_attr is CPU-only and cannot be driven through the
+        subprocess adapter — _SubprocessTTSBackend must refuse it.
+
+        We patch ENGINE_REGISTRY with a synthetic spec so the test is
+        deterministic regardless of what HARTOS currently ships (luxtts
+        was removed from the live registry after this test was authored,
+        so we no longer rely on it being present).
+        """
         from tts.tts_engine import _SubprocessTTSBackend
-        with pytest.raises(ValueError, match='not subprocess-capable'):
-            _SubprocessTTSBackend('luxtts')
+        fake_spec = SimpleNamespace(
+            tool_module='fake.cpu_engine_tool',
+            tool_function='fake_synthesize',
+            tool_worker_attr=None,
+        )
+        with patch(
+            'integrations.channels.media.tts_router.ENGINE_REGISTRY',
+            {'fake_cpu_engine': fake_spec},
+        ):
+            with pytest.raises(ValueError, match='not subprocess-capable'):
+                _SubprocessTTSBackend('fake_cpu_engine')
 
     def test_synthesize_forwards_text_language_voice_output(self):
         mock_fn = MagicMock(return_value='{"path": "/out.wav", "duration": 1.0}')
@@ -878,7 +906,7 @@ class TestSubprocessTTSBackend:
         adapter = self._make_adapter('f5_tts', mock_fn)
         try:
             adapter.synthesize(text='hi', output_path='/out.wav')
-            assert False, 'expected RuntimeError'
+            raise AssertionError('expected RuntimeError')
         except RuntimeError as e:
             assert getattr(e, 'transient', False) is True
 
@@ -935,7 +963,8 @@ class TestSubprocessTTSBackend:
         tool_worker_attr set so the subprocess adapter can find the
         ToolWorker instance. Missing this field = silent CPU fallback."""
         from integrations.channels.media.tts_router import (
-            ENGINE_REGISTRY, TTSDevice,
+            ENGINE_REGISTRY,
+            TTSDevice,
         )
         gpu_engines = [
             eid for eid, spec in ENGINE_REGISTRY.items()
@@ -1514,3 +1543,138 @@ class TestInstallVoice:
         mock.download_model.return_value = True
         engine._backends[BACKEND_PIPER] = mock
         assert engine.install_voice('v1') is True
+
+
+# ===========================================================================
+# TTS_SPEED_PROFILE resolution (env var → ~/.nunba/tts_config.json → default)
+# ===========================================================================
+
+@pytest.fixture
+def _speed_profile_state(monkeypatch, tmp_path):
+    """Clean env + sandboxed HOME so tests never touch real config."""
+    monkeypatch.delenv('TTS_SPEED_PROFILE', raising=False)
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setenv('USERPROFILE', str(tmp_path))
+    _invalidate_speed_cache()
+    yield tmp_path
+    _invalidate_speed_cache()
+
+
+class TestSpeedProfileCatalog:
+    def test_four_named_profiles(self):
+        assert set(_SPEED_PROFILES) == {'fast', 'balanced', 'natural', 'slow'}
+
+    def test_fast_above_natural(self):
+        assert _SPEED_PROFILES['fast'] > _SPEED_PROFILES['natural']
+
+    def test_balanced_above_natural(self):
+        assert _SPEED_PROFILES['balanced'] > _SPEED_PROFILES['natural']
+
+    def test_slow_below_natural(self):
+        assert _SPEED_PROFILES['slow'] < _SPEED_PROFILES['natural']
+
+    def test_natural_is_exactly_one(self):
+        assert _SPEED_PROFILES['natural'] == 1.0
+
+    def test_default_is_balanced(self):
+        assert _DEFAULT_SPEED_PROFILE == 'balanced'
+
+
+class TestGetCurrentSpeedProfile:
+    def test_default_when_nothing_set(self, _speed_profile_state):
+        assert _get_current_speed_profile() == 'balanced'
+
+    def test_env_var_overrides(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'fast')
+        _invalidate_speed_cache()
+        assert _get_current_speed_profile() == 'fast'
+
+    def test_env_var_case_insensitive(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'FAST')
+        _invalidate_speed_cache()
+        assert _get_current_speed_profile() == 'fast'
+
+    def test_env_var_whitespace_stripped(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', '  balanced  ')
+        _invalidate_speed_cache()
+        assert _get_current_speed_profile() == 'balanced'
+
+    def test_invalid_env_var_falls_through(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'turbo_max')
+        _invalidate_speed_cache()
+        assert _get_current_speed_profile() == _DEFAULT_SPEED_PROFILE
+
+    def test_empty_env_var_falls_through(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', '')
+        _invalidate_speed_cache()
+        assert _get_current_speed_profile() == _DEFAULT_SPEED_PROFILE
+
+    def test_cache_prevents_repeat_env_reads(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'fast')
+        _invalidate_speed_cache()
+        first = _get_current_speed_profile()
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'slow')
+        assert _get_current_speed_profile() == first == 'fast'
+
+
+class TestGetDefaultSpeed:
+    def test_default_matches_balanced(self, _speed_profile_state):
+        assert _get_default_speed() == _SPEED_PROFILES['balanced']
+
+    def test_fast_multiplier(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'fast')
+        _invalidate_speed_cache()
+        assert _get_default_speed() == _SPEED_PROFILES['fast']
+
+    def test_slow_multiplier(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'slow')
+        _invalidate_speed_cache()
+        assert _get_default_speed() == _SPEED_PROFILES['slow']
+
+    def test_natural_multiplier(self, _speed_profile_state, monkeypatch):
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'natural')
+        _invalidate_speed_cache()
+        assert _get_default_speed() == 1.0
+
+
+class TestSetSpeedProfile:
+    def test_valid_name_returns_true(self, _speed_profile_state):
+        assert _set_speed_profile('fast') is True
+
+    def test_invalid_name_returns_false(self, _speed_profile_state):
+        assert _set_speed_profile('rocket_mode') is False
+
+    def test_empty_name_returns_false(self, _speed_profile_state):
+        assert _set_speed_profile('') is False
+
+    def test_none_returns_false(self, _speed_profile_state):
+        assert _set_speed_profile(None) is False
+
+    def test_set_invalidates_cache(self, _speed_profile_state):
+        assert _get_current_speed_profile() == 'balanced'
+        _set_speed_profile('fast')
+        assert _get_current_speed_profile() == 'fast'
+
+    def test_set_persists_to_disk(self, _speed_profile_state):
+        import json as _json
+        _set_speed_profile('slow')
+        cfg_path = _speed_profile_state / '.nunba' / 'tts_config.json'
+        assert cfg_path.is_file()
+        with cfg_path.open() as fp:
+            data = _json.load(fp)
+        assert data['speed_profile'] == 'slow'
+
+    def test_persisted_profile_round_trips(self, _speed_profile_state):
+        _set_speed_profile('fast')
+        _invalidate_speed_cache()
+        assert _get_current_speed_profile() == 'fast'
+
+    def test_env_var_takes_priority_over_disk(self, _speed_profile_state, monkeypatch):
+        _set_speed_profile('slow')
+        _invalidate_speed_cache()
+        monkeypatch.setenv('TTS_SPEED_PROFILE', 'fast')
+        assert _get_current_speed_profile() == 'fast'
+
+    def test_case_normalization_on_set(self, _speed_profile_state):
+        assert _set_speed_profile('BALANCED') is True
+        assert _get_current_speed_profile() == 'balanced'

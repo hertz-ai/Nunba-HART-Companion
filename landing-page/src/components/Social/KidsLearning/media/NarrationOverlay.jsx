@@ -1,13 +1,15 @@
-import React, {useState, useEffect, useMemo, useCallback} from 'react';
-import {Box, Typography, IconButton, Fade} from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
 import {
   kidsColors,
   kidsRadius,
   kidsShadows,
   kidsTransitions,
 } from '../data/kidsTheme';
+
+import CloseIcon from '@mui/icons-material/Close';
+import VolumeUpRoundedIcon from '@mui/icons-material/VolumeUpRounded';
+import {Box, Typography, IconButton, Fade} from '@mui/material';
+import React, {useState, useEffect, useMemo, useCallback} from 'react';
+
 
 /**
  * NarrationOverlay

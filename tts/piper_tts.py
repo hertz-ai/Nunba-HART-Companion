@@ -268,7 +268,8 @@ class PiperTTS:
                    text: str,
                    output_path: str | None = None,
                    voice_id: str | None = None,
-                   speed: float = 1.0) -> str | None:
+                   speed: float = 1.0,
+                   **_kwargs) -> str | None:
         """
         Synthesize text to speech.
 
@@ -277,6 +278,15 @@ class PiperTTS:
             output_path: Output WAV file path (auto-generated if None)
             voice_id: Voice to use (uses current voice if None)
             speed: Speech speed multiplier (1.0 = normal)
+            **_kwargs: Tolerated for polymorphic-signature parity with
+                TTSEngine + the other backend adapters (all accept
+                ``**kwargs``).  Callers like ``verified_synth`` pass
+                ``language=lang`` so EVERY backend sees the same call;
+                Piper is voice-scoped via ``voice_id`` so ``language``
+                is informational here and deliberately ignored.  The
+                handshake path (``tts/tts_handshake.py``) would
+                otherwise TypeError against a raw PiperTTS instance —
+                the J212 regression, 2026-04-18 live audit.
 
         Returns:
             Path to generated WAV file, or None on failure

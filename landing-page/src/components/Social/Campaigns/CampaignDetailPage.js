@@ -1,5 +1,16 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {useParams, useNavigate} from 'react-router-dom';
+import {useSocial} from '../../../contexts/SocialContext';
+import {campaignsApi} from '../../../services/socialApi';
+import {GRADIENTS} from '../../../theme/socialTokens';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import TouchAppIcon from '@mui/icons-material/TouchApp';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   Box,
   Typography,
@@ -19,18 +30,10 @@ import {
   DialogActions,
   useTheme,
 } from '@mui/material';
-import {GRADIENTS} from '../../../theme/socialTokens';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import TouchAppIcon from '@mui/icons-material/TouchApp';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import DeleteIcon from '@mui/icons-material/Delete';
-import {campaignsApi} from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
+import React, {useState, useEffect, useCallback} from 'react';
+import {useParams, useNavigate} from 'react-router-dom';
+
+
 
 const STATUS_COLORS = {
   draft: 'default',

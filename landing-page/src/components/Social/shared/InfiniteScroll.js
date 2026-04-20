@@ -1,5 +1,5 @@
-import React, {useRef, useEffect} from 'react';
 import {Box, CircularProgress} from '@mui/material';
+import React, {useRef, useEffect} from 'react';
 
 export default function InfiniteScroll({
   children,

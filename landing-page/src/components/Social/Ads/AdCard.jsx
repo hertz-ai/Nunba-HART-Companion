@@ -1,4 +1,13 @@
-import React, {useState, useEffect, useRef} from 'react';
+import {adApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
+
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
   Box,
   Card,
@@ -8,15 +17,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import {adApi} from '../../../services/socialApi';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
+import React, {useState, useEffect, useRef} from 'react';
 
 /**
  * AdCard - Compact ad card for sidebar, interstitial, and region placements.

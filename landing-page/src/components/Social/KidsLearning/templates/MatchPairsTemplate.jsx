@@ -13,19 +13,20 @@
  *   onComplete - ({ score, correct, total, results, bestStreak }) => void
  */
 
-import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 import {logger} from '../../../../utils/logger';
-import {Box, Typography, Button, Card, Fade, Grow} from '@mui/material';
 import {kidsColors, kidsAnimations} from '../kidsTheme';
-import {GameSounds, GameCommentary} from '../shared/SoundManager';
+import {getEmojiForText} from '../shared/emojiMap';
 import GameAssetService from '../shared/GameAssetService';
 import GameItemImage from '../shared/GameItemImage';
-import InlineCelebration from '../shared/InlineCelebration';
-import useCelebration from '../shared/useCelebration';
 import GameLivesBar from '../shared/GameLivesBar';
+import InlineCelebration from '../shared/InlineCelebration';
 import KidsCharacter from '../shared/KidsCharacter';
+import {GameSounds, GameCommentary} from '../shared/SoundManager';
+import useCelebration from '../shared/useCelebration';
 import VisualHint from '../shared/VisualHint';
-import {getEmojiForText} from '../shared/emojiMap';
+
+import {Box, Typography, Button, Card, Fade, Grow} from '@mui/material';
+import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
 
 const PAIR_COLORS = [
   kidsColors.blue,

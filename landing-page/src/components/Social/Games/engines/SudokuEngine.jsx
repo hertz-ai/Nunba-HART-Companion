@@ -1,4 +1,6 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {RADIUS, GRADIENTS} from '../../../../theme/socialTokens';
+import {animFadeInUp, animFadeInScale} from '../../../../utils/animations';
+
 import {
   Box,
   Typography,
@@ -10,8 +12,7 @@ import {
   Grow,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import {RADIUS, GRADIENTS} from '../../../../theme/socialTokens';
-import {animFadeInUp, animFadeInScale} from '../../../../utils/animations';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 
 // ── Colors ──
 const COLOR_BG = '#0F0E17';

@@ -1,6 +1,6 @@
-import React, {useMemo} from 'react';
 import {Box, Typography} from '@mui/material';
 import {INVALID_MOVE} from 'boardgame.io/core';
+import React, {useMemo} from 'react';
 
 const SIZE = 8;
 const DIRECTIONS = [

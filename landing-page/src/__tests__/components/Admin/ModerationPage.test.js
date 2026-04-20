@@ -1,5 +1,6 @@
 import React from 'react';
 import {screen, fireEvent, waitFor} from '@testing-library/react';
+
 import {renderWithProviders, mockReports} from '../../testHelpers';
 import ModerationPage from '../../../components/Admin/ModerationPage';
 
@@ -7,7 +8,7 @@ import ModerationPage from '../../../components/Admin/ModerationPage';
 jest.mock('../../../services/socialApi', () => ({
   moderationApi: {
     reports: jest.fn(),
-    reviewReport: jest.fn(),
+    resolveReport: jest.fn(),
   },
 }));
 
@@ -95,8 +96,8 @@ describe('ModerationPage Component', () => {
       });
     });
 
-    test('calls reviewReport API with resolved when Resolve button clicked', async () => {
-      moderationApi.reviewReport.mockResolvedValue({success: true});
+    test('calls resolveReport API with resolved when Resolve button clicked', async () => {
+      moderationApi.resolveReport.mockResolvedValue({success: true});
 
       renderWithProviders(<ModerationPage />);
 
@@ -109,15 +110,15 @@ describe('ModerationPage Component', () => {
       fireEvent.click(resolveButtons[0]);
 
       await waitFor(() => {
-        expect(moderationApi.reviewReport).toHaveBeenCalledWith(
+        expect(moderationApi.resolveReport).toHaveBeenCalledWith(
           expect.any(String),
           {action: 'resolved'}
         );
       });
     });
 
-    test('calls reviewReport API with dismissed when Dismiss button clicked', async () => {
-      moderationApi.reviewReport.mockResolvedValue({success: true});
+    test('calls resolveReport API with dismissed when Dismiss button clicked', async () => {
+      moderationApi.resolveReport.mockResolvedValue({success: true});
 
       renderWithProviders(<ModerationPage />);
 
@@ -130,7 +131,7 @@ describe('ModerationPage Component', () => {
       fireEvent.click(dismissButtons[0]);
 
       await waitFor(() => {
-        expect(moderationApi.reviewReport).toHaveBeenCalledWith(
+        expect(moderationApi.resolveReport).toHaveBeenCalledWith(
           expect.any(String),
           {action: 'dismissed'}
         );

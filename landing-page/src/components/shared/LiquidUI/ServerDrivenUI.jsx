@@ -40,7 +40,7 @@
  * }
  */
 
-import React, {useEffect, createContext, useContext, useMemo} from 'react';
+import * as MuiIcons from '@mui/icons-material';
 import {
   Box,
   Typography,
@@ -55,7 +55,7 @@ import {
   CardContent,
   CardActionArea,
 } from '@mui/material';
-import * as MuiIcons from '@mui/icons-material';
+import React, {useEffect, createContext, useContext, useMemo} from 'react';
 
 // ── LiquidUI Context: provides themeTokens to the render tree ────────────────
 

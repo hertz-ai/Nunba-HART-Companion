@@ -8,8 +8,6 @@
  * Agents get diverse seeded avatars. "Create your HART" welcome CTA.
  */
 
-import React, {useState, useRef, useEffect, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -25,6 +23,8 @@ import {
   Tooltip,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
+import React, {useState, useRef, useEffect, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
 
 // Ported from Hevolve.ai ConversationHistoryPanel.js
 function formatTimestamp(ts) {
@@ -47,7 +47,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+
 import {useNunbaChat, getAgentPalette} from './NunbaChatProvider';
+
 import {
   GRADIENTS,
   EASINGS,

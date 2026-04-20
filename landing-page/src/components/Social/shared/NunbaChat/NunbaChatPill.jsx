@@ -6,7 +6,17 @@
  *              just text + icon. Dismissible.
  */
 
-import React, {useState, useEffect, useRef} from 'react';
+import {useNunbaChat} from './NunbaChatProvider';
+
+import {
+  GRADIENTS,
+  EASINGS,
+  RADIUS,
+  socialTokens,
+} from '../../../../theme/socialTokens';
+
+import ChatIcon from '@mui/icons-material/Chat';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   Box,
   Typography,
@@ -16,15 +26,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ChatIcon from '@mui/icons-material/Chat';
-import CloseIcon from '@mui/icons-material/Close';
-import {useNunbaChat} from './NunbaChatProvider';
-import {
-  GRADIENTS,
-  EASINGS,
-  RADIUS,
-  socialTokens,
-} from '../../../../theme/socialTokens';
+import React, {useState, useEffect, useRef} from 'react';
 
 /* ── Keyframes ── */
 const pulseGlow = keyframes`

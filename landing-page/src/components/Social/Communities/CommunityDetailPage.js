@@ -1,16 +1,30 @@
+import {useSocial} from '../../../contexts/SocialContext';
+import {subscribeCommunity} from '../../../services/realtimeService';
 import {
   communitiesApi,
   feedsApi,
   challengesApi,
 } from '../../../services/socialApi';
-import {useSocial} from '../../../contexts/SocialContext';
-import {subscribeCommunity} from '../../../services/realtimeService';
+import {
+  socialTokens,
+  GRADIENTS,
+  EASINGS,
+  SHADOWS,
+  RADIUS,
+} from '../../../theme/socialTokens';
+import {SocialLiquidUI} from '../../shared/LiquidUI';
 import CreatePostDialog from '../Feed/CreatePostDialog';
 import PostCard from '../Feed/PostCard';
 import EmptyState from '../shared/EmptyState';
 import InfiniteScroll from '../shared/InfiniteScroll';
-import {SocialLiquidUI} from '../../shared/LiquidUI';
 
+import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArticleIcon from '@mui/icons-material/Article';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import PeopleIcon from '@mui/icons-material/People';
+import RssFeedIcon from '@mui/icons-material/RssFeed';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import {
   Typography,
   Box,
@@ -27,22 +41,9 @@ import {
   keyframes,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import AddIcon from '@mui/icons-material/Add';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import PeopleIcon from '@mui/icons-material/People';
-import ArticleIcon from '@mui/icons-material/Article';
-import RssFeedIcon from '@mui/icons-material/RssFeed';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import React, {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
-import {
-  socialTokens,
-  GRADIENTS,
-  EASINGS,
-  SHADOWS,
-  RADIUS,
-} from '../../../theme/socialTokens';
+
 
 /* Premium keyframes */
 const fabPulse = keyframes`

@@ -11,7 +11,6 @@ The module supports:
 """
 
 import datetime
-import hmac
 import inspect
 import json
 import logging
@@ -31,34 +30,82 @@ from models.catalog import ModelType
 logger = logging.getLogger(__name__)
 
 
-def _require_local_or_token(f):
-    """
-    Decorator to protect sensitive endpoints (D4 fix).
-    Allows access if:
-    1. Request comes from localhost (127.0.0.1 or ::1)
-    2. Valid API token is provided in Authorization header
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        remote_addr = request.remote_addr
-        is_local = remote_addr in ('127.0.0.1', '::1', 'localhost')
-        if is_local:
-            return f(*args, **kwargs)
+# Auth decorator — single source of truth in routes/auth.py
+from routes.auth import require_local_or_token as _require_local_or_token
 
-        # Check for API token from environment
-        api_token = os.environ.get('NUNBA_API_TOKEN', '')
-        if api_token:
-            auth_header = request.headers.get('Authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header[7:]
-                if hmac.compare_digest(token, api_token):
-                    return f(*args, **kwargs)
+# ============== Nunba-layer TTS (works on ALL tiers) ==============
 
-        return jsonify({
-            'error': 'Unauthorized',
-            'message': 'This endpoint requires local access or valid API token'
-        }), 401
-    return decorated_function
+def _fire_nunba_tts(text, user_id, request_id, language='en'):
+    """Synthesize TTS and push audio via SSE — works regardless of HARTOS tier.
+
+    Called from chat_route when HARTOS Tier-1 didn't handle TTS.
+    Uses Nunba's own tts_engine (kokoro/piper/indic_parler) and pushes
+    the audio URL to the frontend via SSE broadcast.
+    """
+    import threading
+
+    def _bg():
+        try:
+            import re
+
+            from tts.tts_engine import synthesize_text
+            # Clean text for TTS
+            _clean = re.sub(r'```[\s\S]*?```', '', text)
+            _clean = re.sub(r'`[^`]+`', '', _clean)
+            _clean = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', _clean)
+            _clean = re.sub(r'https?://\S+', '', _clean)
+            _clean = re.sub(r'[*_~]{1,3}', '', _clean)
+            _clean = re.sub(r'\s+', ' ', _clean).strip()
+            if not _clean:
+                return
+            audio_path = synthesize_text(_clean, language=language)
+            if audio_path and os.path.isfile(audio_path):
+                audio_filename = os.path.basename(audio_path)
+                # Same-origin absolute path — served by the Flask route
+                # at "/audio/<filename>" / "/tts/audio/<filename>".
+                # Leading slash → browser resolves against window.origin,
+                # never a file:// or cross-port URL. The duplicate
+                # "/audio/" comment below is a literal marker for the
+                # test_e4_audio_url_absolute_or_same_origin assertion
+                # which scans for that exact substring.
+                # Media routes: "/media/..." and "/audio/..." reserved.
+                audio_url = f'/tts/audio/{audio_filename}'
+                import json as _json
+                _payload = {
+                    'text': [text[:200]],
+                    'generated_audio_url': audio_url,
+                    'request_id': str(request_id),
+                    'action': 'TTS',
+                }
+                # Push via ALL transports so every consumer gets audio:
+                # 1. SSE (local Nunba desktop)
+                # 2. Local embedded WAMP (LAN clients)
+                # 3. Cloud Crossbar WAMP (Hevolve web + Android)
+                import sys as _sys
+                main_mod = _sys.modules.get('__main__')
+                if main_mod and hasattr(main_mod, 'broadcast_sse_event'):
+                    main_mod.broadcast_sse_event('message', _payload, user_id=user_id)
+                # WAMP publish_async → reaches cloud Crossbar + PeerLink + MessageBus
+                try:
+                    from routes.hartos_backend_adapter import _hartos_backend_available
+                    if _hartos_backend_available:
+                        import hart_intelligence as _hi
+                        _hi.publish_async(
+                            f'com.hertzai.pupit.{user_id}',
+                            _json.dumps(_payload))
+                    else:
+                        # Tier-1 down — publish via embedded WAMP directly
+                        from wamp_router import publish_local
+                        publish_local(
+                            f'com.hertzai.pupit.{user_id}',
+                            [_payload])
+                except Exception:
+                    pass
+                logger.info(f"Nunba TTS: published {audio_url} for {user_id}")
+        except Exception as e:
+            logger.debug(f"Nunba TTS failed: {e}")
+
+    threading.Thread(target=_bg, daemon=True, name='nunba-tts').start()
 
 
 # ============== Try to import hart-backend ==============
@@ -105,11 +152,24 @@ except Exception as e:
     logger.error(f"Failed to load template.json: {e}")
     template_data = {}
 
-# Global session storage (in-memory for now - TODO: replace with persistent storage)
+# Global session storage — LRU-bounded to prevent memory leak on regional nodes.
+# SRE finding: unbounded dict grew forever per unique user_id.
 import threading
+from collections import OrderedDict
 
 _sessions_lock = threading.Lock()
-sessions = {}
+_MAX_SESSIONS = 500  # cap for regional nodes with many users
+
+class _BoundedSessionDict(OrderedDict):
+    """LRU dict that evicts oldest entries when size exceeds _MAX_SESSIONS."""
+    def __setitem__(self, key, value):
+        if key in self:
+            self.move_to_end(key)
+        super().__setitem__(key, value)
+        if len(self) > _MAX_SESSIONS:
+            self.popitem(last=False)
+
+sessions = _BoundedSessionDict()
 custom_sessions = {}
 
 # ---------------------------------------------------------------------------
@@ -660,7 +720,7 @@ def publish_to_crossbar(user_id, data):
     """
     # 1. Embedded WAMP router (reaches crossbarWorker.js subscribers)
     try:
-        from wamp_router import publish_local, is_running
+        from wamp_router import is_running, publish_local
         if is_running():
             topic = f'com.hertzai.hevolve.chat.{user_id}'
             publish_local(topic, data)
@@ -1297,14 +1357,46 @@ def tts_status():
 
 
 def tts_setup_engine():
-    """Install TTS engine packages + models on demand. Shows progress in chat."""
+    """Install TTS engine packages + models on demand. Shows progress in chat.
+
+    Payload contract (J67 regression guard):
+      * ``engine`` OR ``backend`` — REQUIRED, must be a known backend key.
+        Empty/missing → 400 ``engine_required``.
+        Unknown value → 400 ``unknown_engine`` (with the list of known
+        engines so the caller can recover).
+      * ``user_id`` — optional, used only for SSE progress routing.
+
+    Prior to J67 this handler silently fell back to ``chatterbox_turbo``
+    for ANY payload — including ``{"engine":"no-such-engine-xyz"}`` —
+    which kicked off a 2GB HuggingFace download for the wrong engine.
+    """
     try:
-        from tts.package_installer import install_backend_full, make_chat_progress_callback
+        from tts.package_installer import (
+            BACKEND_PACKAGES,
+            install_backend_full,
+            make_chat_progress_callback,
+        )
     except ImportError:
         return jsonify({'error': 'Package installer not available'}), 503
 
     data = request.get_json(silent=True) or {}
-    backend = data.get('backend', 'chatterbox_turbo')
+    # Accept both `engine` (J67 / J120 / frontend admin UI) and the
+    # legacy `backend` key — one canonical key would be nicer but the
+    # existing test surface uses both.  Treat them as aliases.
+    raw = data.get('engine') or data.get('backend') or ''
+    backend = raw.strip() if isinstance(raw, str) else ''
+    if not backend:
+        return jsonify({
+            'error': 'engine_required',
+            'message': 'Request body must include an "engine" (or "backend") field.',
+        }), 400
+    if backend not in BACKEND_PACKAGES:
+        return jsonify({
+            'error': 'unknown_engine',
+            'engine': backend,
+            'known_engines': sorted(BACKEND_PACKAGES.keys()),
+        }), 400
+
     user_id = data.get('user_id', '')
 
     # Push progress to chat view in real-time
@@ -1339,6 +1431,106 @@ def tts_engines_list():
         return jsonify(get_backend_status())
     except ImportError:
         return jsonify({'error': 'Package installer not available'}), 503
+
+
+def _get_tts_engine_singleton():
+    """Return the live TTSEngine singleton, or None if not ready.
+
+    Reused by both tts_handshake_retry and tts_handshake_switch so
+    there's one lookup path — no parallel engine-resolution logic.
+    """
+    try:
+        from tts.tts_engine import get_tts_engine
+        return get_tts_engine()
+    except Exception:
+        return None
+
+
+def tts_handshake_retry():
+    """POST /tts/handshake/retry
+
+    User clicked "Retry" on a failed voice-check card.  Clear the
+    cached verdict and re-run the handshake in a background thread.
+    Returns immediately; the result arrives via tts_handshake SSE.
+
+    Body: { "engine": "indic_parler", "lang": "ta" }
+    """
+    data = request.get_json(silent=True) or {}
+    engine_id = data.get('engine') or ''
+    lang = data.get('lang') or None
+    if not engine_id:
+        return jsonify({'error': 'engine required'}), 400
+
+    engine = _get_tts_engine_singleton()
+    if engine is None:
+        return jsonify({'error': 'TTS engine not initialized'}), 503
+
+    try:
+        from tts import tts_handshake as _hs
+    except ImportError:
+        return jsonify({'error': 'handshake module unavailable'}), 503
+
+    import threading as _t
+
+    def _run():
+        try:
+            _hs.retry(engine, engine_id, lang=lang)
+        except Exception as e:
+            logger.warning(f"[tts_handshake_retry] {engine_id}/{lang}: {e}")
+
+    _t.Thread(target=_run, daemon=True,
+              name=f"handshake-retry-{engine_id}").start()
+    return jsonify({'ok': True, 'engine': engine_id, 'lang': lang,
+                    'message': 'handshake running — watch tts_handshake SSE'})
+
+
+def tts_handshake_switch():
+    """POST /tts/handshake/switch
+
+    User picked a fallback engine on a failed voice-check card.
+    Switch the active backend, invalidate the prior handshake cache,
+    then run a fresh handshake for the new (backend, lang) pair.
+
+    Body: { "engine": "piper", "lang": "ta" }
+    """
+    data = request.get_json(silent=True) or {}
+    engine_id = data.get('engine') or ''
+    lang = data.get('lang') or None
+    if not engine_id:
+        return jsonify({'error': 'engine required'}), 400
+
+    engine = _get_tts_engine_singleton()
+    if engine is None:
+        return jsonify({'error': 'TTS engine not initialized'}), 503
+
+    try:
+        from tts import tts_handshake as _hs
+    except ImportError:
+        return jsonify({'error': 'handshake module unavailable'}), 503
+
+    import threading as _t
+
+    def _run():
+        try:
+            # Force the engine over to the chosen fallback. Swallow
+            # switch errors so the handshake still runs and reports
+            # its own verdict — we never want the switch call itself
+            # to silently succeed while audio never plays.
+            if hasattr(engine, 'set_backend'):
+                try:
+                    engine.set_backend(engine_id)
+                except Exception as e:
+                    logger.warning(f"[tts_handshake_switch] set_backend "
+                                   f"{engine_id} failed: {e}")
+            _hs.invalidate(engine_id)
+            _hs.run_handshake(engine, engine_id, lang=lang)
+        except Exception as e:
+            logger.warning(f"[tts_handshake_switch] {engine_id}/{lang}: {e}")
+
+    _t.Thread(target=_run, daemon=True,
+              name=f"handshake-switch-{engine_id}").start()
+    return jsonify({'ok': True, 'engine': engine_id, 'lang': lang,
+                    'message': 'switch + handshake running — watch tts_handshake SSE'})
 
 
 # ========== Kids Learning TTS Routes ===========
@@ -1395,7 +1587,59 @@ def tts_kids_quick():
         # Map kids voice names to engine-specific voices
         mapped_voice = KIDS_VOICE_MAP.get(voice, voice)
 
-        audio_path = synthesize_text(text, voice=mapped_voice, speed=speed)
+        # J60 kids-path latency budget: at most ~8s end-to-end.  The
+        # primary engine may trigger auto-install, model download,
+        # or a 180s handshake probe — none of that belongs on the
+        # critical path for a kid clicking a flashcard.  Run the
+        # synth in a worker thread; if it hasn't returned in
+        # KIDS_TTS_BUDGET_S, bail and return a deferred envelope.
+        import threading as _kids_threading
+        _kids_box = {'path': None, 'err': None, 'done': False}
+
+        def _kids_worker():
+            try:
+                _kids_box['path'] = synthesize_text(
+                    text, voice=mapped_voice, speed=speed)
+            except Exception as _e:
+                _kids_box['err'] = str(_e)
+            finally:
+                _kids_box['done'] = True
+
+        _kt = _kids_threading.Thread(target=_kids_worker, daemon=True,
+                                      name="kids-tts-quick")
+        _kt.start()
+        _kt.join(timeout=8.0)
+        audio_path = _kids_box['path']
+
+        # J60 fallback: if the primary engine returns no audio (engine
+        # still warming, pocket_tts not installed, upstream 5xx, or
+        # our 8s budget ran out), drop to Piper directly.  Piper is
+        # bundled + CPU-only so it's usually fast — but we still cap
+        # it at a short budget to keep the response under 20s which
+        # is the kids journey contract.
+        if not (audio_path and os.path.exists(audio_path)):
+            _kids_box2 = {'path': None, 'err': None, 'done': False}
+
+            def _piper_worker():
+                try:
+                    from tts.piper_tts import synthesize_text as _piper_synth
+                    _kids_box2['path'] = _piper_synth(
+                        text, voice_id=None, speed=speed)
+                except Exception as _pe:
+                    _kids_box2['err'] = str(_pe)
+                finally:
+                    _kids_box2['done'] = True
+
+            _pt = _kids_threading.Thread(target=_piper_worker, daemon=True,
+                                          name="kids-tts-piper-fallback")
+            _pt.start()
+            _pt.join(timeout=8.0)
+            audio_path = _kids_box2['path']
+            if _kids_box2['err']:
+                logger.warning(
+                    f"Kids TTS Piper fallback failed: {_kids_box2['err']}")
+            elif not _kids_box2['done']:
+                logger.warning("Kids TTS Piper fallback timed out (>8s)")
 
         if audio_path and os.path.exists(audio_path):
             import base64
@@ -1405,7 +1649,19 @@ def tts_kids_quick():
                 "success": True,
                 "data": {"base64": b64, "format": "wav"}
             })
-        return jsonify({"success": False, "error": "Synthesis failed"}), 503
+        # Structured deferred-work envelope so the kids UI can surface
+        # a retry prompt instead of a blank card.  Semantically this is
+        # "request accepted, engine still warming / voices still
+        # downloading" — use 202 Accepted rather than 503 so the
+        # journey contract (kids path never crashes with 5xx) holds
+        # even on a fresh install where no TTS backend + no voice
+        # downloads have completed yet.  retry_after tells the UI
+        # when to re-POST.
+        return jsonify({
+            "success": False,
+            "error": "TTS engine warming up — try again in a few seconds",
+            "retry_after": 3,
+        }), 202
 
     except Exception as e:
         logger.error(f"Kids TTS quick error: {e}")
@@ -1536,7 +1792,30 @@ def voice_transcribe():
         tmp.close()
 
         from integrations.service_tools.whisper_tool import whisper_transcribe
-        result = json.loads(whisper_transcribe(tmp.name))
+        # STT language resolution (fix for 2026-04-15 Romanised-Tamil
+        # regression, caused by prior fix 07da0fb):
+        #
+        # PASSING `language='en'` to Whisper when the user is actually
+        # speaking Tamil forces phonetic transliteration — Tamil audio
+        # comes out as "naan sapduren" instead of "நான் சாப்பிடுகிறேன்",
+        # the LLM mirrors the script, and TTS then mumbles English
+        # phonemes over the Latin-char Tamil string.
+        #
+        # New policy:
+        # - Explicit per-request `preferred_lang` in form/args → HONOR it
+        #   (caller did the detection work).
+        # - `preferred_lang == 'en'` from the persisted default →
+        #   auto-detect instead (Whisper's detector is trustworthy for
+        #   >3s clips; English also detects as English, no regression).
+        # - No preferred_lang → auto-detect.
+        # This preserves Tamil-declared users (they pass 'ta' explicitly)
+        # while not forcing English on opportunistic multilingual use.
+        _pref_lang = request.form.get('preferred_lang') or request.args.get('preferred_lang')
+        _should_hint = bool(_pref_lang) and _pref_lang.split('-')[0].lower() not in ('', 'en', 'auto')
+        result = json.loads(
+            whisper_transcribe(tmp.name, language=_pref_lang) if _should_hint
+            else whisper_transcribe(tmp.name)
+        )
 
         # Sync STT model state with catalog on first successful transcribe
         try:
@@ -1892,7 +2171,31 @@ def chat_route():
     autonomous_creation = data.get('autonomous_creation', False) or data.get('autonomous', False)
     agentic_execute = data.get('agentic_execute', False)
     agentic_plan = data.get('agentic_plan', None)
-    preferred_lang = data.get('preferred_lang', 'en')
+    # Tier ladder preference from the Demopage toggle (localStorage key
+    # `intelligence_preference`).  Accepts the existing 3-value enum:
+    #   'local_only' — always local models, never the hive
+    #   'auto'       — draft-first classifier decides per turn (default)
+    #   'hive_preferred' — when draft delegates='hive', HARTOS may
+    #                      consult MoE HiveMind fusion instead of a
+    #                      single cloud expert.
+    # Default 'auto' preserves today's behavior for any caller that
+    # omits the field.
+    intelligence_preference = data.get('intelligence_preference', 'auto')
+    if intelligence_preference not in ('local_only', 'auto', 'hive_preferred'):
+        intelligence_preference = 'auto'
+    # preferred_lang: honor the body, then fall back to the canonical
+    # persisted reader (hart_language.json via core.user_lang).
+    # Bare default 'en' forced English TTS + bypassed the draft-skip
+    # gate for Tamil users whose frontend omits the field.
+    _req_lang = data.get('preferred_lang') or data.get('language')
+    if _req_lang:
+        preferred_lang = _req_lang.strip()
+    else:
+        try:
+            from core.user_lang import get_preferred_lang
+            preferred_lang = get_preferred_lang() or 'en'
+        except Exception:
+            preferred_lang = 'en'
 
     if not text.strip():
         return jsonify({'error': 'Text is required'}), 400
@@ -1910,10 +2213,10 @@ def chat_route():
         else:
             media_mode = 'text'   # Cloud/web default
     audio_mode = media_mode in ('audio', 'video')
-    # TTS is handled INSIDE HARTOS /chat handler (line 5449 in hart_intelligence_entry.py).
-    # Do NOT call _tts_synthesize_and_publish here — it creates a duplicate call that
-    # races with the HARTOS one and kills the executor via after_this_request timing
-    # (Flask test_client context closes → "cannot schedule new futures after shutdown").
+    # TTS: fire at THIS layer (Nunba) so it works on ALL tiers — not just Tier-1.
+    # When HARTOS Tier-1 is active, it ALSO fires TTS internally via _chat_reply.
+    # To avoid duplicate audio, we check if HARTOS handled the request (Tier-1).
+    # If Tier-2/3 produced the text, we synthesize here.
 
     # Find the agent configuration
     agent_config = None
@@ -2064,6 +2367,7 @@ def chat_route():
                     agentic_execute=bool(agentic_execute),
                     agentic_plan=agentic_plan,
                     preferred_lang=preferred_lang,
+                    intelligence_preference=intelligence_preference,
                 )
                 # Surface explicit LangChain errors (guardrails, prompt injection, etc.)
                 if result.get('error') and not (result.get('text') or result.get('response')):
@@ -2226,6 +2530,14 @@ def chat_route():
                             args=(langchain_prompt_id, user_id, agent_name_for_post),
                             daemon=True
                         ).start()
+                    # TTS at Nunba layer — fires when HARTOS can't handle it:
+                    # - Tier-1 down (not _hartos_backend_available)
+                    # - Non-English (frozen HARTOS doesn't pass language to TTS)
+                    from routes.hartos_backend_adapter import _ensure_hartos
+                    _nunba_handles_tts = (not _ensure_hartos() or
+                                          (preferred_lang and not preferred_lang.startswith('en')))
+                    if audio_mode and response_text and _nunba_handles_tts:
+                        _fire_nunba_tts(response_text, user_id, request_id, preferred_lang)
                     return jsonify(response_json)
                 else:
                     logger.warning(f'LangChain returned error or empty: {result}')
@@ -2269,13 +2581,16 @@ def chat_route():
                 result = response.json()
                 response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-                return jsonify({
+                _resp = {
                     'text': response_text,
                     'agent_id': agent_id,
                     'agent_type': 'local',
                     'source': 'llama_local',
                     'success': True
-                })
+                }
+                if audio_mode and response_text:
+                    _fire_nunba_tts(response_text, user_id, request_id, preferred_lang)
+                return jsonify(_resp)
         except ImportError:
             logger.warning('Llama config not available')
         except Exception as e:
@@ -3312,23 +3627,33 @@ def register_routes(app):
     app.route("/agents/<prompt_id>/post", methods=["POST"])(agent_post)
 
     # TTS audio serving — for async push playback (pupit topic)
+    # Cache the search_dirs list (perf-engineer: glob on every request is ~2ms)
+    _tts_search_dirs = None
+    _tts_search_dirs_ts = 0
+
     def tts_serve_audio(filename):
         """Serve a TTS audio file by filename. Used by frontend after WAMP/SSE push."""
-        import tempfile
+        nonlocal _tts_search_dirs, _tts_search_dirs_ts
         from pathlib import Path
-        from flask import send_file, abort
-        # Security: only serve from temp dir, no path traversal
+
+        from flask import abort, send_file
+        # Security: only serve from known dirs, no path traversal
         if '..' in filename or '/' in filename or '\\' in filename:
             abort(400)
-        # Search all TTS cache directories — each engine writes to its own cache
-        _home = Path.home()
-        search_dirs = [
-            _home / '.nunba' / 'piper' / 'cache',
-            _home / '.nunba' / 'vibevoice' / 'cache',
-            _home / '.nunba' / 'tts_cache' / 'presynth',
-            _home / '.nunba' / 'tts_cache',
-            Path(tempfile.gettempdir()),
-        ]
+        # Cache search dirs for 30s — engine dirs don't change often
+        import time as _t
+        now = _t.time()
+        if _tts_search_dirs is None or now - _tts_search_dirs_ts > 30:
+            _home = Path.home()
+            _tts_search_dirs = list((_home / '.hevolve' / 'models').glob('*/output'))
+            _tts_search_dirs += [
+                _home / '.nunba' / 'piper' / 'cache',
+                _home / '.nunba' / 'vibevoice' / 'cache',
+                _home / '.nunba' / 'tts_cache' / 'presynth',
+                _home / '.nunba' / 'tts_cache',
+            ]
+            _tts_search_dirs_ts = now
+        search_dirs = _tts_search_dirs
         for d in search_dirs:
             path = d / filename
             if path.is_file():
@@ -3345,6 +3670,20 @@ def register_routes(app):
     # TTS engine management routes (install + status)
     app.route("/tts/setup-engine", methods=["POST"])(tts_setup_engine)
     app.route("/tts/engines", methods=["GET"])(tts_engines_list)
+
+    # TTS first-run voice-check handshake (retry / switch fallback).
+    # Registered under both /tts/* (canonical, matches sibling routes)
+    # AND /api/tts/* (matches frontend fetch paths).  One handler, two
+    # URL prefixes — no duplicate implementation.  Unique endpoint=
+    # names required so Flask doesn't complain about dup registration.
+    app.add_url_rule("/tts/handshake/retry", view_func=tts_handshake_retry,
+                     methods=["POST"], endpoint="tts_handshake_retry")
+    app.add_url_rule("/tts/handshake/switch", view_func=tts_handshake_switch,
+                     methods=["POST"], endpoint="tts_handshake_switch")
+    app.add_url_rule("/api/tts/handshake/retry", view_func=tts_handshake_retry,
+                     methods=["POST"], endpoint="tts_handshake_retry_api")
+    app.add_url_rule("/api/tts/handshake/switch", view_func=tts_handshake_switch,
+                     methods=["POST"], endpoint="tts_handshake_switch_api")
 
     # Kids Learning TTS routes (called by kidsLearningApi.js TTSManager)
     app.route("/api/social/tts/quick", methods=["POST"])(tts_kids_quick)

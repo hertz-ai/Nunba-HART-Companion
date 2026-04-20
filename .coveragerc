@@ -1,0 +1,69 @@
+[run]
+# Measure runtime code coverage during the e2e suite.  Sources listed
+# here are the Nunba code that ships to users — we explicitly track
+# coverage of the code that runs in production, not the test scaffolding.
+source =
+    app.py
+    main.py
+    tts
+    llama
+    routes
+    core
+    models
+    desktop
+
+# Exclude known non-runtime artifacts.
+omit =
+    */__pycache__/*
+    */tests/*
+    */.venv/*
+    */python-embed/*
+    */python-embed-310-backup/*
+    */build/*
+    */landing-page/*
+    */scripts/_dead_code_*
+    */scripts/setup_freeze_*
+    setup.py
+    conftest.py
+    # HARTOS is a separate repo with its own coverage gate — don't
+    # fold its line counts into the Nunba budget, or every HARTOS
+    # refactor would shift the Nunba number.  HARTOS code IS still
+    # exercised at runtime (imported as a pip dep); we only omit it
+    # from the Nunba report, not from what the tests drive.
+    C:/Users/*/PycharmProjects/HARTOS/*
+    */site-packages/HARTOS/*
+    */site-packages/hevolveai/*
+    */site-packages/hevolve_database/*
+
+branch = True
+parallel = True
+concurrency = thread
+
+[report]
+# Lines that legitimately cannot be runtime-covered on CI.
+exclude_also =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    if sys\.platform ==
+    if IS_MACOS
+    if IS_LINUX
+    except ImportError
+    if getattr\(sys, .frozen., False\)
+
+precision = 1
+show_missing = False
+
+# HARD QUALITY GATE — enforced by `coverage report --fail-under` and
+# pytest-cov --cov-fail-under. Lower this only with explicit cause.
+# Current observed baseline: ~5-10%, because most tests are still
+# source-grep. This will FAIL every build until the e2e families land.
+# That's intentional — it makes the "100% runtime coverage" target
+# visible and unavoidable instead of aspirational.
+fail_under = 99
+
+[html]
+directory = .coverage-html
+
+[xml]
+output = coverage.xml

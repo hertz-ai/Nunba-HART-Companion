@@ -1,7 +1,3 @@
-import React from 'react';
-import {Box, Typography, IconButton, useTheme} from '@mui/material';
-import {alpha} from '@mui/material/styles';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   RADIUS,
   GRADIENTS,
@@ -9,6 +5,11 @@ import {
   SHADOWS,
 } from '../../../theme/socialTokens';
 import {animFadeInUp} from '../../../utils/animations';
+
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import {Box, Typography, IconButton, useTheme} from '@mui/material';
+import {alpha} from '@mui/material/styles';
+import React from 'react';
 
 /**
  * AdultGameShell — Game chrome wrapper providing header, timer bar,

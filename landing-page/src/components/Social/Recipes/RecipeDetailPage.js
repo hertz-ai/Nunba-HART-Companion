@@ -1,7 +1,16 @@
-import {recipesApi} from '../../../services/socialApi';
 import {useSocial} from '../../../contexts/SocialContext';
+import {recipesApi} from '../../../services/socialApi';
+import {
+  socialTokens,
+  RADIUS,
+  SHADOWS,
+  EASINGS,
+  GRADIENTS,
+} from '../../../theme/socialTokens';
 import UserChip from '../shared/UserChip';
 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import {
   Typography,
   Box,
@@ -16,17 +25,9 @@ import {
   useTheme,
 } from '@mui/material';
 import {alpha} from '@mui/material/styles';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CallSplitIcon from '@mui/icons-material/CallSplit';
 import React, {useState, useEffect} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
-import {
-  socialTokens,
-  RADIUS,
-  SHADOWS,
-  EASINGS,
-  GRADIENTS,
-} from '../../../theme/socialTokens';
+
 
 export default function RecipeDetailPage() {
   const {recipeId} = useParams();

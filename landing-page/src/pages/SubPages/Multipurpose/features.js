@@ -1,7 +1,8 @@
-import React, {Component} from 'react';
+import img3 from '../../../images/features/cognitive-data.svg';
 import img1 from '../../../images/features/img-1.png';
 import img2 from '../../../images/features/img-2.png';
-import img3 from '../../../images/features/cognitive-data.svg';
+
+import React, {Component} from 'react';
 
 class Features extends Component {
   constructor(props) {

@@ -1,6 +1,6 @@
-import React from 'react';
-import {Box, Typography, Button, Avatar, Chip} from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
+import {Box, Typography, Button, Avatar, Chip} from '@mui/material';
+import React from 'react';
 
 export default function ProximityMatchCard({match, onReveal, onChat}) {
   const {status, distance_bucket, you_revealed, other_revealed} = match;

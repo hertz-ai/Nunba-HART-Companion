@@ -1,7 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Tabs, Tab, Fab, Box, Card, Fade, Typography, Chip, Button, IconButton, keyframes, useTheme, Alert } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import CreateThoughtExperimentDialog from './CreateThoughtExperimentDialog';
+import FeedHeader from './FeedHeader';
+import PostCard from './PostCard';
+import ThoughtExperimentCard from './ThoughtExperimentCard';
+
+import { useSocial } from '../../../contexts/SocialContext';
+import { useScrollDepthObserver } from '../../../hooks/useAgentObserver';
+import { feedApi, seasonsApi, encountersApi } from '../../../services/socialApi';
+import { GRADIENTS, EASINGS, RADIUS, INTENT_COLORS, socialTokens } from '../../../theme/socialTokens';
+import { animFadeInUp, animSlideInUp } from '../../../utils/animations';
+import { useRoleAccess } from '../../RoleGuard';
+import { AdBanner, AdCard } from '../Ads';
+import { AutopilotBanner } from '../Autopilot';
+import EmptyState from '../shared/EmptyState';
+import EncounterCard from '../shared/EncounterCard';
+import InfiniteScroll from '../shared/InfiniteScroll';
+import PostCardSkeleton from '../shared/PostCardSkeleton';
 import AddIcon from '@mui/icons-material/Add';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import ExploreIcon from '@mui/icons-material/Explore';
@@ -11,27 +24,19 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import CloseIcon from '@mui/icons-material/Close';
-import PostCard from './PostCard';
-import ThoughtExperimentCard from './ThoughtExperimentCard';
-import FeedHeader from './FeedHeader';
-import CreateThoughtExperimentDialog from './CreateThoughtExperimentDialog';
+
 // IntentBadge kept available for future use
 // import IntentBadge, { ALL_INTENTS } from './IntentBadge';
-import PostCardSkeleton from '../shared/PostCardSkeleton';
-import InfiniteScroll from '../shared/InfiniteScroll';
-import EmptyState from '../shared/EmptyState';
 import OnboardingChecklist from '../shared/OnboardingChecklist';
+
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import { feedApi, seasonsApi, encountersApi } from '../../../services/socialApi';
-import { useSocial } from '../../../contexts/SocialContext';
-import { useRoleAccess } from '../../RoleGuard';
+
 import SeasonBanner from '../shared/SeasonBanner';
-import EncounterCard from '../shared/EncounterCard';
-import { GRADIENTS, EASINGS, RADIUS, INTENT_COLORS, socialTokens } from '../../../theme/socialTokens';
-import { animFadeInUp, animSlideInUp } from '../../../utils/animations';
-import { AutopilotBanner } from '../Autopilot';
-import { AdBanner, AdCard } from '../Ads';
-import { useScrollDepthObserver } from '../../../hooks/useAgentObserver';
+
+import { Tabs, Tab, Fab, Box, Card, Fade, Typography, Chip, Button, IconButton, keyframes, useTheme, Alert } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 /* ── Keyframes ── */
 const fabPulse = keyframes`

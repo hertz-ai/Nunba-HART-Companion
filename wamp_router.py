@@ -26,7 +26,7 @@ import logging
 import os
 import threading
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple  # noqa: UP035
 
 logger = logging.getLogger('nunba.wamp_router')
 
@@ -34,6 +34,8 @@ logger = logging.getLogger('nunba.wamp_router')
 HELLO = 1
 WELCOME = 2
 ABORT = 3
+CHALLENGE = 4
+AUTHENTICATE = 5
 GOODBYE = 6
 ERROR = 8
 PUBLISH = 16
@@ -51,6 +53,31 @@ UNREGISTER = 66
 UNREGISTERED = 67
 INVOCATION = 68
 YIELD_MSG = 70
+
+# ── Auth Token ──────────────────────────────────────────────────────────
+# When NUNBA_WAMP_TICKET is set (or auto-generated for LAN mode),
+# the router requires ticket auth.  When empty, anonymous is allowed.
+import secrets
+
+_wamp_ticket: str | None = os.environ.get('NUNBA_WAMP_TICKET', '')
+
+
+def _require_auth() -> bool:
+    """True when the router requires ticket authentication."""
+    return bool(_wamp_ticket)
+
+
+def get_wamp_ticket() -> str:
+    """Return the current WAMP ticket (for Flask API to serve to clients)."""
+    return _wamp_ticket
+
+
+def _enable_auth_for_lan():
+    """Auto-generate a ticket when binding to non-localhost (LAN mode)."""
+    global _wamp_ticket
+    if not _wamp_ticket:
+        _wamp_ticket = secrets.token_urlsafe(32)
+        logger.info("WAMP auth enabled (auto-generated ticket for LAN mode)")
 
 # ── Router State ─────────────────────────────────────────────────────────
 
@@ -71,15 +98,15 @@ class WampRealm:
     def __init__(self, name: str = 'realm1'):
         self.name = name
         # topic -> set of (session_id, subscription_id)
-        self.subscriptions: Dict[str, Set[Tuple[int, int]]] = defaultdict(set)
+        self.subscriptions: dict[str, set[tuple[int, int]]] = defaultdict(set)
         # subscription_id -> (session_id, topic)
-        self.sub_index: Dict[int, Tuple[int, str]] = {}
+        self.sub_index: dict[int, tuple[int, str]] = {}
         # uri -> (session_id, registration_id)
-        self.registrations: Dict[str, Tuple[int, int]] = {}
+        self.registrations: dict[str, tuple[int, int]] = {}
         # registration_id -> (session_id, uri)
-        self.reg_index: Dict[int, Tuple[int, str]] = {}
+        self.reg_index: dict[int, tuple[int, str]] = {}
         # invocation_id -> (caller_session_id, call_request_id)
-        self.pending_calls: Dict[int, Tuple[int, int]] = {}
+        self.pending_calls: dict[int, tuple[int, int]] = {}
         self.lock = threading.Lock()
 
 
@@ -89,7 +116,9 @@ class WampSession:
     def __init__(self, session_id: int, protocol):
         self.session_id = session_id
         self.protocol = protocol  # WebSocket protocol instance
-        self.realm: Optional[str] = None
+        self.realm: str | None = None
+        self.authenticated: bool = False  # True after successful auth or when auth not required
+        self.authid: str = 'anonymous'    # User identity for topic authorization
 
     def send(self, msg: list):
         """Send a WAMP message (JSON-encoded list) to this client."""
@@ -102,12 +131,12 @@ class WampSession:
 
 # ── Global router state ──────────────────────────────────────────────────
 
-_realms: Dict[str, WampRealm] = {}
-_sessions: Dict[int, WampSession] = {}
-_protocol_to_session: Dict[int, int] = {}  # id(protocol) -> session_id
+_realms: dict[str, WampRealm] = {}
+_sessions: dict[int, WampSession] = {}
+_protocol_to_session: dict[int, int] = {}  # id(protocol) -> session_id
 _state_lock = threading.Lock()
-_event_loop: Optional[asyncio.AbstractEventLoop] = None
-_router_thread: Optional[threading.Thread] = None
+_event_loop: asyncio.AbstractEventLoop | None = None
+_router_thread: threading.Thread | None = None
 _started = False
 
 
@@ -119,12 +148,11 @@ def _get_realm(name: str = 'realm1') -> WampRealm:
 
 # ── WAMP Message Handlers ────────────────────────────────────────────────
 
-def _handle_hello(session: WampSession, msg: list):
-    """HELLO [realm, details] -> WELCOME"""
-    realm_name = msg[1] if len(msg) > 1 else 'realm1'
-    session.realm = realm_name
-    _get_realm(realm_name)
-
+def _send_welcome(session: WampSession, authid: str = 'anonymous',
+                   authrole: str = 'anonymous', authmethod: str = 'anonymous'):
+    """Send WELCOME message after successful auth (or when auth not required)."""
+    session.authenticated = True
+    session.authid = authid
     welcome = [WELCOME, session.session_id, {
         'roles': {
             'broker': {
@@ -139,12 +167,54 @@ def _handle_hello(session: WampSession, msg: list):
                 }
             },
         },
-        'authid': 'anonymous',
-        'authrole': 'anonymous',
-        'authmethod': 'anonymous',
+        'authid': authid,
+        'authrole': authrole,
+        'authmethod': authmethod,
     }]
     session.send(welcome)
-    logger.debug("Session %d joined realm '%s'", session.session_id, realm_name)
+
+
+def _handle_hello(session: WampSession, msg: list):
+    """HELLO [realm, details] -> WELCOME or CHALLENGE"""
+    realm_name = msg[1] if len(msg) > 1 else 'realm1'
+    details = msg[2] if len(msg) > 2 else {}
+    session.realm = realm_name
+    _get_realm(realm_name)
+
+    if _require_auth():
+        # Check if client supports ticket auth
+        client_methods = details.get('authmethods', [])
+        if 'ticket' in client_methods:
+            # Send CHALLENGE for ticket auth
+            session.send([CHALLENGE, 'ticket', {}])
+            logger.debug("Session %d: sent ticket CHALLENGE", session.session_id)
+            return
+        else:
+            # Client doesn't support ticket auth — reject
+            session.send([ABORT, {}, 'wamp.error.no_auth_method'])
+            logger.warning("Session %d: rejected (no ticket auth support)",
+                           session.session_id)
+            return
+
+    # No auth required — welcome immediately with client-provided authid
+    _client_authid = details.get('authid', 'anonymous')
+    _send_welcome(session, authid=_client_authid)
+    logger.debug("Session %d joined realm '%s' as '%s'",
+                 session.session_id, realm_name, _client_authid)
+
+
+def _handle_authenticate(session: WampSession, msg: list):
+    """AUTHENTICATE [signature, extra] -> WELCOME or ABORT"""
+    import hmac as _hmac
+    signature = msg[1] if len(msg) > 1 else ''
+
+    if _require_auth() and _hmac.compare_digest(str(signature), _wamp_ticket):
+        _send_welcome(session, authid='client', authrole='trusted',
+                      authmethod='ticket')
+        logger.debug("Session %d authenticated via ticket", session.session_id)
+    else:
+        session.send([ABORT, {}, 'wamp.error.not_authorized'])
+        logger.warning("Session %d: ticket auth FAILED", session.session_id)
 
 
 def _handle_goodbye(session: WampSession, msg: list):
@@ -160,6 +230,18 @@ def _handle_subscribe(session: WampSession, msg: list):
     if not topic:
         session.send([ERROR, SUBSCRIBE, request_id, {}, 'wamp.error.invalid_uri'])
         return
+
+    # Topic authorization: user-scoped topics (com.hertzai.hevolve.*.{userId})
+    # must match the session's authid. Prevents cross-user eavesdropping.
+    # Backend publish_local() bypasses this (no session, direct realm access).
+    if session.authid and session.authid != 'anonymous':
+        # User-scoped topics end with the user_id segment
+        if 'hertzai' in topic and session.authid not in topic:
+            session.send([ERROR, SUBSCRIBE, request_id, {},
+                          'wamp.error.not_authorized'])
+            logger.warning("Session %d (%s): subscribe to '%s' DENIED (not their topic)",
+                           session.session_id, session.authid, topic)
+            return
 
     realm = _get_realm(session.realm or 'realm1')
     sub_id = _gen_id()
@@ -216,7 +298,7 @@ def _handle_publish(session: WampSession, msg: list):
 
 
 def _deliver_event(realm: WampRealm, topic: str, args: list, kwargs: dict,
-                   pub_id: int, exclude_session: Optional[int] = None):
+                   pub_id: int, exclude_session: int | None = None):
     """Deliver an EVENT message to all subscribers of a topic."""
     with realm.lock:
         subscribers = list(realm.subscriptions.get(topic, set()))
@@ -349,9 +431,15 @@ def _handle_yield(session: WampSession, msg: list):
 
 # ── Message Dispatch ─────────────────────────────────────────────────────
 
-_HANDLERS = {
+# Handlers that don't require authentication (pre-auth phase)
+_PRE_AUTH_HANDLERS = {
     HELLO: _handle_hello,
+    AUTHENTICATE: _handle_authenticate,
     GOODBYE: _handle_goodbye,
+}
+
+# Handlers that require authentication
+_AUTH_HANDLERS = {
     SUBSCRIBE: _handle_subscribe,
     UNSUBSCRIBE: _handle_unsubscribe,
     PUBLISH: _handle_publish,
@@ -374,8 +462,23 @@ def _dispatch_message(session: WampSession, raw: str):
         return
 
     msg_type = msg[0]
-    handler = _HANDLERS.get(msg_type)
+
+    # Pre-auth handlers (HELLO, AUTHENTICATE, GOODBYE) always allowed
+    handler = _PRE_AUTH_HANDLERS.get(msg_type)
     if handler:
+        try:
+            handler(session, msg)
+        except Exception as e:
+            logger.warning("Handler error for msg_type %d: %s", msg_type, e)
+        return
+
+    # Auth-required handlers — reject if session not authenticated
+    handler = _AUTH_HANDLERS.get(msg_type)
+    if handler:
+        if not session.authenticated:
+            logger.warning("Session %d: msg_type %d rejected (not authenticated)",
+                           session.session_id, msg_type)
+            return
         try:
             handler(session, msg)
         except Exception as e:
@@ -517,8 +620,8 @@ def _run_router(port: int, host: str):
 
     try:
         from autobahn.asyncio.websocket import (
-            WebSocketServerProtocol,
             WebSocketServerFactory,
+            WebSocketServerProtocol,
         )
     except ImportError:
         logger.error("autobahn not available — WAMP router cannot start")
@@ -574,6 +677,28 @@ def _run_router(port: int, host: str):
             logger.warning("WAMP router did not start — realtime features will use SSE fallback")
 
 
+def ensure_wamp_running(reason: str = '') -> bool:
+    """Start the WAMP router if it isn't running yet.
+
+    Called by on-demand paths: a channel adapter being registered after
+    boot, a mobile peer being discovered, an admin enabling realtime
+    features — anything that needs cross-process messaging.  At cold boot
+    when no channels/peers are configured, main.py skips the router to
+    save ~100MB; this lets it wake later without restarting Nunba.
+
+    Idempotent — if already running, returns True immediately.
+    """
+    if is_running():
+        return True
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"WAMP router: on-demand start ({reason or 'unspecified'})")
+    except Exception:
+        pass
+    return start_wamp_router()
+
+
 def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
     """Start the embedded WAMP router in a daemon thread.
 
@@ -582,8 +707,7 @@ def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
 
     Security: defaults to 127.0.0.1 (localhost only). Set host='0.0.0.0'
     explicitly for regional/LAN deployments where React Native clients
-    connect from other devices. WAMP auth should be added before exposing
-    to LAN (tracked: ethical-hacker finding #1).
+    connect from other devices. Ticket auth is auto-enabled for LAN mode.
 
     Args:
         port: WebSocket port (default 8088, matching crossbarWorker.js expectation)
@@ -591,18 +715,87 @@ def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
     """
     global _router_thread, _started
 
-    if _started or (_router_thread and _router_thread.is_alive()):
-        return True
+    # SRE finding: the old guard+assign sequence had a TOCTOU race — two
+    # concurrent ensure_wamp_running() callers (e.g. a channel adapter boot +
+    # a mobile peer discovery firing in the same tick) could both observe
+    # _started=False and _router_thread=None, then both spawn a daemon
+    # thread. Result: two WampRouter threads racing for port 8088, one wins
+    # the bind() and the other silently fails in _run_router. Wrap the
+    # check-and-spawn in the module-level _state_lock so only one caller
+    # ever reaches thread.start(). _state_lock is NOT held during
+    # thread.start() itself (safe — the new thread only touches _started
+    # after its own event loop is up, not while we hold the lock), and
+    # neither _run_router nor is_running re-enter start_wamp_router, so
+    # no deadlock is possible.
+    with _state_lock:
+        if _started or (_router_thread and _router_thread.is_alive()):
+            return True
 
-    # Allow port override via environment variable
-    port = int(os.environ.get('NUNBA_WAMP_PORT', port))
+        # Allow port override via environment variable
+        port = int(os.environ.get('NUNBA_WAMP_PORT', port))
 
-    _router_thread = threading.Thread(
-        target=_run_router, args=(port, host),
-        daemon=True, name='WampRouter',
-    )
-    _router_thread.start()
+        # Auto-enable ticket auth when binding to LAN (non-localhost)
+        if host != '127.0.0.1':
+            _enable_auth_for_lan()
+
+        _router_thread = threading.Thread(
+            target=_run_router, args=(port, host),
+            daemon=True, name='WampRouter',
+        )
+        _router_thread.start()
+
+    # Register with watchdog so silent crashes are detected and auto-restarted
+    _register_with_watchdog(port, host)
+
     return True
+
+
+def _register_with_watchdog(port: int, host: str):
+    """Register WAMP router with the node watchdog for crash detection."""
+    try:
+        from security.node_watchdog import get_watchdog
+        wd = get_watchdog()
+        if wd and not wd.is_registered('wamp_router'):
+            wd.register(
+                name='wamp_router',
+                expected_interval=60,
+                restart_fn=lambda: start_wamp_router(port, host),
+                stop_fn=stop_wamp_router,
+            )
+            # Start a heartbeat thread that pulses while the router is alive
+            _start_heartbeat_thread()
+    except ImportError:
+        pass  # watchdog not available (standalone mode)
+
+
+_heartbeat_thread: threading.Thread | None = None
+
+
+def _start_heartbeat_thread():
+    """Pulse a watchdog heartbeat every 30s while the router is alive."""
+    global _heartbeat_thread
+    if _heartbeat_thread and _heartbeat_thread.is_alive():
+        return
+
+    def _pulse():
+        try:
+            from security.node_watchdog import get_watchdog
+        except ImportError:
+            return
+        while _started:
+            wd = get_watchdog()
+            if wd:
+                # Use sleep_with_heartbeat to avoid GIL-stall false FROZEN
+                # (SRE finding: bare time.sleep re-introduces the 2026-04-11 cascade)
+                wd.sleep_with_heartbeat('wamp_router', 30,
+                                         stop_check=lambda: not _started)
+            else:
+                import time
+                time.sleep(30)
+
+    _heartbeat_thread = threading.Thread(target=_pulse, daemon=True,
+                                         name='WampRouterHeartbeat')
+    _heartbeat_thread.start()
 
 
 def stop_wamp_router():
@@ -611,3 +804,12 @@ def stop_wamp_router():
     _started = False
     if _event_loop and _event_loop.is_running():
         _event_loop.call_soon_threadsafe(_event_loop.stop)
+
+    # Unregister from watchdog
+    try:
+        from security.node_watchdog import get_watchdog
+        wd = get_watchdog()
+        if wd:
+            wd.unregister('wamp_router')
+    except ImportError:
+        pass
