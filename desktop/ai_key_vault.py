@@ -124,7 +124,26 @@ def _get_machine_identity() -> str:
         except Exception:
             pass
 
-    parts.append(platform.node())
+    # Hostname: use socket.gethostname() NOT platform.node().
+    # platform.node() on Windows calls _wmi_query() internally which
+    # can hang 60+ seconds on machines where the WMI service is busy
+    # (Windows Defender real-time scan often triggers this).  Witnessed
+    # 2026-04-21: startup blocked 70s+ in ai_key_vault with watchdog
+    # phase='post_splash' stuck=60s.  socket.gethostname() reads the
+    # same value without going through WMI — effectively instant.
+    #
+    # Fallbacks: COMPUTERNAME env var (Windows), HOSTNAME env var
+    # (POSIX), then 'unknown-host' so key derivation still succeeds
+    # (key just doesn't include the hostname component).
+    try:
+        import socket
+        parts.append(socket.gethostname())
+    except Exception:
+        parts.append(
+            os.environ.get('COMPUTERNAME')
+            or os.environ.get('HOSTNAME')
+            or 'unknown-host'
+        )
     return '|'.join(parts)
 
 

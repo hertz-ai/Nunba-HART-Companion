@@ -190,20 +190,82 @@ def _preload_pycparser_from_lib_src():
         pass
 
 
+def _running_from_install_location():
+    """Detect whether THIS process is executing from the installed Nunba
+    directory (``\\HevolveAI\\Nunba\\``), regardless of how Python was
+    launched.
+
+    Motivation (2026-04-21 watchdog dump): the installed Nunba hung 31+s
+    at ``importing_main`` because ``integrations.social.models`` imported
+    ``sqlalchemy`` from the developer's ``.venv\\Lib\\site-packages\\``
+    instead of the bundled ``lib\\sqlalchemy\\``.  Root cause: the
+    freeze_core console launcher does NOT always set ``sys.frozen = True``,
+    so ``_isolate_frozen_imports()`` short-circuited and left the dev
+    venv ahead of bundled ``lib/`` on ``sys.path``.
+
+    The only reliable signal available at that early point is the file
+    location of ``__main__`` / ``sys.executable`` / ``sys.argv[0]``.  If
+    any of those sit under the install root, we MUST isolate sys.path
+    regardless of ``sys.frozen``.
+
+    Safe on dev tree: developer's app.py at
+    ``C:\\Users\\...\\PycharmProjects\\Nunba-HART-Companion\\app.py``
+    returns False, so dev-mode ``python app.py`` still resolves imports
+    from the active venv as expected.
+    """
+    _needle = "\\hevolveai\\nunba\\"
+
+    def _norm(p):
+        try:
+            return os.path.abspath(p).lower().replace("/", "\\")
+        except Exception:
+            return ""
+
+    # Check 1: cx_Freeze exe (Nunba.exe) → sys.executable is inside install
+    if _needle in _norm(sys.executable):
+        return True
+    # Check 2: direct-python launcher → sys.argv[0] is the installed app.py
+    if sys.argv and sys.argv[0] and _needle in _norm(sys.argv[0]):
+        return True
+    # Check 3: __main__.__file__ fallback (covers runpy / exec chains)
+    main_mod = sys.modules.get("__main__")
+    main_file = getattr(main_mod, "__file__", None) if main_mod else None
+    if main_file and _needle in _norm(main_file):
+        return True
+    return False
+
+
 def _isolate_frozen_imports():
-    if not getattr(sys, "frozen", False):
+    # FIX-5.3 (2026-04-21): Run if we're cx_Freeze frozen OR running from
+    # the installed directory.  The freeze_core console launcher does not
+    # always set sys.frozen, so a bare ``sys.frozen`` guard lets the dev
+    # venv's sqlalchemy/site-packages win on sys.path precedence and the
+    # watchdog catches a 31s+ stuck import during boot.
+    if not (getattr(sys, "frozen", False) or _running_from_install_location()):
         return
 
-    # block user site-packages (prevents importing fastapi from Roaming)
+    # block user site-packages (prevents importing fastapi from Roaming).
+    # Also clear VIRTUAL_ENV so subprocess spawns (llama-server, piper,
+    # parler worker) don't inherit the developer's .venv.
     os.environ["PYTHONNOUSERSITE"] = "1"
     os.environ.pop("PYTHONPATH", None)
+    os.environ.pop("VIRTUAL_ENV", None)
 
-    # aggressively remove user site-packages if already present (case-insensitive)
+    # aggressively remove user site-packages if already present
+    # (case-insensitive). Three patterns are stripped:
+    #   1. Roaming user site-packages (pip --user installs)
+    #   2. Any \site-packages not under \HevolveAI\Nunba\
+    #   3. Dev-tree venv paths (PycharmProjects, .venv) — the one the
+    #      2026-04-21 watchdog caught winning over bundled lib/.
     bad = []
     for p in list(sys.path):
         _lp = p.lower().replace("/", "\\")
-        if ("\\appdata\\roaming\\python\\" in _lp) or \
-           ("\\site-packages" in _lp and "\\hevolveai\\nunba\\" not in _lp):
+        if (
+            ("\\appdata\\roaming\\python\\" in _lp)
+            or ("\\site-packages" in _lp and "\\hevolveai\\nunba\\" not in _lp)
+            or ("\\pycharmprojects\\" in _lp and "\\hevolveai\\nunba\\" not in _lp)
+            or ("\\.venv\\" in _lp)
+        ):
             bad.append(p)
     for p in bad:
         try:
@@ -220,8 +282,21 @@ def _isolate_frozen_imports():
     except Exception:
         pass
 
-    # ensure bundled lib wins
-    base = os.path.dirname(sys.executable)
+    # ensure bundled lib wins.  Prefer sys.executable's directory, but fall
+    # back to __main__.__file__'s directory for the direct-python launcher
+    # case where sys.executable points at the dev Python interpreter.
+    base = os.path.dirname(os.path.abspath(sys.executable))
+    if "\\hevolveai\\nunba\\" not in base.lower().replace("/", "\\"):
+        main_mod = sys.modules.get("__main__")
+        main_file = getattr(main_mod, "__file__", None) if main_mod else None
+        if main_file:
+            _mbase = os.path.dirname(os.path.abspath(main_file))
+            if "\\hevolveai\\nunba\\" in _mbase.lower().replace("/", "\\"):
+                base = _mbase
+        if sys.argv and sys.argv[0]:
+            _abase = os.path.dirname(os.path.abspath(sys.argv[0]))
+            if "\\hevolveai\\nunba\\" in _abase.lower().replace("/", "\\"):
+                base = _abase
     for p in [base, os.path.join(base, "lib"), os.path.join(base, "lib_src")]:
         if os.path.isdir(p) and p not in sys.path:
             sys.path.insert(0, p)
