@@ -1101,6 +1101,82 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
             # (just with the leaky METADATA intact).  Log so it's visible.
             print(f"python-embed: METADATA sanitization WARN: {_san_err}")
 
+        # ── Phase 2 — HevolveArmor wiring ─────────────────────────────
+        # Produce an encrypted .enc bundle of hevolveai via HARTOS's
+        # producer (scripts/armor_hevolveai.py), install the hevolvearmor
+        # decryption loader package into python-embed, and stage the
+        # bundle + key under build/Nunba/vendor/hevolveai_armored/ so the
+        # frozen app exports HEVOLVE_ARMORED_DIR / HEVOLVE_ARMOR_KEY_FILE
+        # at startup (see app.py).  This pipeline is the "only at runtime
+        # and only via HevolveArmor" path the user requires; the raw
+        # hevolveai install into python-embed is kept as a fallback for
+        # now and will be removed in a later hardening pass once every
+        # Nunba site has switched over to the armored loader.  Failures
+        # here are logged but non-fatal so a missing Rust toolchain or
+        # absent hevolvearmor wheel doesn't break the whole build.
+        _hartos_root = os.path.join(_project_root, 'HARTOS')
+        _armor_producer = os.path.join(_hartos_root, 'scripts', 'armor_hevolveai.py')
+        _hevolveai_src = os.path.join(_project_root, 'hevolveai', 'src', 'hevolveai')
+        _armor_pkg_dir = os.path.join(_hartos_root, 'hevolvearmor')
+        _armor_stage = os.path.abspath(
+            os.path.join(build_exe_options["build_exe"],
+                         'vendor', 'hevolveai_armored'))
+        _armor_modules = os.path.join(_armor_stage, 'modules')
+        _armor_keyfile = os.path.join(_armor_stage, '_key.bin')
+
+        # Step 1: encrypt hevolveai → build/Nunba/vendor/hevolveai_armored/modules/
+        if os.path.isfile(_armor_producer) and os.path.isdir(_hevolveai_src):
+            os.makedirs(_armor_stage, exist_ok=True)
+            print(f"HevolveArmor: encrypting hevolveai -> {_armor_modules}")
+            _r = subprocess.run(
+                [sys.executable, _armor_producer,
+                 '--source', _hevolveai_src,
+                 '--output', _armor_modules,
+                 '--key-file', _armor_keyfile,
+                 '--quiet'],
+                capture_output=True, text=True, timeout=600)
+            if _r.returncode == 0:
+                print(f"HevolveArmor: encryption OK "
+                      f"({os.path.relpath(_armor_modules, _project_root)})")
+            else:
+                print(f"HevolveArmor: encryption FAILED (non-fatal): "
+                      f"{(_r.stderr or _r.stdout)[:400]}")
+        else:
+            print(f"HevolveArmor: producer or source absent, skipping "
+                  f"(producer={os.path.isfile(_armor_producer)}, "
+                  f"src={os.path.isdir(_hevolveai_src)})")
+
+        # Step 2: install hevolvearmor decryption loader into python-embed.
+        # Uses a pre-built cp312 wheel if present in
+        # HARTOS/hevolvearmor/target/wheels/; falls back to the source
+        # directory (pip will invoke maturin if available).  The loader
+        # ships a Rust _native.cp312-win_amd64.pyd so the pip install has
+        # to target the correct Python ABI — which matches python-embed
+        # (PYTHON_EMBED_VERSION, currently 3.12.x).
+        if os.path.isdir(_armor_pkg_dir):
+            _armor_wheels = os.path.join(_armor_pkg_dir, 'target', 'wheels')
+            _armor_whl = None
+            if os.path.isdir(_armor_wheels):
+                _cps = [w for w in os.listdir(_armor_wheels)
+                        if w.endswith('.whl') and 'cp312' in w]
+                if _cps:
+                    _armor_whl = os.path.join(_armor_wheels, sorted(_cps)[-1])
+            _install_target = _armor_whl or _armor_pkg_dir
+            print(f"HevolveArmor: installing loader into python-embed from "
+                  f"{os.path.relpath(_install_target, _project_root)}")
+            _r = subprocess.run(
+                [sys.executable, '-m', 'pip', 'install', '--no-deps',
+                 '--target', _embed_sp, '--upgrade', _install_target],
+                capture_output=True, text=True, timeout=900)
+            if _r.returncode == 0:
+                print("HevolveArmor: loader install OK")
+            else:
+                print(f"HevolveArmor: loader install FAILED (non-fatal): "
+                      f"{(_r.stderr or _r.stdout)[:400]}")
+        else:
+            print(f"HevolveArmor: loader package absent at {_armor_pkg_dir}, "
+                  f"skipping")
+
         # Invalidate hash cache — sibling deps changed python-embed contents
         _skip_python_embed_copy = False
         current_python_embed_hash = get_directory_hash("python-embed")
