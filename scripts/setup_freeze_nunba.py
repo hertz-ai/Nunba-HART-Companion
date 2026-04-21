@@ -1043,6 +1043,64 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
                 else:
                     print(f"python-embed: {_pkg_name} update FAILED: {_r.stderr[:200]}")
 
+        # ── Sanitize hevolveai METADATA — strip dependency-tree leak ──
+        # hevolveai's setup.py declares torch / transformers / peft / bitsandbytes
+        # / qwen-vl-utils / vector-quantize-pytorch / etc.  pip writes all of
+        # those into hevolveai-<ver>.dist-info/METADATA as Requires-Dist lines,
+        # which end up shipped inside the bundle and reveal the entire
+        # architecture stack to anyone who unzips the installer.
+        #
+        # We cannot delete the dist-info directory -- it's required by:
+        #   * HARTOS security/source_protection.py (reads importlib.metadata.
+        #     metadata('hevolveai') to classify install trust tier)
+        #   * HARTOS scripts/compile_hevolveai.py (reads version('hevolveai')
+        #     for signed manifest generation)
+        #   * Nunba scripts/build.py:840-860 (explicit "keep all dist-info"
+        #     policy — prior strips caused repeated transformers/filelock/
+        #     tqdm import failures)
+        #
+        # What we CAN do is rewrite METADATA to keep only the fields that
+        # importlib.metadata consumers need (Name, Version, Summary, optional
+        # Author) while dropping Requires-Dist / Description / Classifier
+        # blocks that leak internals.  RECORD / WHEEL / INSTALLER /
+        # direct_url.json are preserved untouched.
+        try:
+            import glob as _glob
+            _dist_info_dirs = _glob.glob(os.path.join(_embed_sp, 'hevolveai-*.dist-info'))
+            for _di in _dist_info_dirs:
+                _meta_path = os.path.join(_di, 'METADATA')
+                if not os.path.isfile(_meta_path):
+                    continue
+                _name, _version, _summary = 'hevolveai', '0.1.0', 'HevolveAI compiled binary'
+                with open(_meta_path, 'r', encoding='utf-8', errors='replace') as _mf:
+                    for _ln in _mf:
+                        _lns = _ln.rstrip()
+                        if _lns.startswith('Name:'):
+                            _name = _lns.split(':', 1)[1].strip() or _name
+                        elif _lns.startswith('Version:'):
+                            _version = _lns.split(':', 1)[1].strip() or _version
+                        elif _lns.startswith('Summary:'):
+                            _summary = _lns.split(':', 1)[1].strip() or _summary
+                        elif _lns == '' or (not _lns.startswith(('Name:', 'Version:',
+                                    'Summary:', 'Metadata-Version:'))):
+                            # Body starts — stop parsing headers (don't read
+                            # Requires-Dist / Description into memory).
+                            if _lns == '':
+                                break
+                _stub = (
+                    'Metadata-Version: 2.1\n'
+                    f'Name: {_name}\n'
+                    f'Version: {_version}\n'
+                    f'Summary: {_summary}\n'
+                )
+                with open(_meta_path, 'w', encoding='utf-8') as _mf:
+                    _mf.write(_stub)
+                print(f"python-embed: sanitized METADATA at {os.path.relpath(_meta_path, _embed_sp)}")
+        except Exception as _san_err:
+            # Non-fatal: if sanitization fails the bundle still builds
+            # (just with the leaky METADATA intact).  Log so it's visible.
+            print(f"python-embed: METADATA sanitization WARN: {_san_err}")
+
         # Invalidate hash cache — sibling deps changed python-embed contents
         _skip_python_embed_copy = False
         current_python_embed_hash = get_directory_hash("python-embed")

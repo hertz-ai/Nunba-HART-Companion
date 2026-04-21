@@ -292,14 +292,30 @@ def get_torch_spec():
 # =============================================================================
 
 def compute_embed_deps_hash() -> str:
-    """Stable hash of EMBED_DEPS content.
+    """Stable hash of EMBED_DEPS content + Python ABI version.
 
     Used by build.py as the invalidation key for python-embed/.  Any
     addition, removal, or version bump in EMBED_DEPS changes the hash,
     which triggers a rebuild.  Independent of dict ordering.
+
+    PYTHON_EMBED_VERSION is folded in because a Python minor-version
+    bump (e.g. 3.11.x -> 3.12.x) changes the CPython ABI tag baked
+    into every compiled extension (.pyd / .so).  Without that in the
+    hash, a cached python-embed from a prior Python version is reused
+    and the extensions inside it fail to load against the new ABI
+    -- exactly the ABI-mismatch that caused the 3.11 -> 3.12 regression
+    fixed in rebuild_python_embed.py (commit ec5533c5).  Folding the
+    Python version into the hash guarantees any ABI-relevant change
+    invalidates the snapshot automatically.
+
+    Formatting note: the 'python==' line is prefixed so future sorted
+    dict entries can never collide with it (no real pypi package is
+    named 'python').
     """
     import hashlib
-    payload = '\n'.join(f'{k}=={v}' for k, v in sorted(EMBED_DEPS.items()))
+    payload_lines = [f'python=={PYTHON_EMBED_VERSION}']
+    payload_lines.extend(f'{k}=={v}' for k, v in sorted(EMBED_DEPS.items()))
+    payload = '\n'.join(payload_lines)
     return hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]
 
 
