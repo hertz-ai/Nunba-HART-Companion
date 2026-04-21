@@ -6,8 +6,13 @@
 > system does end-to-end and how to verify it.
 >
 > When claims here disagree with code, code wins — but please update
+<<<<<<< Updated upstream
 > this map in the same PR. See the repo root's AI-agent-guidance doc, Gate 2 (DRY), before copying
 > any table into another document.
+=======
+> this map in the same PR. See the repo's top-level agent-guidance doc
+> Gate 2 (DRY) before copying any table into another document.
+>>>>>>> Stashed changes
 
 ---
 
@@ -48,7 +53,11 @@ Hevolve (web SPA) ── REST / WAMP ──▶ HARTOS regional/central (hevolve.
 Hevolve_React_Native ── native Java WAMP ──▶ HARTOS regional/central
 ```
 
+<<<<<<< Updated upstream
 Nunba **must not** own its own `core/`, `integrations/`, `security/`, or `models/` packages — those live in HARTOS and are imported through `site-packages`. Namespace collision under cx_Freeze silently hides whichever `__init__.py` loads second (see the repo root's AI-agent-guidance doc, Gate 6, and `memory/feedback_frozen_build_pitfalls.md`).
+=======
+Nunba **must not** own its own `core/`, `integrations/`, `security/`, or `models/` packages — those live in HARTOS and are imported through `site-packages`. Namespace collision under cx_Freeze silently hides whichever `__init__.py` loads second (see the repo's agent-guidance doc, Gate 6, and `memory/feedback_frozen_build_pitfalls.md`).
+>>>>>>> Stashed changes
 
 ### 1.3 Topology tiers
 
@@ -368,7 +377,11 @@ VLM: MiniCPM. Local :9890 is tried before cloud `azurekong.hertzai.com:8000/mini
 
 ### 5.1 Master key exclusion
 
+<<<<<<< Updated upstream
 `HEVOLVE_MASTER_PRIVATE_KEY` is a kill switch for the distributed intelligence. It is held by human stewards, inaccessible to AI. Any AI agent **MUST NEVER** read, print, or derive this key. See the HARTOS root AI-agent-guidance doc, § Master Key - AI Exclusion Zone.
+=======
+`HEVOLVE_MASTER_PRIVATE_KEY` is a kill switch for the distributed intelligence. It is held by human stewards, inaccessible to AI. Any AI agent operating on the codebase **MUST NEVER** read, print, or derive this key. See `HARTOS/` root agent-guidance doc § Master Key - AI Exclusion Zone.
+>>>>>>> Stashed changes
 
 ### 5.2 3-tier role system
 
@@ -396,7 +409,11 @@ Four supply-chain gates on `/api/admin/models/hub/install`:
 
 ### 5.4 MCP bearer auth
 
+<<<<<<< Updated upstream
 HARTOS MCP HTTP bridge at `/api/mcp/local/*`. Bearer token stored at `%LOCALAPPDATA%/Nunba/mcp.token` (Windows). External MCP client configs use `type: "http"` + `url`, not `command`/`args` — such clients are pure MCP consumers, they MUST NEVER spawn or host an MCP server locally.
+=======
+HARTOS MCP HTTP bridge at `/api/mcp/local/*`. Bearer token stored at `%LOCALAPPDATA%/Nunba/mcp.token` (Windows). External MCP client configs use `type: "http"` + `url`, not `command`/`args` — external clients are pure MCP consumers, they MUST NEVER spawn or host an MCP server locally; the bridge is always Nunba-owned.
+>>>>>>> Stashed changes
 
 ### 5.5 Hive guardrails
 
@@ -867,10 +884,17 @@ Security: JWT auth on media routes via `_get_user_id_from_request()`, path-trave
 
 ### J15 — External MCP client → Nunba bearer auth → tool invocation
 
+<<<<<<< Updated upstream
 **Precondition:** Nunba running locally. An external MCP-capable client installed (any IDE or agent that speaks MCP over HTTP).
 
 **Steps:**
 1. User configures the MCP client's `.mcp.json` with `type: "http"`, `url: "http://localhost:5000/api/mcp/local/"`, `headers: {Authorization: "Bearer <token>"}`. Token lives in `%LOCALAPPDATA%/Nunba/mcp.token`.
+=======
+**Precondition:** Nunba running locally. An external MCP-capable client installed (any IDE or agent that speaks the Model Context Protocol over HTTP).
+
+**Steps:**
+1. User configures their MCP client's `.mcp.json` with `type: "http"`, `url: "http://localhost:5000/api/mcp/local/"`, `headers: {Authorization: "Bearer <token>"}`. Token lives in `%LOCALAPPDATA%/Nunba/mcp.token`.
+>>>>>>> Stashed changes
 2. Open the MCP client.
 3. Invoke a tool that calls an HARTOS capability (e.g., `hart.memory.recall`).
 
@@ -1077,7 +1101,11 @@ docker compose down -v
 
 ## 10. Change Protocol Reminders
 
+<<<<<<< Updated upstream
 All work on this ecosystem follows the 10-gate Change Protocol in the repo root's AI-agent-guidance doc. Short version:
+=======
+All work on this ecosystem follows the 10-gate Change Protocol in the repo root's agent-guidance doc. Short version:
+>>>>>>> Stashed changes
 
 | Gate | Blocking | Purpose |
 |---|---|---|
