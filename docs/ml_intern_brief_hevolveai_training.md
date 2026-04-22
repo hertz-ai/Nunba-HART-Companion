@@ -103,14 +103,57 @@ work, we verify with runtime evidence:
    in the `superhuman_prover.py` benchmark. If it doesn't, don't ship
    the "superhuman" label.
 4. **Per-user sovereign weights.** Is the LoRA state persisted
-   per-user at `~/.hevolve/<agent_id>/lora_state.pt` (or equivalent)
-   such that User A's adaptation is never applied to User B's
-   inference? The living doc doesn't specify the filesystem layout.
-   Verify before any multi-tenant deploy.
+   per-user + per-prompt at `~/.hevolve/<user_id>/<prompt_id>/lora_state.pt`
+   (or equivalent) such that User A's adaptation is never applied to
+   User B's inference, and Speech Companion's adapter is never mixed
+   with HART Coder's? The living doc doesn't specify the filesystem
+   layout. Verify before any multi-tenant deploy.
 5. **Reality-anchor gate on RALT.** `WorldModelSafetyBounds.gate_ralt_export`
    checks `PROHIBITED_SKILL_CATEGORIES`. Confirm the pre-ingest check
    (`ingest_skill_packet`) ALSO calls it — a skill received from a peer
    can still be poisoned even if our own exports are clean.
+
+### 2.2b Correlation-id contract (do NOT add trace_id / thread_id)
+
+The system already carries enough identity to reconstruct any chain.
+Reusing these across every mechanism is the ONLY unification work
+needed — anyone proposing a new `trace_id` or `thread_id` field is
+adding a parallel path (Gate 4 violation per CLAUDE.md).
+
+Canonical fields that MUST propagate across every hop:
+
+| Field | Meaning | Lifetime |
+|---|---|---|
+| `request_id` | one user turn (or one daemon dispatch tick) | seconds |
+| `user_id` | whose session / sovereign LoRA scope | install-lifetime |
+| `prompt_id` | which agent persona (LOCAL_AGENTS / SEED_BOOTSTRAP_GOALS identity) | install-lifetime |
+| `goal_id` | which seeded goal owns a daemon-initiated turn | until goal completes |
+
+Propagation map — these ids must be honored (not regenerated) by:
+
+- LangChain / AutoGen internal tool calls (already in-process; pass via
+  experience dict + tool kwargs)
+- `world_model_bridge.record_interaction(user_id, prompt_id, …,
+  goal_id, attribution_chain)` — carries them today; confirm every
+  caller fills them
+- PeerLink HiveMind channel (0x05 PRIVATE) — add `request_id`
+  `user_id` `prompt_id` `goal_id` to the HiveMind query envelope so
+  node2's log entry joins node1's by `request_id`
+- WAMP events (wamp_router) — include the four fields in every
+  published payload's `details` dict; subscribers echo them back on
+  responses
+- RALT skill packets — already have `source_id` + `task_id`; add
+  `origin_request_id` so the packet's lineage is auditable
+- Federated aggregator batches — tag each batch with the set of
+  `user_id`s + `goal_id`s that contributed
+
+Multi-turn conversation continuity = `user_id + prompt_id + memory_graph`
+entries. No `thread_id` required.
+
+Task #J2 in the Nunba task list refers to propagating THESE fields,
+not inventing new ones. Close it by auditing `wamp_router.py`,
+`tts_handshake.py`, `chat_sync.py`, `chat_settings.py` for missing
+carriers and adding them.
 
 ### 2.3 Aspirational / deployment-side
 
@@ -292,9 +335,13 @@ minimum `security-review` skill + human sign-off.
 
 1. Extend `federated_aggregator.py` so demonstrability deltas cross
    peer boundaries (consent-gated).
-2. Add `HiveConsensus.upgrade_proposal(agent_id, new_prompt_or_weights,
+2. Add `HiveConsensus.upgrade_proposal(prompt_id, new_prompt_or_weights,
    probe_evidence)` that requires 4-of-4 votes from (local probe,
    peer-probe quorum ≥ 3, ConstitutionalFilter, HiveCircuitBreaker).
+   Key carrier is `prompt_id` — the canonical identity of a seeded
+   agent in LOCAL_AGENTS / SEED_BOOTSTRAP_GOALS. `user_id` accompanies
+   it for per-user LoRA overlays; the underlying prompt/weight upgrade
+   is shared across users of the same `prompt_id`.
 3. Write the decision trace to `monitoring/reasoning_trace.py` so every
    promotion is auditable forever.
 
