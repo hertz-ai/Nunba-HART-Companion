@@ -270,9 +270,30 @@ def _isolate_frozen_imports():
     #   2. Any \site-packages not under \HevolveAI\Nunba\
     #   3. Dev-tree venv paths (PycharmProjects, .venv) — the one the
     #      2026-04-21 watchdog caught winning over bundled lib/.
+    #
+    # 2026-04-24 regression fix (argparse-missing): the frozen bundle's
+    # OWN directory tree must never be stripped — even when the build
+    # sits under a path that matches a dev-tree pattern (e.g.
+    # `build/Nunba/lib/` under `PycharmProjects\`).  That case fell
+    # through `_running_from_install_location()` (which only matches
+    # `\HevolveAI\Nunba\`), so rule 3 above ripped the bundle's own
+    # library.zip out of sys.path and `import argparse` failed at
+    # boot despite argparse.pyc being physically bundled.
+    _frozen_base = ''
+    if getattr(sys, 'frozen', False):
+        try:
+            _frozen_base = os.path.abspath(
+                os.path.dirname(sys.executable)
+            ).lower().replace("/", "\\")
+        except Exception:
+            _frozen_base = ''
+
     bad = []
     for p in list(sys.path):
         _lp = p.lower().replace("/", "\\")
+        # Never strip paths belonging to the frozen bundle itself.
+        if _frozen_base and _lp.startswith(_frozen_base):
+            continue
         if (
             ("\\appdata\\roaming\\python\\" in _lp)
             or ("\\site-packages" in _lp and "\\hevolveai\\nunba\\" not in _lp)
