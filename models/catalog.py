@@ -145,22 +145,28 @@ def populate_media_gen(catalog: ModelCatalog) -> int:
         #   idle_timeout_s = 600
         # Nunba is the desktop shell that surfaces these models to end
         # users, so the user-facing surface is OWNED here. Merge the
-        # Nunba-canonical values onto the existing entry instead of
-        # overwriting it wholesale (preserves whatever HARTOS added that
-        # we don't have an opinion on, e.g. capabilities.music_gen flag).
+        # Nunba-canonical values onto the existing entry via the catalog's
+        # single-writer override() API (task #330) — direct ``_existing.X
+        # = Y`` mutation would bypass the catalog lock + dirty flag + log
+        # and create a parallel write path into a shared mutable.
         _tags = list(_existing.tags or [])
         for _t in ('local', 'music', 'generative'):
             if _t not in _tags:
                 _tags.append(_t)
-        _existing.tags = _tags
-        # supports_cpu=True → acestep can degrade to CPU via torch_to_cpu
-        # offload; HARTOS's heuristic `vram<5` is too strict for our use
-        # case (we explicitly set supports_cpu_offload=True).
-        _existing.supports_cpu = True
-        # idle_timeout_s=300 → matches the 5-minute eviction budget Nunba
-        # docs advertise for media-gen models; HARTOS's 600s is an LLM
-        # default that leaves acestep resident too long on low-VRAM desks.
-        _existing.idle_timeout_s = 300
+        catalog.override(
+            'audio_gen-acestep',
+            # tags preserve whatever HARTOS added (e.g. capabilities flags
+            # aren't touched — tags is the only collection we amend).
+            tags=_tags,
+            # supports_cpu=True → acestep can degrade to CPU via torch_to_cpu
+            # offload; HARTOS's heuristic `vram<5` is too strict for our use
+            # case (we explicitly set supports_cpu_offload=True).
+            supports_cpu=True,
+            # idle_timeout_s=300 → matches the 5-minute eviction budget Nunba
+            # docs advertise for media-gen models; HARTOS's 600s is an LLM
+            # default that leaves acestep resident too long on low-VRAM desks.
+            idle_timeout_s=300,
+        )
 
     if not catalog.get('video_gen-ltx2'):
         catalog.register(ModelEntry(

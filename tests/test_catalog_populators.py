@@ -499,5 +499,121 @@ class TestNFTIdempotency(unittest.TestCase):
         self.assertLess(elapsed, 0.05, f"Took {elapsed:.3f}s, expected < 50ms")
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Drift-guard (task #330): populate_media_gen must NOT mutate ModelEntry
+# fields via direct attribute assignment. All cross-populator amendments
+# must go through catalog.override() to preserve single-writer semantics.
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestPopulateMediaGenNoDirectMutation(unittest.TestCase):
+    """Drift-guard: AST scan of populate_media_gen rejects direct
+    ``_existing.X = Y`` mutation of a ModelEntry attribute.
+
+    If this test fails, a commit reintroduced the pre-#330 parallel
+    write path. Route the amendment through catalog.override() instead.
+    """
+
+    def _get_function_ast(self):
+        import ast
+        import inspect
+        from models import catalog as _mc
+        src = inspect.getsource(_mc.populate_media_gen)
+        return ast.parse(src).body[0]
+
+    def test_no_direct_attribute_assignment_on_existing_entry(self):
+        import ast
+        fn = self._get_function_ast()
+
+        offenders = []
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                # Match `<name>.<attr> = <value>` where <name> looks like
+                # a ModelEntry handle returned by catalog.get().
+                if (isinstance(target, ast.Attribute)
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id.lstrip('_').startswith('existing')):
+                    offenders.append(
+                        f"{target.value.id}.{target.attr} = ..."
+                        f" at line {getattr(node, 'lineno', '?')}",
+                    )
+
+        self.assertFalse(
+            offenders,
+            msg=(
+                "populate_media_gen must not mutate a returned ModelEntry "
+                "directly — use catalog.override() to preserve catalog "
+                f"lock + dirty-flag + log semantics.\nOffenders: {offenders}"
+            ),
+        )
+
+    def test_calls_catalog_override(self):
+        """Positive assertion: the refactored path must invoke
+        catalog.override(...) at least once."""
+        import ast
+        fn = self._get_function_ast()
+
+        found = False
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == 'override'):
+                found = True
+                break
+
+        self.assertTrue(
+            found,
+            msg=("populate_media_gen is expected to call catalog.override() "
+                 "for the HARTOS-registered audio_gen-acestep amendment"),
+        )
+
+
+class TestPopulateMediaGenOverrideBehavior(unittest.TestCase):
+    """Behavioral test for the override branch of populate_media_gen.
+
+    Simulates the cross-populator scenario: HARTOS registers a narrower
+    audio_gen-acestep first, then Nunba's populate_media_gen runs and
+    must amend (not wholesale-replace) the entry.
+    """
+
+    def setUp(self):
+        self.catalog, self._tmp = _fresh_catalog()
+
+    def tearDown(self):
+        try:
+            os.unlink(self._tmp)
+        except Exception:
+            pass
+
+    def test_override_branch_merges_nunba_fields(self):
+        # Simulate HARTOS fallback populator having registered first.
+        self.catalog.register(ModelEntry(
+            id='audio_gen-acestep',
+            name='ACE Step (HARTOS fallback)',
+            model_type=ModelType.AUDIO_GEN,
+            source='huggingface',
+            repo_id='ACE-Step/ACE-Step-v1-3.5B',
+            vram_gb=6.0,
+            tags=['local', 'audio_gen'],   # HARTOS's narrower tag set
+            supports_cpu=False,            # HARTOS's vram<5 heuristic
+            idle_timeout_s=600,            # HARTOS's LLM default
+        ), persist=False)
+
+        added = populate_media_gen(self.catalog)
+        # The HARTOS entry already existed, so ACE Step contributes 0;
+        # only video_gen-ltx2 is newly added.
+        self.assertEqual(added, 1)
+
+        entry = self.catalog.get('audio_gen-acestep')
+        self.assertIn('local', entry.tags)
+        self.assertIn('music', entry.tags)
+        self.assertIn('generative', entry.tags)
+        # HARTOS's original tag must be preserved (merge, not replace).
+        self.assertIn('audio_gen', entry.tags)
+        self.assertTrue(entry.supports_cpu)
+        self.assertEqual(entry.idle_timeout_s, 300)
+
+
 if __name__ == '__main__':
     unittest.main()
