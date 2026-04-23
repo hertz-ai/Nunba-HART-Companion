@@ -1,8 +1,14 @@
 name: Build & Sign Installers
 
 on:
-  # Build on version tags (e.g. v2.0.1)
+  # Rolling nightly: every push to main produces a fresh `nightly-<sha>-<runid>`
+  # release marked --latest=true so docs.hevolve.ai/downloads links like
+  # /releases/latest/download/Nunba_Setup.exe always resolve to the newest
+  # build between tagged v* releases.  Mirrors the pattern in
+  # hertz-ai/HARTOS .github/workflows/release.yml `publish-nightly` job.
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   # Manual trigger from GitHub UI
@@ -620,3 +626,92 @@ jobs:
             artifacts/Nunba_Setup_macOS/Nunba_Setup.dmg
             artifacts/Nunba_Setup_Linux_AppImage/Nunba-x86_64.AppImage
             artifacts/Nunba_Setup_Linux_deb/nunba_*.deb
+
+  # ============================================================
+  # Publish Rolling Nightly Release (every push to main)
+  # ============================================================
+  #
+  # Mirrors the pattern in hertz-ai/HARTOS .github/workflows/release.yml
+  # publish-nightly job (lines 462-567): every push to main produces a
+  # fresh `nightly-<sha>-<runid>` release marked --latest=true, so
+  # docs.hevolve.ai/downloads links like
+  #   https://github.com/hertz-ai/Nunba/releases/latest/download/Nunba_Setup.exe
+  # always resolve to the newest build between signed v* tags.
+  #
+  # Why unique-per-run tag instead of reusing "nightly":
+  # GitHub's immutable-release feature permanently reserves any tag name
+  # used for a published release — reusing "nightly" would 422 on
+  # subsequent publishes.  github.run_id makes the tag unique even under
+  # "Re-run all jobs" of the same commit.  Old nightly-* releases are
+  # pruned to newest 3.
+  #
+  # `if: always()` so partial build success (e.g. macOS codesigning flakes
+  # but Windows + Linux complete) still ships the artifacts that did build.
+  publish-nightly:
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/all-artifacts
+          pattern: Nunba_Setup_*
+          merge-multiple: true
+
+      - name: Create unique-tagged nightly release, upload, publish as latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          REPO="${{ github.repository }}"
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          RUN_ID="${{ github.run_id }}"
+          TAG="nightly-${SHORT_SHA}-${RUN_ID}"
+
+          echo "=== Artifacts downloaded ==="
+          ls -la /tmp/all-artifacts/ || { echo "No artifacts dir"; exit 0; }
+          FILES=$(find /tmp/all-artifacts -maxdepth 2 -type f | wc -l)
+          if [[ "$FILES" -eq 0 ]]; then
+            echo "No installer artifacts produced by any build-* job — nothing to publish"
+            exit 0
+          fi
+
+          echo "=== Creating $TAG DRAFT (mutable while draft) ==="
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --target "$SHA" \
+            --draft \
+            --prerelease \
+            --title "Nunba nightly ${SHORT_SHA}" \
+            --notes "Rolling bleeding-edge build from \`main\` @ ${SHORT_SHA} on every push. For signed stable installers see the [vX.Y.Z release archive](https://github.com/${REPO}/releases)."
+
+          echo "=== Uploading artifacts ==="
+          find /tmp/all-artifacts -maxdepth 2 -type f | while read -r f; do
+            echo "  -> $(basename "$f")"
+            gh release upload "$TAG" "$f" --repo "$REPO" --clobber
+          done
+
+          echo "=== Publishing as latest (immutable after publish) ==="
+          gh release edit "$TAG" --repo "$REPO" \
+            --draft=false --latest=true --prerelease=false
+
+          echo "=== Pruning old nightly-* releases (keep newest 3) ==="
+          gh api "repos/${REPO}/releases" --paginate \
+            --jq '.[] | select(.tag_name | startswith("nightly-")) | {tag:.tag_name, created:.created_at}' \
+            | jq -s 'sort_by(.created) | reverse | .[3:] | .[].tag' -r \
+            | while read -r OLD_TAG; do
+              [[ -n "$OLD_TAG" && "$OLD_TAG" != "$TAG" ]] && {
+                echo "  pruning $OLD_TAG"
+                gh release delete "$OLD_TAG" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
+              }
+            done
+
+          echo "=== Done ==="
+          gh api "repos/${REPO}/releases/latest" \
+            --jq '{tag:.tag_name, assets:[.assets[].name], published:.published_at}' || true
