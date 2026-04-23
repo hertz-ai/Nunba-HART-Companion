@@ -155,6 +155,21 @@ not inventing new ones. Close it by auditing `wamp_router.py`,
 `tts_handshake.py`, `chat_sync.py`, `chat_settings.py` for missing
 carriers and adding them.
 
+**Audit outcome (2026-04-23)** — the 4 named files either don't
+need correlation IDs or already carry them:
+
+| File | Status | Reasoning |
+|---|---|---|
+| `tts/tts_handshake.py` | **N/A** | Boot-time per-(backend, lang) one-shot probe; no user request context exists when the handshake runs. Adding ids here would be noise. |
+| `desktop/chat_settings.py` | **N/A** | Admin-global config (restore policy, cloud_sync flag). Not per-request/per-user. |
+| `desktop/chat_sync.py` | **OK** | `push/pull/forget(user_id, …)` already take `user_id` and log it on failure (`logger.warning("chat_sync forget failed for %s: %s", user_id, e)`). |
+| `wamp_router.py` | **OK** | Every auth-gated message logs `session_id + authid` (WAMP `authid` IS the user principal after ticket auth; #300 tightened this to exact-segment match). DENIED subscribe/publish lines include both. |
+
+Remaining real threading work lives in HARTOS (world_model_bridge,
+PeerLink HiveMind envelope, RALT `origin_request_id`, federated
+aggregator batch tags) and belongs on the HARTOS side of the
+ml-intern brief, not Nunba's #J2 file list.
+
 ### 2.3 Aspirational / deployment-side
 
 The user mentioned these exist on the hevolve.ai central infrastructure.
