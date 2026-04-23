@@ -534,7 +534,11 @@ jobs:
           else
             convert -size 256x256 xc:purple Nunba.AppDir/usr/share/icons/hicolor/256x256/apps/nunba.png 2>/dev/null || true
           fi
-          cp Nunba.AppDir/nunba.desktop Nunba.AppDir/
+          # Previous line tried `cp Nunba.AppDir/nunba.desktop Nunba.AppDir/`
+          # which is a self-copy — bash errors with "same file".  The
+          # .desktop file is already at the AppDir root (line 522's
+          # `cat > Nunba.AppDir/nunba.desktop`), which is where
+          # appimagetool expects it.  No copy needed.
           ln -sf usr/share/icons/hicolor/256x256/apps/nunba.png Nunba.AppDir/nunba.png
 
           cat > Nunba.AppDir/AppRun << 'APPRUN'
