@@ -1456,7 +1456,16 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
             _val_log = next((p for p in _val_log_candidates if os.path.isfile(p)), None)
             if _val_log:
                 print("\n--- validate.log (partial) ---")
-                print(open(_val_log, encoding='utf-8').read().strip())
+                # Windows consoles default to cp1252; validate.log contains
+                # Unicode (box-drawing, emoji, CJK from model labels).  Use
+                # the same ASCII fallback the success path uses below so a
+                # partial log actually prints instead of a UnicodeEncodeError
+                # burying the diagnostics.
+                _partial_text = open(_val_log, encoding='utf-8').read().strip()
+                try:
+                    print(_partial_text)
+                except UnicodeEncodeError:
+                    print(_partial_text.encode('ascii', errors='replace').decode('ascii'))
             print("\nBuild artifacts are still usable — validation is a smoke test only.")
             print("Run manually: build\\Nunba\\Nunba.exe --validate\n")
             # Don't sys.exit(1) — the build itself succeeded; only validation timed out
