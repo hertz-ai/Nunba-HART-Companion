@@ -216,13 +216,24 @@ def merge(stored: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def push(user_id: str, bucket: dict[str, Any]) -> dict[str, Any]:
+def push(user_id: str, bucket: dict[str, Any],
+         *, request_id: str | int | None = None) -> dict[str, Any]:
     """Merge-and-persist. Returns the merged blob (what pull would
     return right after this call).
 
     Auth is OUT OF SCOPE here — the Flask handler is responsible for
     confirming the caller's JWT maps to ``user_id``.
+
+    ``request_id`` (task #335 J2) is an optional correlation id from
+    the calling HTTP request.  Reused — NOT a new trace_id (contract
+    commit ace96769).
     """
+    # Stamp user_id + optional request_id onto every log line from
+    # this call so a push failure can be grepped per-user without
+    # dredging the whole file.
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger, request_id=request_id, user_id=user_id)
+
     if not isinstance(bucket, dict):
         raise ValueError("bucket must be a JSON object")
     # Reject payloads that exceed _MAX_PAYLOAD_BYTES at the JSON-encode
@@ -253,23 +264,43 @@ def push(user_id: str, bucket: dict[str, Any]) -> dict[str, Any]:
                 f"{_MAX_PERSISTED_BYTES} byte per-user cap"
             )
         _atomic_write(_user_file_path(user_id), merged)
+    log.info("chat_sync push merged_size=%d buckets=%d",
+             _merged_size, len(merged.get("buckets") or {}))
     return merged
 
 
-def pull(user_id: str) -> dict[str, Any]:
-    """Return the stored blob for ``user_id``. Empty when absent."""
-    return _load(user_id)
+def pull(user_id: str,
+         *, request_id: str | int | None = None) -> dict[str, Any]:
+    """Return the stored blob for ``user_id``. Empty when absent.
+
+    ``request_id`` (task #335 J2) propagates the calling request's
+    correlation id — reused, NOT a new trace_id.
+    """
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger, request_id=request_id, user_id=user_id)
+    blob = _load(user_id)
+    log.debug("chat_sync pull buckets=%d",
+              len(blob.get("buckets") or {}))
+    return blob
 
 
-def forget(user_id: str) -> bool:
+def forget(user_id: str,
+           *, request_id: str | int | None = None) -> bool:
     """Delete the per-user blob. Returns ``True`` if a file was
-    removed, ``False`` if nothing was there."""
+    removed, ``False`` if nothing was there.
+
+    ``request_id`` (task #335 J2) propagates the calling request's
+    correlation id.
+    """
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger, request_id=request_id, user_id=user_id)
     path = _user_file_path(user_id)
     if not os.path.isfile(path):
         return False
     try:
         os.remove(path)
+        log.info("chat_sync forget ok")
         return True
     except Exception as e:  # noqa: BLE001
-        logger.warning("chat_sync forget failed for %s: %s", user_id, e)
+        log.warning("chat_sync forget failed: %s", e)
         return False

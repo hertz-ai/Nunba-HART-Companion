@@ -217,7 +217,11 @@ def run_handshake(engine, backend: str,
                   lang: str | None = None,
                   timeout_s: int = 60,
                   broadcast: bool = True,
-                  play_audio: bool = True) -> HandshakeResult:
+                  play_audio: bool = True,
+                  *,
+                  request_id: str | int | None = None,
+                  user_id: str | int | None = None,
+                  prompt_id: str | None = None) -> HandshakeResult:
     """Drive a first-run synthesis and verify audible output.
 
     This is the ONE function allowed to flip a "Voice engine ready"
@@ -237,6 +241,13 @@ def run_handshake(engine, backend: str,
         broadcast:  Push result via SSE (True in production, False
                     in unit tests that inspect the returned dataclass).
         play_audio: Play the clip locally so the user hears it.
+        request_id: Optional correlation id from the calling HTTP /
+                    WAMP request.  Task #335 J2 — reused, NOT a new
+                    trace_id.
+        user_id:    Optional correlation id — the signed-in Nunba
+                    user or guest_id triggering the handshake.
+        prompt_id:  Optional canonical agent-persona id (e.g.
+                    ``"speech_companion"``) — see commit ace96769.
 
     Returns:
         ``HandshakeResult`` — ``ok=True`` ONLY when synth produced
@@ -245,6 +256,15 @@ def run_handshake(engine, backend: str,
     This function never raises.  All failure modes are captured in
     ``result.err`` and the SSE payload.
     """
+    # Task #335 J2: correlation-id stamp.  All four existing ids are
+    # optional — missing ones are dropped by log_ctx so this helper
+    # remains backward compatible with callers that have none.
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger,
+                  request_id=request_id,
+                  user_id=user_id,
+                  prompt_id=prompt_id)
+
     lang_used, phrase = _pick_greeting(lang)
     cache_key = (backend, lang_used)
 
@@ -252,8 +272,8 @@ def run_handshake(engine, backend: str,
     with _cache_lock:
         cached = _cache.get(cache_key)
     if cached is not None:
-        logger.debug("handshake: cache hit for %s/%s (ok=%s)",
-                     backend, lang_used, cached.ok)
+        log.debug("handshake: cache hit for %s/%s (ok=%s)",
+                  backend, lang_used, cached.ok)
         return cached
 
     # Import lazily so broken HARTOS modules don't crash boot.
@@ -305,8 +325,8 @@ def run_handshake(engine, backend: str,
             _cache[cache_key] = result
         if broadcast:
             _broadcast(result.to_event())
-        logger.warning("handshake: %s/%s FAIL — %s",
-                       backend, lang_used, result.err)
+        log.warning("handshake: %s/%s FAIL — %s",
+                    backend, lang_used, result.err)
         return result
 
     # Re-run synth to keep the bytes around for playback.  Same code
@@ -327,7 +347,7 @@ def run_handshake(engine, backend: str,
             except Exception:
                 pass
     except Exception as e:
-        logger.warning("handshake: post-verify synth failed: %s", e)
+        log.warning("handshake: post-verify synth failed: %s", e)
 
     n_bytes = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
     duration_s = _measure_duration(tmp_path, n_bytes) if n_bytes else 0.0
@@ -361,26 +381,35 @@ def run_handshake(engine, backend: str,
         _broadcast(result.to_event())
 
     if ok:
-        logger.info("handshake: %s/%s PASS (%d bytes, %.2fs audio, %.1fs total)",
-                    backend, lang_used, n_bytes, duration_s, elapsed)
+        log.info("handshake: %s/%s PASS (%d bytes, %.2fs audio, %.1fs total)",
+                 backend, lang_used, n_bytes, duration_s, elapsed)
     else:
-        logger.warning("handshake: %s/%s FAIL — %s",
-                       backend, lang_used, err)
+        log.warning("handshake: %s/%s FAIL — %s",
+                    backend, lang_used, err)
 
     return result
 
 
 def retry(engine, backend: str, lang: str | None = None,
-          timeout_s: int = 60) -> HandshakeResult:
+          timeout_s: int = 60,
+          *,
+          request_id: str | int | None = None,
+          user_id: str | int | None = None,
+          prompt_id: str | None = None) -> HandshakeResult:
     """User clicked "Retry" — clear the cached verdict and re-run.
 
     Public helper so the API / UI layer doesn't have to reach into
-    ``_cache`` directly.
+    ``_cache`` directly.  Correlation ids (task #335 J2) flow
+    through to ``run_handshake`` when the caller has them.
     """
     lang_used, _ = _pick_greeting(lang)
     with _cache_lock:
         _cache.pop((backend, lang_used), None)
-    return run_handshake(engine, backend, lang=lang_used, timeout_s=timeout_s)
+    return run_handshake(engine, backend, lang=lang_used,
+                         timeout_s=timeout_s,
+                         request_id=request_id,
+                         user_id=user_id,
+                         prompt_id=prompt_id)
 
 
 def invalidate(backend: str | None = None) -> None:

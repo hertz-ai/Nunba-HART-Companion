@@ -291,6 +291,12 @@ def _handle_subscribe(session: WampSession, msg: list):
     request_id = msg[1]
     topic = msg[3] if len(msg) > 3 else ''
 
+    # Task #335 J2: stamp WAMP wire request_id + authenticated user id
+    # onto every log line so grep can correlate across subsystems.
+    # Uses the canonical reuse-existing-ids helper (desktop.log_ctx).
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger, request_id=request_id, user_id=session.authid)
+
     if not topic:
         session.send([ERROR, SUBSCRIBE, request_id, {}, 'wamp.error.invalid_uri'])
         return
@@ -300,9 +306,9 @@ def _handle_subscribe(session: WampSession, msg: list):
     if not _authorize_topic_for_authid(topic, session.authid):
         session.send([ERROR, SUBSCRIBE, request_id, {},
                       'wamp.error.not_authorized'])
-        logger.warning("Session %d (%s): subscribe to '%s' DENIED "
-                       "(topic-authid mismatch)",
-                       session.session_id, session.authid, topic)
+        log.warning("Session %d (%s): subscribe to '%s' DENIED "
+                    "(topic-authid mismatch)",
+                    session.session_id, session.authid, topic)
         return
 
     realm = _get_realm(session.realm or 'realm1')
@@ -313,8 +319,8 @@ def _handle_subscribe(session: WampSession, msg: list):
         realm.sub_index[sub_id] = (session.session_id, topic)
 
     session.send([SUBSCRIBED, request_id, sub_id])
-    logger.debug("Session %d subscribed to '%s' (sub_id=%d)",
-                 session.session_id, topic, sub_id)
+    log.debug("Session %d subscribed to '%s' (sub_id=%d)",
+              session.session_id, topic, sub_id)
 
 
 def _handle_unsubscribe(session: WampSession, msg: list):
@@ -342,6 +348,11 @@ def _handle_publish(session: WampSession, msg: list):
     args = msg[4] if len(msg) > 4 else []
     kwargs = msg[5] if len(msg) > 5 else {}
 
+    # Task #335 J2: correlation-id stamp — reuse wire request_id + authid
+    # (see desktop/log_ctx.py; contract commit ace96769).
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger, request_id=request_id, user_id=session.authid)
+
     if not topic:
         return
 
@@ -354,9 +365,9 @@ def _handle_publish(session: WampSession, msg: list):
         if options.get('acknowledge'):
             session.send([ERROR, PUBLISH, request_id, {},
                           'wamp.error.not_authorized'])
-        logger.warning("Session %d (%s): publish to '%s' DENIED "
-                       "(topic-authid mismatch)",
-                       session.session_id, session.authid, topic)
+        log.warning("Session %d (%s): publish to '%s' DENIED "
+                    "(topic-authid mismatch)",
+                    session.session_id, session.authid, topic)
         return
 
     realm = _get_realm(session.realm or 'realm1')
@@ -443,12 +454,19 @@ def _handle_call(session: WampSession, msg: list):
     args = msg[4] if len(msg) > 4 else []
     kwargs = msg[5] if len(msg) > 5 else {}
 
+    # Task #335 J2: correlation-id stamp — reuse wire request_id + authid
+    # (see desktop/log_ctx.py; contract commit ace96769).
+    from desktop.log_ctx import log_ctx
+    log = log_ctx(logger, request_id=request_id, user_id=session.authid)
+
     realm = _get_realm(session.realm or 'realm1')
 
     with realm.lock:
         reg = realm.registrations.get(procedure)
 
     if not reg:
+        log.debug("Session %d (%s): CALL '%s' → no such procedure",
+                  session.session_id, session.authid, procedure)
         session.send([ERROR, CALL, request_id, {},
                       'wamp.error.no_such_procedure'])
         return
@@ -471,7 +489,11 @@ def _handle_call(session: WampSession, msg: list):
                 invocation.append([])
             invocation.append(kwargs)
         callee.send(invocation)
+        log.debug("Session %d (%s): CALL '%s' dispatched (inv_id=%d)",
+                  session.session_id, session.authid, procedure, inv_id)
     else:
+        log.debug("Session %d (%s): CALL '%s' → callee gone",
+                  session.session_id, session.authid, procedure)
         session.send([ERROR, CALL, request_id, {},
                       'wamp.error.no_such_procedure'])
 

@@ -986,6 +986,23 @@ def api_guest_id_delete():
     return jsonify({'deleted': True, 'previous_guest_id': prev}), 200
 
 
+def _chat_cfg_request_id() -> str | None:
+    """Pull the per-request correlation id from Flask's request context.
+
+    Nunba's React SPA sets ``X-Request-Id`` on admin calls; if
+    missing, fall back to ``X-Nunba-Local-Token`` last-8 so logs
+    still have *something* greppable.  Never raises.
+    """
+    try:
+        rid = request.headers.get('X-Request-Id')
+        if rid:
+            return rid[:64]  # defensive cap
+        tok = request.headers.get('X-Nunba-Local-Token') or ''
+        return tok[-8:] if tok else None
+    except Exception:  # noqa: BLE001 — outside request ctx
+        return None
+
+
 @app.route('/api/admin/config/chat', methods=['GET'])
 def api_admin_chat_config_get():
     """Return the current admin-controlled chat-restore settings.
@@ -1002,11 +1019,17 @@ def api_admin_chat_config_get():
     it to gate the auto-restore + auto-scroll behaviour. See
     desktop/chat_settings.py for the canonical schema + writer.
     """
+    # Task #335 J2: stamp request_id so chat-config polling (fires
+    # every few seconds from the UI) is greppable per-request.
+    from desktop.log_ctx import log_ctx
+    _log = log_ctx(logging.getLogger('main.chat_settings'),
+                   request_id=_chat_cfg_request_id())
     try:
         from desktop.chat_settings import get_chat_settings
+        _log.debug("chat-config GET ok")
         return jsonify(get_chat_settings().to_dict()), 200
     except Exception as e:  # noqa: BLE001
-        logging.warning("chat-config GET failed: %s", e)
+        _log.warning("chat-config GET failed: %s", e)
         # Defensive default — frontend treats this as 'always' so the
         # user still gets restore behaviour even if the settings file
         # is unreachable.
@@ -1036,15 +1059,22 @@ def api_admin_chat_config_put():
     React SPA carries via http://localhost:<flask_port>/local but
     third-party origins do not.
     """
+    # Task #335 J2: reuse request_id for the admin PUT trace.
+    from desktop.log_ctx import log_ctx
+    _log = log_ctx(logging.getLogger('main.chat_settings'),
+                   request_id=_chat_cfg_request_id())
     try:
         from desktop.chat_settings import update_chat_settings
         payload = request.get_json(silent=True) or {}
         new_settings = update_chat_settings(payload)
+        _log.info("chat-config PUT applied keys=%s",
+                  sorted(k for k in payload if isinstance(payload, dict)))
         return jsonify(new_settings.to_dict()), 200
     except ValueError as ve:
+        _log.warning("chat-config PUT invalid: %s", ve)
         return jsonify({'error': 'invalid_payload', 'message': str(ve)}), 400
     except Exception as e:  # noqa: BLE001
-        logging.error("chat-config PUT failed: %s", e)
+        _log.error("chat-config PUT failed: %s", e)
         return jsonify({'error': 'update_failed', 'message': str(e)}), 500
 
 
