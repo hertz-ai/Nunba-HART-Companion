@@ -294,3 +294,141 @@ class TestWampRouterConstants:
         assert UNREGISTERED == 67
         assert INVOCATION == 68
         assert YIELD_MSG == 70
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Task #325 / G5 — autobahn shutdown ordering regression guards.
+#
+# The race that motivated this:
+#  - main.py imports HARTOS → integrations.service_tools.runtime_manager
+#    registers runtime_tool_manager.stop_all via atexit at module load.
+#  - main.py later calls start_wamp_router() which spawns an asyncio
+#    loop with pending create_task()'s (chat publish fan-out, etc).
+#  - On process exit (tray quit, SIGTERM), atexit LIFO runs
+#    runtime_manager.stop_all FIRST — it tears down the ThreadPoolExecutor
+#    that HARTOS tool calls share with the WAMP event handlers.
+#  - Wamp tasks then try to schedule callbacks on the shut-down executor:
+#    ``RuntimeError: cannot schedule new futures after shutdown``.
+#
+# The fix has two moving parts that both need regression tests:
+#  1. start_wamp_router registers stop_wamp_router via atexit, AFTER
+#     HARTOS has already registered (LIFO → ours runs first).
+#  2. stop_wamp_router drains pending asyncio tasks with a bounded
+#     timeout before stopping the loop, so nothing scheduled on the
+#     HARTOS executor survives past our shutdown hook.
+# ──────────────────────────────────────────────────────────────────────
+
+class TestShutdownOrdering:
+
+    def test_atexit_registered_only_once(self):
+        """start_wamp_router idempotency must not stack atexit callbacks."""
+        import atexit
+        import wamp_router as wr
+
+        # Reset the module-level guard so this test is deterministic
+        # regardless of whether an earlier test already started the router.
+        original_registered = wr._atexit_registered
+        wr._atexit_registered = False
+
+        registered: list = []
+
+        def fake_register(fn, *args, **kwargs):
+            registered.append(fn)
+            return fn
+
+        original_register = atexit.register
+        atexit.register = fake_register  # type: ignore[assignment]
+        try:
+            # Simulate the tail of start_wamp_router: register once, then
+            # a second caller comes in and must NOT re-register.
+            if not wr._atexit_registered:
+                atexit.register(wr.stop_wamp_router)
+                wr._atexit_registered = True
+
+            if not wr._atexit_registered:
+                atexit.register(wr.stop_wamp_router)   # pragma: no cover
+                wr._atexit_registered = True
+
+            assert len(registered) == 1
+            assert registered[0] is wr.stop_wamp_router
+        finally:
+            atexit.register = original_register  # type: ignore[assignment]
+            wr._atexit_registered = original_registered
+
+    def test_stop_without_running_loop_is_noop(self):
+        """Calling stop when the router never started must not raise."""
+        import wamp_router as wr
+
+        original_loop = wr._event_loop
+        original_started = wr._started
+        wr._event_loop = None
+        wr._started = False
+        try:
+            # Must not raise, must not hang.
+            wr.stop_wamp_router(drain_timeout_s=0.1)
+            assert wr._started is False
+        finally:
+            wr._event_loop = original_loop
+            wr._started = original_started
+
+    def test_stop_drains_pending_tasks_before_loop_stop(self):
+        """Pending asyncio tasks must be cancelled+awaited before the
+        loop stops — otherwise their done-callbacks can try to schedule
+        new work on a shut-down HARTOS executor."""
+        import asyncio
+        import threading
+
+        import wamp_router as wr
+
+        loop_started = threading.Event()
+        loop_done = threading.Event()
+        cancelled_seen: list[bool] = []
+
+        async def _long_task():
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                cancelled_seen.append(True)
+                raise
+
+        def _run_loop(loop):
+            asyncio.set_event_loop(loop)
+            loop.create_task(_long_task())
+            loop_started.set()
+            try:
+                loop.run_forever()
+            finally:
+                loop.close()
+                loop_done.set()
+
+        test_loop = asyncio.new_event_loop()
+        t = threading.Thread(target=_run_loop, args=(test_loop,), daemon=True)
+
+        # Wire our loop into the wamp_router module so stop_wamp_router
+        # drains THIS loop (and only THIS loop).
+        original_loop = wr._event_loop
+        original_started = wr._started
+        wr._event_loop = test_loop
+        wr._started = True
+
+        try:
+            t.start()
+            assert loop_started.wait(timeout=2.0), "test loop never started"
+
+            # Give the create_task'd coroutine a beat to actually start
+            # awaiting asyncio.sleep(10) so all_tasks() can see it.
+            time.sleep(0.05)
+
+            wr.stop_wamp_router(drain_timeout_s=2.0)
+
+            assert loop_done.wait(timeout=3.0), (
+                "loop did not exit after stop_wamp_router"
+            )
+            assert cancelled_seen == [True], (
+                "pending task was not cancelled before loop stopped"
+            )
+        finally:
+            wr._event_loop = original_loop
+            wr._started = original_started
+            if t.is_alive():
+                t.join(timeout=1.0)

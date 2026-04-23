@@ -175,6 +175,10 @@ _state_lock = threading.Lock()
 _event_loop: asyncio.AbstractEventLoop | None = None
 _router_thread: threading.Thread | None = None
 _started = False
+# Set to True once stop_wamp_router is registered as an atexit hook, so
+# we don't stack N copies of the callback when start_wamp_router is
+# called repeatedly (idempotent start + idempotent atexit registration).
+_atexit_registered = False
 
 
 def _get_realm(name: str = 'realm1') -> WampRealm:
@@ -842,6 +846,21 @@ def start_wamp_router(port: int = 8088, host: str = '127.0.0.1') -> bool:
     # Register with watchdog so silent crashes are detected and auto-restarted
     _register_with_watchdog(port, host)
 
+    # Register stop as an atexit hook so we drain pending asyncio tasks
+    # BEFORE HARTOS's runtime_manager.stop_all (registered at HARTOS import
+    # in integrations/service_tools/runtime_manager.py) tears down its
+    # ThreadPoolExecutor.  atexit is LIFO — wamp_router imports later than
+    # HARTOS, so our handler runs first on interpreter shutdown.  Skipping
+    # this left pending .create_task()'s trying to schedule callbacks on
+    # the shut-down executor and raising
+    # ``RuntimeError: cannot schedule new futures after shutdown`` during
+    # tray-quit on Windows (task #325 / G5).
+    global _atexit_registered
+    if not _atexit_registered:
+        import atexit
+        atexit.register(stop_wamp_router)
+        _atexit_registered = True
+
     return True
 
 
@@ -893,12 +912,64 @@ def _start_heartbeat_thread():
     _heartbeat_thread.start()
 
 
-def stop_wamp_router():
-    """Stop the embedded WAMP router (for clean shutdown)."""
+def stop_wamp_router(drain_timeout_s: float = 3.0):
+    """Stop the embedded WAMP router cleanly.
+
+    Drains pending asyncio tasks with a bounded timeout BEFORE stopping
+    the event loop.  Without the drain, tasks scheduled via
+    `loop.create_task` (chat publish fan-out, tool-call dispatch) keep
+    running and their done-callbacks try to schedule follow-up work on
+    a shut-down ThreadPoolExecutor — producing
+    ``RuntimeError: cannot schedule new futures after shutdown`` when
+    the HARTOS runtime_manager atexit has already torn its executor
+    down (task #325 / G5).
+
+    Idempotent: safe to call even if the router was never started, or
+    called multiple times (atexit + tray-quit + test teardown can all
+    fire).
+    """
     global _started, _event_loop
     _started = False
-    if _event_loop and _event_loop.is_running():
-        _event_loop.call_soon_threadsafe(_event_loop.stop)
+
+    loop = _event_loop
+    if loop is not None and loop.is_running():
+        # Drain in the loop's own thread: cancel every task other than
+        # the drain itself, then gather (with return_exceptions) so
+        # CancelledError doesn't escape.  Uses run_coroutine_threadsafe
+        # because we're being called from the main thread (atexit) or
+        # the watchdog thread, not from inside the loop.
+        async def _drain_tasks():
+            tasks = [t for t in asyncio.all_tasks(loop)
+                     if t is not asyncio.current_task()]
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+        try:
+            drain_future = asyncio.run_coroutine_threadsafe(
+                _drain_tasks(), loop,
+            )
+            try:
+                drain_future.result(timeout=drain_timeout_s)
+            except (TimeoutError, asyncio.TimeoutError):
+                logger.warning(
+                    "WAMP drain exceeded %.1fs; stopping loop with pending "
+                    "tasks (futures-after-shutdown may still fire)",
+                    drain_timeout_s,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("WAMP drain raised: %s", e)
+        except RuntimeError:
+            # Loop already closed between our is_running() check and
+            # run_coroutine_threadsafe — nothing left to drain.
+            pass
+
+        try:
+            loop.call_soon_threadsafe(loop.stop)
+        except RuntimeError:
+            # Loop closed concurrently; acceptable.
+            pass
 
     # Unregister from watchdog
     try:
