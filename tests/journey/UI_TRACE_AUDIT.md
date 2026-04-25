@@ -345,13 +345,31 @@ end).  Build queue:
      `nearby` are all absent compared to the web SPA's
      `services/socialApi.js:185-221`.
 
-   * **CONFIRMED ANDROID BREAK**: Tab 2 "Discovery" is DEAD on Android.
-     User taps it → no API call → no render → empty screen.  The
-     web SPA Discovery tab works (calls `suggestions` + renders
-     EncounterCard with `acknowledge` accept-button).  Fix requires:
-     (a) adding `suggestions` + `acknowledge` to RN's encountersApi,
-     (b) adding an `activeTab === 2` render branch with a
-     RN-equivalent of `EncounterCard`.
+   * **CORRECTION 2026-04-25**: my initial "Tab 2 is DEAD" claim
+     was based on an incomplete read.  I grepped for
+     `activeTab === N` and only matched the data-loading branches
+     at lines 85, 87.  The actual render goes through a `switch
+     (activeTab)` at line 290, where Tab 2 routes to
+     `renderDiscoveryTab` (line 253).  Reading that function
+     showed it renders an INTENTIONAL "Coming Soon" placeholder
+     (sparkles icon + headline + body text), NOT a broken /
+     empty render.  Retracting "DEAD" claim.
+
+   * **Actual Android parity status** for Tab 2: feature-parity
+     gap, not a bug.  Web SPA implements Discovery (suggestions
+     + acknowledge); Android renders a placeholder.  The 6
+     "missing" RN encountersApi methods are absent because no
+     RN screen needs them today — adding them without a consumer
+     would be premature.  Decision belongs to product: build
+     Android Discovery to match web, OR commit to the
+     placeholder long-term.  Logged as task #424 (revised).
+
+   * **Lesson logged for this audit**: do not declare any flow
+     "broken" from grep evidence alone.  Always read the render
+     path (switch / map / conditional) AND the explicit branches
+     before claiming.  My fast greps found the data-loading
+     branches but missed the render switch — the wrong evidence
+     class for a "DEAD" claim.
 
    * **No BLE encounter UI on Android** (confirmed via grep —
      no `bleEncounterApi`, no `/api/social/encounter/discoverable`
