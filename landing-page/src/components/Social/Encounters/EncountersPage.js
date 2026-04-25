@@ -1,4 +1,6 @@
-import { encountersApi } from '../../../services/socialApi';
+import { useSocial } from '../../../contexts/SocialContext';
+import { bleEncounterApi, encountersApi } from '../../../services/socialApi';
+import { subscribeEncounterMatch } from '../../../services/realtimeService';
 import { socialTokens } from '../../../theme/socialTokens';
 import { animFadeInUp, animFadeInScale } from '../../../utils/animations';
 import EmptyState from '../shared/EmptyState';
@@ -11,6 +13,7 @@ import MissedConnectionMapView from '../shared/MissedConnectionMapView';
 import ProximityBanner from '../shared/ProximityBanner';
 import ProximityMatchCard from '../shared/ProximityMatchCard';
 import useLocationPing from '../shared/useLocationPing';
+import BleMatchCard from './shared/BleMatchCard';
 
 import AddIcon from '@mui/icons-material/Add';
 import MapIcon from '@mui/icons-material/Map';
@@ -24,6 +27,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function EncountersPage() {
   const navigate = useNavigate();
+  const { currentUser } = useSocial();
   const [tab, setTab] = useState(0);
 
   // --- Nearby Now ---
@@ -111,6 +115,59 @@ export default function EncountersPage() {
     else if (tab === 3) loadHistory();
   }, [tab, loadSuggestions, loadHistory]);
 
+  // --- BLE Matches (Tab 4) ---
+  // Consumes bleEncounterApi.listMatches (was dead code per
+  // master-orchestrator backfill run aa3ead1; F2 IcebreakerDraftSheet
+  // wires onto the "Send icebreaker" callback below).
+  const [bleMatches, setBleMatches] = useState([]);
+  const [bleMatchesLoading, setBleMatchesLoading] = useState(false);
+
+  const loadBleMatches = useCallback(async () => {
+    setBleMatchesLoading(true);
+    try {
+      const res = await bleEncounterApi.listMatches();
+      // Axios envelope: res.data === {success, data: {matches, count}}
+      const payload = res?.data?.data || res?.data || {};
+      setBleMatches(Array.isArray(payload.matches) ? payload.matches : []);
+    } catch {
+      /* silent — tab will show empty state */
+    }
+    setBleMatchesLoading(false);
+  }, []);
+
+  // Auto-load on mount AND on encounter-match WAMP events.  Subscription
+  // lives at the page level (not gated on tab) so a fresh match badge
+  // can be surfaced even while the user is on another tab.
+  useEffect(() => {
+    loadBleMatches();
+    const unsubscribe = subscribeEncounterMatch(() => {
+      loadBleMatches();
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [loadBleMatches]);
+
+  const handleSendIcebreaker = (match) => {
+    // F2 (IcebreakerDraftSheet modal) will wire here to mount + run the
+    // full draftIcebreaker → approveIcebreaker / declineIcebreaker flow.
+    // Until then we surface a placeholder console event so e2e probes
+    // can verify the trigger fires.
+    if (typeof window !== 'undefined' && window.console) {
+      // eslint-disable-next-line no-console
+      console.log('[encounters] icebreaker requested for match', match?.id);
+    }
+  };
+
+  const handleHideMatch = (match) => {
+    // F2 follow-up will call /encounter/map-pins toggle.  Placeholder
+    // for now; declining the match itself is a separate verb.
+    if (typeof window !== 'undefined' && window.console) {
+      // eslint-disable-next-line no-console
+      console.log('[encounters] hide-from-map requested for match', match?.id);
+    }
+  };
+
   const handleAccept = async (encounter) => {
     try {
       await encountersApi.acknowledge(encounter.id);
@@ -152,6 +209,7 @@ export default function EncountersPage() {
         <Tab label="Missed Connections" />
         <Tab label="Discovery" />
         <Tab label="History" />
+        <Tab label="BLE Matches" />
       </Tabs>
 
       {/* ---- Tab 0: Nearby Now ---- */}
@@ -319,6 +377,33 @@ export default function EncountersPage() {
                 </Box>
               );
             })
+          )}
+        </Box>
+      )}
+
+      {/* ---- Tab 4: BLE Matches ---- */}
+      {tab === 4 && (
+        <Box sx={{ ...animFadeInUp(0) }} data-testid="ble-matches-tab">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Connections from nearby — both of you said yes.
+          </Typography>
+          {bleMatchesLoading ? (
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <CircularProgress />
+            </Box>
+          ) : bleMatches.length === 0 ? (
+            <EmptyState message="No mutual encounters yet. They appear once both sides say yes." />
+          ) : (
+            bleMatches.map((m, i) => (
+              <Box key={m.id} sx={{ ...animFadeInScale(i * 100) }}>
+                <BleMatchCard
+                  match={m}
+                  currentUserId={currentUser?.id}
+                  onIcebreaker={handleSendIcebreaker}
+                  onHide={handleHideMatch}
+                />
+              </Box>
+            ))
           )}
         </Box>
       )}
