@@ -718,18 +718,22 @@ def build_react_landing_page():
     # 4GB was insufficient on the current landing-page bundle size
     # (webpack + tailwind + all lazy-split chunks): saw `FATAL ERROR:
     # CALL_AND_RETRY_LAST Allocation failed - JavaScript heap out of
-    # memory` at 4096MB on 2026-04-15.  Bumped to 8192MB.  If CI runners
-    # have less than 8GB available, scale via env override.
+    # memory` at 4096MB on 2026-04-15.  Bumped to 6144MB for CI
+    # (Windows runner has ~14GB free but Python/torch consume ~6GB,
+    # leaving ~8GB; 8192MB was pushing the runner into OOM which sent
+    # Ctrl+C to the process group).  Override via NUNBA_NODE_HEAP_MB.
     env = os.environ.copy()
     env['CI'] = 'false'
     env['ESLINT_NO_DEV_ERRORS'] = 'true'
     env['DISABLE_ESLINT_PLUGIN'] = 'true'  # skip ESLint entirely during build
-    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', '8192')
+    _default_heap = '6144' if os.environ.get('NUNBA_CI') else '8192'
+    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', _default_heap)
     env['NODE_OPTIONS'] = f'--max-old-space-size={_node_heap_mb}'
 
     result = subprocess.run(
         [npm_cmd, 'run', 'build'],
-        cwd=landing_dir, env=env, check=False
+        cwd=landing_dir, env=env, check=False,
+        stdin=subprocess.DEVNULL,  # prevents "Terminate batch job (Y/N)?" hang on Windows CI
     )
     if result.returncode != 0:
         print_error("React build failed! Fix the build errors before freezing.")
