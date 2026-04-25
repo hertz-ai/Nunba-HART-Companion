@@ -198,6 +198,271 @@ class TestWampMessageHandlers:
             assert 'community.feed' not in realm.subscriptions
 
 
+class TestPerUserDelivery:
+    """End-to-end per-user delivery enforcement via _handle_subscribe.
+
+    Closes the gap surfaced by master-orchestrator backfill run aa3ead1
+    (W0b B6): the unit test ``test_b1_*`` in tests/test_session_fixes_runtime.py
+    pins the helper ``_authorize_topic_for_authid`` semantics, and
+    test_handle_subscribe_and_publish above exercises the *allow* path
+    via a public-prefix topic. Neither asserts that the SUBSCRIBE handler
+    refuses to register a per-user topic for a session whose authid is a
+    different user, NOR that a publish to that topic reaches no
+    subscriber on the deny path. Both invariants are load-bearing for
+    BLE encounter privacy (J209-J210, commit 8e4f462d):
+      - com.hevolve.encounter.match.{user_id}      — mutual-like rows
+      - com.hevolve.encounter.icebreaker.{user_id} — per-user state
+    A leak here would let a LAN-attached attacker subscribe to a
+    victim's match feed (location + identity) just by claiming their
+    own authid in HELLO.
+
+    Auth model under test (wamp_router.py L107-111, L289-323):
+      _authorize_topic_for_authid(topic, authid) returns False whenever
+      the topic ends with `.{other_user}` and the public-prefix
+      whitelist (HARTOS realtime._PUBLIC_TOPIC_PREFIXES) doesn't claim
+      it.  _handle_subscribe early-returns ERROR + warning on False
+      (no SUBSCRIBED, no entry in realm.subscriptions).
+    """
+
+    def _setup_session(self, authid: str):
+        """Helper — register a fake-protocol session as `authid`.
+
+        Returns (session, proto, sent_msgs).  sent_msgs accumulates
+        every WAMP frame the router would have written back to this
+        client; tests inspect it for ERROR vs SUBSCRIBED.
+        """
+        from wamp_router import (
+            WampSession,
+            _gen_id,
+            _handle_hello,
+            _protocol_to_session,
+            _sessions,
+            _state_lock,
+        )
+
+        sent: list = []
+
+        class FakeProto:
+            def sendMessage(self, payload, isBinary=False):
+                sent.append(json.loads(payload))
+
+        proto = FakeProto()
+        session = WampSession(_gen_id(), proto)
+        with _state_lock:
+            _sessions[session.session_id] = session
+            _protocol_to_session[id(proto)] = session.session_id
+        _handle_hello(session, [1, 'realm1', {'authid': authid}])
+        return session, proto, sent
+
+    def _teardown_session(self, session, proto):
+        from wamp_router import (
+            _protocol_to_session,
+            _sessions,
+            _state_lock,
+        )
+        with _state_lock:
+            _sessions.pop(session.session_id, None)
+            _protocol_to_session.pop(id(proto), None)
+
+    def test_subscribe_to_other_user_topic_denied(self):
+        """A session authenticated as user A must be refused when it
+        SUBSCRIBE's to a per-user topic ending in another user's id."""
+        from wamp_router import (
+            ERROR,
+            SUBSCRIBE,
+            _get_realm,
+            _handle_subscribe,
+        )
+
+        session, proto, sent = self._setup_session('userA')
+        try:
+            # Attempt to subscribe to the encounter match feed of userB.
+            # Per _authorize_topic_for_authid this MUST be refused.
+            sent.clear()
+            _handle_subscribe(session, [
+                SUBSCRIBE, 7, {}, 'com.hevolve.encounter.match.userB',
+            ])
+
+            # Expect exactly one outbound frame, and it must be ERROR.
+            err_frames = [m for m in sent if m and m[0] == ERROR]
+            sub_frames = [m for m in sent if m and m[0] == 33]  # SUBSCRIBED
+            assert len(err_frames) == 1, (
+                f'expected exactly one ERROR frame, got sent={sent!r}'
+            )
+            err = err_frames[0]
+            # ERROR frame layout: [ERROR, request_type, request_id, details, uri]
+            assert err[1] == SUBSCRIBE
+            assert err[2] == 7  # echoed request_id
+            assert err[4] == 'wamp.error.not_authorized'
+            assert sub_frames == [], (
+                'subscribe must NOT have been registered'
+            )
+
+            # And the realm must have NO subscription entry for the
+            # cross-user topic.
+            realm = _get_realm('realm1')
+            with realm.lock:
+                assert (
+                    'com.hevolve.encounter.match.userB' not in realm.subscriptions
+                ), (
+                    'cross-user topic ended up in the subscription map; '
+                    'per-user delivery is broken'
+                )
+        finally:
+            self._teardown_session(session, proto)
+
+    def test_publish_to_other_user_topic_does_not_deliver(self):
+        """Defense in depth — even if some bug let the subscribe slip
+        through, a PUBLISH from session A to a topic ending .userB must
+        not fan out to anyone (subscribe-side denial means no subscriber
+        for that topic in the realm).  This test sets up the full chain:
+        sessionA tries to subscribe to userB's encounter.match (denied),
+        then sessionA publishes to that topic; no event must arrive
+        anywhere.
+        """
+        from wamp_router import (
+            EVENT,
+            PUBLISH,
+            SUBSCRIBE,
+            _get_realm,
+            _handle_publish,
+            _handle_subscribe,
+        )
+
+        session_a, proto_a, sent_a = self._setup_session('userA')
+        # Also create a *legitimate* userB session that subscribes to
+        # ITS OWN topic — verifies the deny path doesn't accidentally
+        # silence the legitimate path either.
+        session_b, proto_b, sent_b = self._setup_session('userB')
+        try:
+            # 1. userA fails to subscribe to userB's topic.
+            sent_a.clear()
+            _handle_subscribe(session_a, [
+                SUBSCRIBE, 11, {}, 'com.hevolve.encounter.match.userB',
+            ])
+            assert any(m[0] == 8 for m in sent_a), (
+                'expected ERROR on cross-user subscribe (B6 invariant)'
+            )
+
+            # 2. userB legitimately subscribes to its own topic.
+            sent_b.clear()
+            _handle_subscribe(session_b, [
+                SUBSCRIBE, 13, {}, 'com.hevolve.encounter.match.userB',
+            ])
+            sub_frames = [m for m in sent_b if m[0] == 33]  # SUBSCRIBED
+            assert len(sub_frames) == 1, (
+                f'userB must be allowed to subscribe to its own topic; '
+                f'sent_b={sent_b!r}'
+            )
+
+            # 3. userA tries to publish to userB's topic — must be
+            # refused at the publish-side authorizer (defense in depth).
+            sent_b.clear()
+            _handle_publish(session_a, [
+                PUBLISH, 17, {},
+                'com.hevolve.encounter.match.userB',
+                [{'spoofed': True}],
+            ])
+
+            # userB session must have received NO EVENT frame from
+            # userA's spoofed publish.
+            event_frames = [m for m in sent_b if m and m[0] == EVENT]
+            assert event_frames == [], (
+                f'cross-user publish leaked into userB subscription; '
+                f'sent_b={sent_b!r}'
+            )
+
+            # 4. Sanity: a publish FROM userB to its own topic still
+            # works — proves we didn't break the legitimate path.
+            sent_b.clear()
+            _handle_publish(session_b, [
+                PUBLISH, 19, {},
+                'com.hevolve.encounter.match.userB',
+                [{'legit': True}],
+            ])
+            # exclude_me=True default suppresses self-delivery, so we
+            # expect NO event back to userB. Fan out a third subscriber
+            # to confirm legitimate publishes do reach a 3rd party.
+            session_c, proto_c, sent_c = self._setup_session('userB')
+            try:
+                _handle_subscribe(session_c, [
+                    SUBSCRIBE, 23, {}, 'com.hevolve.encounter.match.userB',
+                ])
+                sent_c.clear()
+                _handle_publish(session_b, [
+                    PUBLISH, 29, {},
+                    'com.hevolve.encounter.match.userB',
+                    [{'legit2': True}],
+                ])
+                events_c = [m for m in sent_c if m and m[0] == EVENT]
+                assert len(events_c) >= 1, (
+                    'second userB-claiming session should still receive '
+                    "userB's own publish (legitimate path must keep working)"
+                )
+                # Sanity: payload is the legit2 dict.
+                assert events_c[-1][4][0]['legit2'] is True
+            finally:
+                self._teardown_session(session_c, proto_c)
+
+            # Final invariant: the cross-user topic still has only the
+            # legitimate userB subscriber registered (userA's denied
+            # subscribe never landed in the map).
+            realm = _get_realm('realm1')
+            with realm.lock:
+                topic_subs = realm.subscriptions.get(
+                    'com.hevolve.encounter.match.userB', set(),
+                )
+                # Only userB sessions should be subscribed.
+                from wamp_router import _sessions
+                authids = {
+                    _sessions[sid].authid for (sid, _sub) in topic_subs
+                    if sid in _sessions
+                }
+                assert authids == {'userB'}, (
+                    f'expected only userB subscribers on per-user topic; '
+                    f'got authids={authids}'
+                )
+        finally:
+            self._teardown_session(session_a, proto_a)
+            self._teardown_session(session_b, proto_b)
+
+    def test_subscribe_to_icebreaker_other_user_denied(self):
+        """Same invariant for the icebreaker topic prefix (J210)."""
+        from wamp_router import ERROR, SUBSCRIBE, _handle_subscribe
+
+        session, proto, sent = self._setup_session('alice')
+        try:
+            sent.clear()
+            _handle_subscribe(session, [
+                SUBSCRIBE, 31, {},
+                'com.hevolve.encounter.icebreaker.bob',
+            ])
+            err_frames = [m for m in sent if m and m[0] == ERROR]
+            assert len(err_frames) == 1
+            assert err_frames[0][4] == 'wamp.error.not_authorized'
+        finally:
+            self._teardown_session(session, proto)
+
+    def test_subscribe_to_own_encounter_topic_allowed(self):
+        """The legitimate path must keep working — a session whose
+        authid matches the topic suffix must be SUBSCRIBED."""
+        from wamp_router import SUBSCRIBED, SUBSCRIBE, _handle_subscribe
+
+        session, proto, sent = self._setup_session('alice')
+        try:
+            sent.clear()
+            _handle_subscribe(session, [
+                SUBSCRIBE, 41, {},
+                'com.hevolve.encounter.match.alice',
+            ])
+            sub_frames = [m for m in sent if m and m[0] == SUBSCRIBED]
+            assert len(sub_frames) == 1, (
+                f'allow-path must yield one SUBSCRIBED frame; sent={sent!r}'
+            )
+        finally:
+            self._teardown_session(session, proto)
+
+
 class TestBackendPublish:
     """Test publish_local() delivers events to subscribers."""
 
