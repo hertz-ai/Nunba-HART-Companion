@@ -34,7 +34,7 @@ jobs:
   # ============================================================
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     steps:
       - name: Checkout Nunba
@@ -312,7 +312,7 @@ jobs:
   # ============================================================
   build-macos:
     runs-on: macos-14  # Apple Silicon (M1) runner
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Nunba
@@ -464,7 +464,7 @@ jobs:
   # ============================================================
   build-linux:
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Nunba
