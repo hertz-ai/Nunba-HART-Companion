@@ -219,7 +219,12 @@ jobs:
           # Always create .pth as belt-and-suspenders (editable installs can silently break)
           if [ -d "_deps/Hevolve_Database/sql" ]; then
             SITE_PKG=$(python -c "import site; print(site.getsitepackages()[0])")
-            HEVOLVE_DB_PATH=$(cd _deps/Hevolve_Database && pwd)
+            # MUST be a Windows-style absolute path on win runners — bash's
+            # `pwd` returns MSYS2-style /d/a/... which Python on Windows
+            # treats as a literal-but-nonexistent path, silently dropping
+            # the .pth entry.  Use python's os.path.abspath so the .pth
+            # carries D:\a\... and `import sql` actually resolves.
+            HEVOLVE_DB_PATH=$(python -c "import os; print(os.path.abspath('_deps/Hevolve_Database'))")
             echo "$HEVOLVE_DB_PATH" > "$SITE_PKG/hevolve_database.pth"
             echo "Added Hevolve_Database to Python path via .pth: $HEVOLVE_DB_PATH"
           fi
@@ -599,7 +604,7 @@ jobs:
           Exec=Nunba
           Icon=nunba
           Type=Application
-          Categories=Utility;Education;ArtificialIntelligence;
+          Categories=Utility;ArtificialIntelligence;
           EOF
 
           if [ -f assets/icon.png ]; then
@@ -622,6 +627,7 @@ jobs:
           APPRUN
           chmod +x Nunba.AppDir/AppRun
 
+          mkdir -p Output
           ARCH=x86_64 ./appimagetool-x86_64.AppImage Nunba.AppDir Output/Nunba-x86_64.AppImage
         env:
           ARCH: x86_64
