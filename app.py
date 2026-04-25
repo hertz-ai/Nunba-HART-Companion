@@ -1682,8 +1682,9 @@ if getattr(args, 'validate', False):
         # 8. Key libraries
         'PIL', 'numpy', 'sqlalchemy', 'pystray', 'requests', 'certifi',
         'json_repair', 'bs4',
-        # 9. Database package (hevolve-database pip-installed)
-        'sql.database', 'sql.models',
+        # 9. Database package (optional — only bundled when hevolve-database is installed)
+        *( ['sql.database', 'sql.models']
+           if __import__('importlib.util').find_spec('sql') else [] ),
     ]
 
     # NameError = code references an undefined name (e.g. missing import logging)

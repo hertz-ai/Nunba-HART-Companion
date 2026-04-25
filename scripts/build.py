@@ -1516,6 +1516,7 @@ def build_macos(python_exe, app_only=False, installer_only=False):
                 '--icon', 'Nunba.app', '150', '190',
                 '--app-drop-link', '450', '190',
                 '--hide-extension', 'Nunba.app',
+                '--no-internet-enable',  # prevents hdiutil internet-enable which fails on CI
                 output_dmg,
                 app_path
             ]
@@ -1628,6 +1629,7 @@ def sign_macos():
                 '--icon', 'Nunba.app', '150', '190',
                 '--app-drop-link', '450', '190',
                 '--hide-extension', 'Nunba.app',
+                '--no-internet-enable',  # prevents hdiutil internet-enable which fails on CI
                 output_dmg,
                 app_path
             ]
