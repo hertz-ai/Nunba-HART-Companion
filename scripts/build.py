@@ -539,6 +539,10 @@ def _find_local_hartos_backend():
     parent = os.path.dirname(project_dir)
 
     candidates = [
+        # CI: actions/checkout puts sibling repos under _deps/
+        os.path.join(project_dir, '_deps', 'HARTOS'),
+        os.path.join(project_dir, '_deps', 'hart-backend'),
+        # Local dev: sibling directory next to Nunba
         os.path.join(parent, 'HARTOS'),
         os.path.join(parent, 'hart-backend'),
     ]
@@ -559,10 +563,14 @@ def _install_hevolve_database(python_exe):
     declares hevolve-database as a git dependency. Pre-installing from local
     sibling satisfies the dependency so pip skips the git URL.
     """
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parent = os.path.dirname(project_dir)
     candidates = [
-        # 1. Sibling directory (canonical repo clone)
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'Hevolve_Database'),
-        # 2. User's PycharmProjects directory (fallback)
+        # CI: actions/checkout puts sibling repos under _deps/
+        os.path.join(project_dir, '_deps', 'Hevolve_Database'),
+        # Local dev: sibling directory next to Nunba
+        os.path.join(parent, 'Hevolve_Database'),
+        # User's PycharmProjects directory (fallback)
         os.path.join(os.path.expanduser('~'), 'PycharmProjects', 'Hevolve_Database'),
     ]
     for path in candidates:
@@ -596,8 +604,15 @@ def _install_embodied_ai(python_exe):
     the user's git credentials for private repo access).
     """
     # Try local sibling first
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parent = os.path.dirname(project_dir)
     candidates = [
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'hevolveai'),
+        # CI: actions/checkout puts sibling repos under _deps/
+        os.path.join(project_dir, '_deps', 'hevolveai'),
+        # Local dev: sibling directory next to Nunba
+        os.path.join(parent, 'hevolveai'),
+        os.path.join(parent, 'HevolveAI'),
+        # User's PycharmProjects directory (fallback)
         os.path.join(os.path.expanduser('~'), 'PycharmProjects', 'hevolveai'),
     ]
     for path in candidates:
@@ -718,18 +733,22 @@ def build_react_landing_page():
     # 4GB was insufficient on the current landing-page bundle size
     # (webpack + tailwind + all lazy-split chunks): saw `FATAL ERROR:
     # CALL_AND_RETRY_LAST Allocation failed - JavaScript heap out of
-    # memory` at 4096MB on 2026-04-15.  Bumped to 8192MB.  If CI runners
-    # have less than 8GB available, scale via env override.
+    # memory` at 4096MB on 2026-04-15.  Bumped to 6144MB for CI
+    # (Windows runner has ~14GB free but Python/torch consume ~6GB,
+    # leaving ~8GB; 8192MB was pushing the runner into OOM which sent
+    # Ctrl+C to the process group).  Override via NUNBA_NODE_HEAP_MB.
     env = os.environ.copy()
     env['CI'] = 'false'
     env['ESLINT_NO_DEV_ERRORS'] = 'true'
     env['DISABLE_ESLINT_PLUGIN'] = 'true'  # skip ESLint entirely during build
-    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', '8192')
+    _default_heap = '6144' if os.environ.get('NUNBA_CI') else '8192'
+    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', _default_heap)
     env['NODE_OPTIONS'] = f'--max-old-space-size={_node_heap_mb}'
 
     result = subprocess.run(
         [npm_cmd, 'run', 'build'],
-        cwd=landing_dir, env=env, check=False
+        cwd=landing_dir, env=env, check=False,
+        stdin=subprocess.DEVNULL,  # prevents "Terminate batch job (Y/N)?" hang on Windows CI
     )
     if result.returncode != 0:
         print_error("React build failed! Fix the build errors before freezing.")
