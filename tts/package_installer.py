@@ -1180,19 +1180,44 @@ def _download_model_weights(backend: str,
 
 
 def _invalidate_import_cache():
-    """Clear TTSEngine import cache so newly installed packages are detected.
+    """Clear ALL import-related caches so newly installed packages are
+    detected on the very next probe.  Three independent caches sit
+    between the install path and the runnable check:
 
-    Also refreshes importlib's finder cache.
+      1. TTSEngine._import_check_cache       (per-package, in-process)
+      2. importlib's internal finder cache   (in-process)
+      3. _torch_probe._backend_cache         (per-backend, in-process,
+                                              keys the subprocess
+                                              import probe — was the
+                                              missed one that caused
+                                              chatterbox-librosa
+                                              self-heal to spin: pip
+                                              installed librosa, this
+                                              fn cleared (1) and (2)
+                                              but NOT (3), so the next
+                                              probe call returned the
+                                              stale pre-install False
+                                              instead of re-running
+                                              the subprocess.)
+
+    Cheap to clear all three, expensive to forget any one of them.
     """
-    # Clear TTSEngine's static cache
+    # 1. TTSEngine's static cache
     try:
         from tts.tts_engine import TTSEngine
         TTSEngine._import_check_cache.clear()
     except Exception:
         pass
 
-    # Refresh importlib finders
+    # 2. importlib finders
     importlib.invalidate_caches()
+
+    # 3. _torch_probe per-backend subprocess result cache
+    try:
+        from tts import _torch_probe as _tp
+        _tp._backend_cache.clear()
+    except Exception:
+        pass
 
     # Re-add python-embed to sys.path if not present (edge case after pip install)
     sp = get_embed_site_packages()
