@@ -238,7 +238,7 @@ jobs:
           NUNBA_WARN_ACCEPTANCE: '1'
 
       - name: Sign Nunba.exe (Azure Trusted Signing)
-        if: ${{ !inputs.skip_signing }}
+        if: ${{ !inputs.skip_signing && secrets.AZURE_CODE_SIGNING_ACCOUNT != '' }}
         uses: azure/trusted-signing-action@v0.5.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -258,7 +258,7 @@ jobs:
         run: python scripts/build.py installer
 
       - name: Sign installer (Azure Trusted Signing)
-        if: ${{ !inputs.skip_signing }}
+        if: ${{ !inputs.skip_signing && secrets.AZURE_CODE_SIGNING_ACCOUNT != '' }}
         uses: azure/trusted-signing-action@v0.5.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -409,7 +409,7 @@ jobs:
           NUNBA_WARN_ACCEPTANCE: '1'
 
       - name: Import Apple signing certificate
-        if: ${{ !inputs.skip_signing }}
+        if: ${{ !inputs.skip_signing && secrets.APPLE_CERTIFICATE_P12 != '' }}
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -428,7 +428,7 @@ jobs:
         continue-on-error: true
 
       - name: Sign and notarize
-        if: ${{ !inputs.skip_signing }}
+        if: ${{ !inputs.skip_signing && secrets.APPLE_CERTIFICATE_P12 != '' }}
         continue-on-error: true
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
@@ -632,6 +632,7 @@ jobs:
           APPRUN
           chmod +x Nunba.AppDir/AppRun
 
+          mkdir -p Output
           ARCH=x86_64 ./appimagetool-x86_64.AppImage Nunba.AppDir Output/Nunba-x86_64.AppImage
         env:
           ARCH: x86_64
