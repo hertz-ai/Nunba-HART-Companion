@@ -211,6 +211,16 @@ build_exe_options = {
     ),
 }
 
+# Resolve HARTOS directory: _deps/HARTOS (CI) or ../HARTOS (local dev)
+_proj_dir_mac = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_hartos_dir_mac = next(
+    (d for d in [
+        os.path.join(_proj_dir_mac, '_deps', 'HARTOS'),
+        os.path.join(os.path.dirname(_proj_dir_mac), 'HARTOS'),
+    ] if os.path.isdir(d)),
+    os.path.join(os.path.dirname(_proj_dir_mac), 'HARTOS'),
+)
+
 # ── Include hart-backend modules (same logic as Windows build) ──
 def find_hevolve_modules():
     hevolve_modules = [
@@ -225,8 +235,7 @@ def find_hevolve_modules():
         spec = importlib.util.find_spec(mod_name)
         if spec and spec.origin and os.path.isfile(spec.origin):
             found[mod_name] = (spec.origin, f"{mod_name}.py")
-    llm_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           '..', '..', 'HARTOS')
+    llm_dir = _hartos_dir_mac
     if os.path.isdir(llm_dir):
         for mod_name in hevolve_modules:
             if mod_name in found:
@@ -244,8 +253,7 @@ build_exe_options["include_files"] = list(build_exe_options["include_files"]) + 
 import importlib.util as _ilu_pre
 
 if not _ilu_pre.find_spec("agent_ledger"):
-    _al_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            '..', '..', 'HARTOS', 'agent-ledger-opensource', 'agent_ledger')
+    _al_path = os.path.join(_hartos_dir_mac, 'agent-ledger-opensource', 'agent_ledger')
     if os.path.isdir(_al_path) and os.path.isfile(os.path.join(_al_path, '__init__.py')):
         build_exe_options["include_files"].append((os.path.normpath(_al_path), "agent_ledger"))
         print(f"Including agent_ledger package <- {os.path.normpath(_al_path)}")
@@ -274,7 +282,7 @@ for _pkg in _optional_packages:
 # Include langchain config.json with safe destination name
 _langchain_config = None
 for _cfg_candidate in [
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'HARTOS', 'config.json'),
+    os.path.join(_hartos_dir_mac, 'config.json'),
 ]:
     if os.path.isfile(_cfg_candidate):
         _langchain_config = os.path.normpath(_cfg_candidate)

@@ -405,9 +405,16 @@ def find_hevolve_modules():
     """
     # Auto-discover from HARTOS pyproject.toml
     hevolve_modules = None
-    _hartos_toml = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '..', '..', 'HARTOS', 'pyproject.toml')
-    if os.path.isfile(_hartos_toml):
+    _proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _hartos_toml = None
+    for _ht_cand in [
+        os.path.join(_proj, '_deps', 'HARTOS', 'pyproject.toml'),
+        os.path.join(os.path.dirname(_proj), 'HARTOS', 'pyproject.toml'),
+    ]:
+        if os.path.isfile(_ht_cand):
+            _hartos_toml = _ht_cand
+            break
+    if _hartos_toml and os.path.isfile(_hartos_toml):
         import re
         try:
             with open(_hartos_toml, encoding='utf-8') as _tf:
@@ -451,9 +458,17 @@ def find_hevolve_modules():
             if os.path.isfile(mod_path):
                 found[mod_name] = (mod_path, os.path.join("lib", f"{mod_name}.py"))
 
-    # 3. sibling HARTOS directory
-    llm_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           '..', '..', 'HARTOS')
+    # 3. sibling HARTOS directory (_deps/HARTOS for CI, ../HARTOS for local dev)
+    _proj_linux = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    llm_dir = None
+    for _ld_cand in [
+        os.path.join(_proj_linux, '_deps', 'HARTOS'),
+        os.path.join(os.path.dirname(_proj_linux), 'HARTOS'),
+    ]:
+        if os.path.isdir(_ld_cand):
+            llm_dir = _ld_cand
+            break
+    llm_dir = llm_dir or os.path.join(os.path.dirname(_proj_linux), 'HARTOS')
     if os.path.isdir(llm_dir):
         for mod_name in hevolve_modules:
             if mod_name in found:
@@ -478,8 +493,7 @@ build_exe_options["include_files"].extend(hevolve_files)
 
 # Always include agent_ledger from sibling dir (namespace package issue)
 _agent_ledger_candidates = [
-    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 '..', '..', 'HARTOS', 'agent-ledger-opensource', 'agent_ledger'),
+    os.path.join(_hartos_dir, 'agent-ledger-opensource', 'agent_ledger'),
     os.path.join('hartos_backend_src', 'agent_ledger'),
 ]
 for _al_path in _agent_ledger_candidates:
@@ -491,8 +505,18 @@ else:
     print("WARNING: agent_ledger package not found -- distributed agent features unavailable")
 
 # Include HARTOS package directories (integrations, core, security)
-_hartos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           '..', '..', 'HARTOS')
+# Check _deps/HARTOS first (CI), then ../HARTOS (local dev)
+_project_dir_linux = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_hartos_dir = None
+for _hd_cand in [
+    os.path.join(_project_dir_linux, '_deps', 'HARTOS'),
+    os.path.join(os.path.dirname(_project_dir_linux), 'HARTOS'),
+]:
+    if os.path.isdir(_hd_cand):
+        _hartos_dir = _hd_cand
+        break
+if _hartos_dir is None:
+    _hartos_dir = os.path.join(os.path.dirname(_project_dir_linux), 'HARTOS')
 _hartos_packages = [
     ("integrations", "integrations"),
     ("core", "core"),
@@ -523,7 +547,7 @@ except Exception as _sql_err:
 # Include langchain config.json
 _langchain_config = None
 for _cfg_candidate in [
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'HARTOS', 'config.json'),
+    os.path.join(_hartos_dir, 'config.json'),
     os.path.join('hartos_backend_src', 'config.json'),
 ]:
     if os.path.isfile(_cfg_candidate):
