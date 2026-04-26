@@ -5,6 +5,7 @@ Each row is a director's treatment + scene-by-scene shot list + AI-video-model g
 | Slug | Feature | PRODUCT_MAP refs | Variants | Last updated |
 |------|---------|------------------|----------|--------------|
 | [encounters](./encounters.md) | BLE encounter + icebreaker (Hevolve mobile + Nunba desktop continuation) | J200–J215 | 75s hero / 30s mid / 15s short | 2026-04-25 |
+| [voice-chat](./voice-chat.md) | NunbaChatPanel mic — dual-path STT (local Whisper → browser fallback) with privacy badge | F4 (commit `fcd4d426`) | 75s hero / 30s mid / 15s short | 2026-04-26 |
 
 ## Conventions
 
