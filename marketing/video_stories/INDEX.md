@@ -6,6 +6,7 @@ Each row is a director's treatment + scene-by-scene shot list + AI-video-model g
 |------|---------|------------------|----------|--------------|
 | [encounters](./encounters.md) | BLE encounter + icebreaker (Hevolve mobile + Nunba desktop continuation) | J200–J215 | 75s hero / 30s mid / 15s short | 2026-04-25 |
 | [voice-chat](./voice-chat.md) | NunbaChatPanel mic — dual-path STT (local Whisper → browser fallback) with privacy badge | F4 (commit `fcd4d426`) | 75s hero / 30s mid / 15s short | 2026-04-26 |
+| [auto-evolve](./auto-evolve.md) | Hive flywheel — democratic vote → constitutional filter → parallel dispatch → federated learning | `auto-evolve.md` design + `project_realtime_self_optimization.md` mission anchor | 75s hero / 30s mid / 15s short | 2026-04-26 |
 
 ## Conventions
 
