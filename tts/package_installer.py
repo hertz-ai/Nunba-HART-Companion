@@ -787,7 +787,57 @@ def install_backend_packages(backend: str,
             # Continue — caller decides how to handle a still-CPU torch.
 
     if not to_install and not cuda_torch_was_installed:
-        return True, f"All packages for {backend} already installed"
+        # Pip-level "all installed" is an unreliable success signal —
+        # is_package_installed only checks top-level find_spec, missing
+        # transitives the upstream package omits from install_requires
+        # (chatterbox-tts pulled this stunt twice: librosa, then perth).
+        # Run the deep self-heal probe BEFORE returning so we either
+        # confirm the engine is truly runnable or auto-install the
+        # actual missing transitive.  Skipping this check is what
+        # caused the perth failure on a chatterbox re-install where
+        # librosa was already on disk from the prior heal attempt.
+        deep_ok, healed = _self_heal_missing_transitives(
+            backend, progress_cb=progress_cb,
+        )
+        if healed:
+            logger.info(
+                f"Self-heal (early-return path) installed transitives for "
+                f"{backend}: {healed} — add to HARTOS pip_install_plan"
+            )
+        if deep_ok:
+            return True, f"All packages for {backend} already installed"
+        # Deep probe failed even after self-heal — fall through to the
+        # error_advice handoff at the bottom of the function so an
+        # autogen agent can investigate.
+        all_ok = False
+        # Skip the redundant top-level verify since to_install is empty
+        # — go straight to the agent-remediation path below.
+        try:
+            from core.error_advice import handle_exception
+            handle_exception(
+                RuntimeError(
+                    f"deterministic self-heal exhausted for {backend} "
+                    f"(early-return path) after installing {healed}"
+                ),
+                category='tts.install.self_heal_exhausted',
+                severity='high',
+                agent_remediation=True,
+                context={
+                    'backend': backend,
+                    'display_name': display_name,
+                    'attempted_packages': packages,
+                    'healed_during_loop': healed,
+                    'path': 'early-return (all-pip-installed)',
+                    'probe_err_file': os.path.join(
+                        os.path.expanduser('~'),
+                        'Documents', 'Nunba', 'logs',
+                        f'probe_{backend}.err',
+                    ),
+                },
+            )
+        except Exception:
+            pass
+        return False, f"Deep probe failed for {backend} after self-heal"
 
     if to_install and progress_cb:
         progress_cb(f"Installing packages for {display_name}: {', '.join(to_install)}")
@@ -934,9 +984,20 @@ def _self_heal_missing_transitives(
         return True, []  # nothing to probe; treat as healthy
 
     try:
-        from tts._torch_probe import check_backend_runnable
+        from tts._torch_probe import check_backend_runnable, _resolve_paths
     except Exception:
         return True, []  # probe unavailable in dev mode — treat as healthy
+
+    # Probe requires a frozen python-embed bundle to run the deep
+    # subprocess import.  In dev mode (running from source, not a
+    # frozen .exe), `_resolve_paths()` returns False, and a direct
+    # call to check_backend_runnable would return False without ever
+    # actually running the probe — indistinguishable from "probe ran
+    # and the engine is broken".  Treat unavailable-probe as healthy
+    # so dev-mode + unit-test runs trust the pip-level signal that
+    # called us; only frozen-build users get the deep-probe gate.
+    if not _resolve_paths():
+        return True, []
 
     err_file = os.path.join(
         os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
