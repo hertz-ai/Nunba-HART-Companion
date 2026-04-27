@@ -1032,7 +1032,7 @@ if os.path.exists("python-embed"):
             f"across reinstalls for weeks)."
         )
         for fp, reason in _src_corruption[:10]:
-            print(f"  {fp}  →  {reason}")
+            print(f"  {fp}  ->  {reason}")
         if len(_src_corruption) > 10:
             print(f"  ... and {len(_src_corruption) - 10} more")
         _repaired = _autorepair_corrupt_packages(_src_corruption)
@@ -1049,7 +1049,7 @@ if os.path.exists("python-embed"):
                 f"corrupt after autorepair — refusing to ship."
             )
             for fp, reason in _src_corruption[:30]:
-                print(f"  {fp}  →  {reason}")
+                print(f"  {fp}  ->  {reason}")
             print()
             print("  Manual repair recipe (run from the Nunba repo root):")
             print("    rm -rf python-embed/Lib/site-packages/<bad-pkg>")
@@ -1371,7 +1371,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
                 f"broken installer."
             )
             for _di, _reason in _bad_meta:
-                print(f"  {_di}  →  {_reason}")
+                print(f"  {_di}  ->  {_reason}")
             print(
                 "  Fix: rebuild python-embed (delete + recreate) or "
                 "reinstall the affected packages with "
