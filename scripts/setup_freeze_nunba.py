@@ -935,6 +935,77 @@ def _validate_python_embed_source() -> list[tuple[str, str]]:
     return bad
 
 
+def _build_import_to_pip_map(sp: str) -> dict[str, str]:
+    """Walk every *.dist-info in `sp`, read METADATA Name: + top_level.txt,
+    return {import_name: pip_dist_name}.
+
+    Why this exists: PyPI dist names rarely match Python import names.
+    `chatterbox-tts` installs the `chatterbox` package; `resemble-perth`
+    installs `perth`; `descript-audio-codec` installs `dac`.  When a
+    .py file at `<sp>/<import_name>/...` is corrupt, the autorepair
+    needs the PyPI dist name to pip-install — guessing from the dir
+    name lands on the wrong (unrelated) package and silently doesn't
+    fix the corruption (witnessed: cycle 8 — pip install `chatterbox`
+    grabbed an old chatbot framework instead of ResembleAI's
+    chatterbox-tts; the corrupt models/t3/t3.py survived and shipped).
+
+    The dist-info itself records the mapping authoritatively:
+      * METADATA's `Name:` header is the PyPI dist name
+      * top_level.txt lists the import names the package provides
+    Inverting top_level.txt → Name: gives us the right pip name for
+    every corrupt import path the validator finds.
+
+    Robust against missing top_level.txt (older pip versions / wheel
+    packages) by also indexing the dist-info's own derived name.
+    Robust against multiple top-levels per dist (e.g. `setuptools`
+    provides `setuptools`, `pkg_resources`, `_distutils_hack`)."""
+    out: dict[str, str] = {}
+    if not os.path.isdir(sp):
+        return out
+    for entry in os.listdir(sp):
+        full = os.path.join(sp, entry)
+        if not (os.path.isdir(full) and entry.endswith('.dist-info')):
+            continue
+        # 1) PyPI dist name from METADATA Name:
+        pip_name = ''
+        meta = os.path.join(full, 'METADATA')
+        if os.path.isfile(meta):
+            try:
+                with open(meta, encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        if line.startswith('Name:'):
+                            pip_name = line.split(':', 1)[1].strip()
+                            break
+                        if line.strip() == '':
+                            break
+            except OSError:
+                pass
+        # Fallback: derive from `<name>-<version>.dist-info` dir name
+        if not pip_name:
+            pip_name = entry[:-len('.dist-info')].rsplit('-', 1)[0]
+        # 2) Import names from top_level.txt
+        top = os.path.join(full, 'top_level.txt')
+        import_names: list[str] = []
+        if os.path.isfile(top):
+            try:
+                with open(top, encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        n = line.strip()
+                        if n:
+                            import_names.append(n)
+            except OSError:
+                pass
+        # If no top_level.txt, fall back to the dist's own derived name
+        # normalized (dashes -> underscores) which usually matches
+        if not import_names:
+            import_names.append(pip_name.replace('-', '_'))
+        for n in import_names:
+            # First mapping wins (deterministic if multiple dist-infos
+            # claim the same top-level).
+            out.setdefault(n, pip_name)
+    return out
+
+
 def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
     """Auto-repair corrupt python-embed packages by deleting the package
     dir + pip-installing it again with --force-reinstall.  Mirrors the
@@ -944,8 +1015,7 @@ def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
     Returns the number of packages successfully repaired.  Skips
     packages we can't safely auto-repair (sibling repos with no PyPI
     name — those are handled by the dedicated sibling-deps loop
-    further down) and packages whose pip name we can't infer from
-    the dist dir name."""
+    further down) and packages whose pip name we can't infer."""
     import subprocess as _sp
     import shutil as _shutil
 
@@ -959,6 +1029,10 @@ def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
         except Exception:
             pass
 
+    # Build the import-name → pip-dist-name map BEFORE we start
+    # deleting dist-info dirs (deletion races would empty it mid-loop).
+    _import_to_pip = _build_import_to_pip_map(sp)
+
     # Sibling repos are handled by the explicit re-install loop below
     # — don't double-repair them here (would race the loop's own
     # delete + pip install).
@@ -971,18 +1045,28 @@ def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
 
     repaired = 0
     for pkg_dir in sorted(by_pkg.keys()):
-        # Derive the pip distribution name from the directory name.
-        # `.dist-info` / `.egg-info` carry it as a `<name>-<version>`
-        # prefix.  Plain package dirs just use the dir name.
-        _pip_name = pkg_dir
-        for _suf in ('.dist-info', '.egg-info'):
-            if _pip_name.endswith(_suf):
-                # `transformers-5.1.0.dist-info` → `transformers`
-                _pip_name = _pip_name[: -len(_suf)].rsplit('-', 1)[0]
-                break
+        # Derive the pip distribution name.  Three rules in order:
+        #   1) Exact match in import → pip map (handles
+        #      `chatterbox -> chatterbox-tts`, `perth -> resemble-perth`,
+        #      `dac -> descript-audio-codec`)
+        #   2) Strip .dist-info / .egg-info suffixes for direct dist
+        #      dirs (handles `transformers-5.1.0.dist-info -> transformers`)
+        #   3) Fallback: dir name unchanged
+        if pkg_dir in _import_to_pip:
+            _pip_name = _import_to_pip[pkg_dir]
+        else:
+            _pip_name = pkg_dir
+            for _suf in ('.dist-info', '.egg-info'):
+                if _pip_name.endswith(_suf):
+                    _pip_name = _pip_name[: -len(_suf)].rsplit('-', 1)[0]
+                    # After stripping, also try the import-name lookup
+                    # against the bare name in case it disambiguates.
+                    if _pip_name in _import_to_pip:
+                        _pip_name = _import_to_pip[_pip_name]
+                    break
         if _pip_name.lower() in _SIBLING_NAMES:
             print(
-                f"  python-embed: {pkg_dir} corrupt — skipping autorepair "
+                f"  python-embed: {pkg_dir} corrupt -- skipping autorepair "
                 f"(handled by sibling-deps loop below)"
             )
             continue
@@ -993,7 +1077,7 @@ def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
             _shutil.rmtree(_full)
         except Exception as _exc:
             print(
-                f"  python-embed: failed to remove {pkg_dir}: {_exc} — "
+                f"  python-embed: failed to remove {pkg_dir}: {_exc} -- "
                 f"skipping autorepair"
             )
             continue
@@ -1001,7 +1085,8 @@ def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
         # --no-deps <pip_name>.  --no-deps because the bundle already
         # carries every required transitive; we only want to repair
         # this one corrupt package without unbounded re-resolution.
-        print(f"  python-embed: autorepair pip-install {_pip_name}...")
+        print(f"  python-embed: autorepair pip-install {_pip_name} "
+              f"(import={pkg_dir})...")
         _r = _sp.run(
             [sys.executable, "-m", "pip", "install",
              "--target", sp, "--force-reinstall", "--no-deps",
