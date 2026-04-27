@@ -13,7 +13,12 @@
   <a href="https://docs.hevolve.ai/downloads/"><img src="https://img.shields.io/badge/Downloads-docs.hevolve.ai-orange?style=for-the-badge" alt="Downloads"></a>
 </p>
 
-**The only desktop AI companion that learns *while* you live with it.** Nunba is a privacy-first multimodal assistant powered by [HARTOS](https://github.com/hertz-ai/HARTOS) — the **Hevolve Hive Agent Runtime OS**. Every conversation, every action, every observed outcome flows into a closed *autoresearch → constitutional filter → vote → parallel dispatch → federated learning* loop that makes the agent **measurably better than yesterday**, on your hardware, without sending your data anywhere.
+**The only desktop AI companion that learns *while* you live with it.** Nunba is the privacy-first consumer companion sitting on top of [HART OS](https://github.com/hertz-ai/HARTOS) — the **Hevolve Hive Agentic Runtime**. Every conversation, every action, every observed outcome flows into a closed *autoresearch → constitutional filter → vote → parallel dispatch → federated learning* loop that makes the agent **measurably better than yesterday**, on your hardware, without sending your data anywhere.
+
+> **The stack, named precisely**
+> - **HART** — the bare agent engine. Headless. `pip install hart-backend`. Port `:6777`. No screens.
+> - **[HART OS](https://github.com/hertz-ai/HARTOS)** — HART **+ operator/admin desktop screens** (model catalog, channel pairing, agent dashboard, hive view, thought-experiment console). Ships `hevolve-install.exe` and the pip package together.
+> - **Nunba** *(this repo)* — the consumer companion. Bundles HART OS inside a signed desktop installer (Windows / macOS / Linux) and adds the **chat / social / encounter / kids-learning** screens a non-operator wants. The screen most users see.
 
 It runs **entirely on your machine** — local LLM (Qwen3.5-VL or any GGUF), local speech (Whisper STT, Indic Parler / Chatterbox / Kokoro / CosyVoice / Piper TTS), local vision (MiniCPM, Qwen3-VL). Bring your own provider when you want — [OpenAI](https://platform.openai.com), [Anthropic](https://anthropic.com), [Google Gemini](https://ai.google.dev), [Groq](https://groq.com), [Mistral](https://mistral.ai), [DeepSeek](https://deepseek.com), [Hugging Face](https://huggingface.co), [Ollama](https://ollama.com), or any OpenAI-compatible endpoint — through one universal gateway with smart cost/latency routing. **No lock-in. No telemetry. No subscription.**
 
