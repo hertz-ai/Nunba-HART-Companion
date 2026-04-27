@@ -125,7 +125,15 @@ EMBED_DEPS = {
     # subprocesses spawned from python-embed/python.exe CAN'T see the cx_Freeze
     # lib/ numpy/regex/tqdm/yaml. Without these pins every transformers-based TTS
     # worker (Indic Parler, Chatterbox, F5) crashes on load.
-    "regex": "2024.11.6",
+    # transformers 5.6.2 fails its module-load dep check with
+    # `regex>=2025.10.22 is required for a normal functioning of this
+    # module, but found regex==2024.11.6` — Chatterbox Turbo / Indic
+    # Parler / F5 all crash before loading because they import
+    # transformers (probe_chatterbox_turbo.err, 2026-04-27).  Bumping
+    # the floor to 2025.11.3 (latest stable, satisfies the >=2025.10.22
+    # requirement and forward-compatible with future transformers
+    # patches that tightened the floor again).
+    "regex": "2025.11.3",
     "numpy": "1.26.4",
     "tqdm": "4.67.1",
     "pyyaml": "6.0.2",

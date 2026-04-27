@@ -979,6 +979,18 @@ def install_backend_packages(backend: str,
 _MISSING_MODULE_RE = re.compile(
     r"ModuleNotFoundError:\s+No module named ['\"]([^'\"]+)['\"]"
 )
+# transformers' `dependency_versions_check` raises this format when a
+# transitive dep is installed but pinned too low.  Example seen 2026-04-27
+# in probe_chatterbox_turbo.err:
+#   ImportError: regex>=2025.10.22 is required for a normal functioning
+#   of this module, but found regex==2024.11.6.
+# Without this pattern, self-heal exits with `installing []` and the
+# user sees "Chatterbox Turbo Failed".  Captured group is the package
+# name; install path uses `pip install -U <pkg>` to upgrade past the
+# floor.
+_VERSION_MISMATCH_RE = re.compile(
+    r"ImportError:\s+([A-Za-z_][\w.\-]*)\s*[<>=!~]",
+)
 
 
 def _self_heal_missing_transitives(
@@ -1040,29 +1052,48 @@ def _self_heal_missing_transitives(
         except Exception:
             return False, healed
 
+        # Two recognised failure shapes — try in order:
+        #  1. ModuleNotFoundError → install missing top-level package.
+        #  2. ImportError: pkg>=X is required (transformers' version-
+        #     check format) → upgrade to satisfy the floor.
         m = _MISSING_MODULE_RE.search(err_text)
-        if not m:
-            # Different kind of failure (e.g., DLL not found, runtime
-            # error in __init__) — can't auto-heal; bail.
-            return False, healed
-        missing = m.group(1).split('.')[0]  # heal at top-level only
+        if m:
+            missing = m.group(1).split('.')[0]  # heal at top-level only
+            pip_args = ['install', missing]
+            heal_key = missing
+            kind = 'missing'
+        else:
+            vm = _VERSION_MISMATCH_RE.search(err_text)
+            if not vm:
+                # Different kind of failure (e.g., DLL not found, runtime
+                # error in __init__) — can't auto-heal; bail.
+                return False, healed
+            missing = vm.group(1).split('.')[0]
+            # Upgrade-in-place: pip will pick the latest version that
+            # satisfies the floor in the error message.  Use a distinct
+            # heal_key so a prior plain-install of the same pkg this
+            # run does not falsely abort the upgrade attempt.
+            pip_args = ['install', '-U', missing]
+            heal_key = f'{missing}@upgrade'
+            kind = 'version-mismatch'
 
-        if missing in healed:
-            # Already installed it this run, probe still fails — circular
-            # or the install lied; stop looping.
+        if heal_key in healed:
+            # Already attempted this exact remediation this run, probe
+            # still fails — circular or the install lied; stop looping.
             return False, healed
 
         if progress_cb:
             progress_cb(
-                f"Auto-healing {backend}: deep probe needs '{missing}' — installing..."
+                f"Auto-healing {backend}: deep probe shows {kind} for "
+                f"'{missing}' — installing..."
             )
-        ok, msg = _run_pip(['install', missing], progress_cb)
+        ok, msg = _run_pip(pip_args, progress_cb)
         if not ok:
             logger.warning(
                 f"Self-heal pip install of '{missing}' for {backend} failed: {msg}"
             )
             return False, healed
-        healed.append(missing)
+        healed.append(heal_key)
         # Loop re-runs deep probe
 
     # Exhausted max_iter — treat as failed

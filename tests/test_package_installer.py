@@ -719,6 +719,67 @@ class TestChatterboxClassRegression:
             f"Self-heal didn't pip-install librosa. pip calls: {pip_args}"
         )
 
+    def test_self_heal_catches_transformers_version_mismatch(self):
+        """transformers' module-load `dependency_versions_check` raises
+        `ImportError: regex>=2025.10.22 is required for a normal
+        functioning of this module, but found regex==2024.11.6.` —
+        a different shape than `ModuleNotFoundError: No module named X`.
+
+        Pre-fix (2026-04-27): self-heal regex only matched
+        `ModuleNotFoundError`, so the version-mismatch case fell into
+        the bail branch and produced
+        `deterministic self-heal exhausted ... after installing []`,
+        which the operator saw as "Chatterbox Turbo Failed."
+
+        Post-fix: _VERSION_MISMATCH_RE captures the package name and
+        the loop runs `pip install -U <pkg>` to upgrade past the
+        floor.  Pinned here so a future regex tightening doesn't
+        re-introduce the chatterbox-class outage."""
+        probe_calls = {'n': 0}
+
+        def fake_deep_probe(backend, import_name):
+            probe_calls['n'] += 1
+            return probe_calls['n'] >= 2  # passes after 1 upgrade
+
+        def fake_open_version_mismatch(*args, **kwargs):
+            from io import StringIO
+            return StringIO(
+                "Traceback (most recent call last):\n"
+                "  File \"...\", line 11, in <module>\n"
+                "    from transformers import LlamaModel\n"
+                "  File \"...transformers/__init__.py\", line 30, in <module>\n"
+                "    from . import dependency_versions_check\n"
+                "ImportError: regex>=2025.10.22 is required for a normal "
+                "functioning of this module, but found regex==2024.11.6.\n"
+            )
+
+        with patch.object(pi, 'is_package_installed', return_value=True), \
+             patch.object(pi, 'is_cuda_torch', return_value=True), \
+             patch.object(pi, '_run_pip', return_value=(True, 'ok')) as mock_pip, \
+             patch('tts._torch_probe.check_backend_runnable',
+                   side_effect=fake_deep_probe), \
+             patch('tts._torch_probe._resolve_paths', return_value=True), \
+             patch('os.path.isfile', return_value=True), \
+             patch('builtins.open', side_effect=fake_open_version_mismatch):
+            ok, msg = pi.install_backend_packages('chatterbox_turbo')
+
+        assert ok is True, f"Self-heal failed to recover: {msg}"
+
+        # Must have run `pip install -U regex` (upgrade), not plain
+        # `pip install regex` (which pip might no-op if regex is
+        # already installed at the wrong version).
+        upgraded = False
+        for c in mock_pip.call_args_list:
+            args = c.args[0]
+            if 'install' in args and '-U' in args and 'regex' in args:
+                upgraded = True
+                break
+        assert upgraded, (
+            f"Self-heal didn't pip install -U regex on a "
+            f"`regex>=X is required` ImportError. pip calls: "
+            f"{[c.args[0] for c in mock_pip.call_args_list]}"
+        )
+
     # ── Cycle 2 (cache pollution between probes) ──
 
     def test_invalidate_import_cache_clears_torch_probe_cache(self):
