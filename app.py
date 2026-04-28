@@ -1818,6 +1818,22 @@ if getattr(args, 'validate', False):
             _mod_obj = sys.modules.get(_mod_name)
             if not _mod_obj:
                 _mod_obj = importlib.import_module(_mod_name)
+            # Trigger the adapter's lazy Tier-1 import.  Runtime spawns this
+            # from `main.py._deferred_social_init` (background thread) — but
+            # in --validate mode main.py never runs, so the attributes below
+            # would otherwise stay at their module-import defaults
+            # (False / 'unknown') and falsely report "Tier-1 failed to load".
+            # Calling _attempt_hartos_init synchronously exercises the SAME
+            # import path Tier-1 takes at runtime, so this check is honest:
+            # if the synchronous call sets _hartos_backend_available=True,
+            # the bundle will work; if it doesn't, the bundle is genuinely
+            # broken and we want validate to flag it.
+            _trigger = getattr(_mod_obj, '_attempt_hartos_init', None)
+            if callable(_trigger):
+                try:
+                    _trigger()
+                except Exception:
+                    pass  # the failure is already recorded in adapter state
             for _attr, _expected, _msg in _checks:
                 _val = getattr(_mod_obj, _attr, '__MISSING__')
                 if _val == '__MISSING__':
@@ -5732,30 +5748,134 @@ def start_flask():
                 "message": "CORS is working correctly"
             })
 
-        # Start the Flask application via waitress (production WSGI)
+        # Start the Flask application — Hypercorn (ASGI) primary,
+        # Waitress fallback.  This is the BUNDLE entry point: Nunba.exe
+        # runs app.py; app.py imports main.py as the Flask app provider.
         # Use _dynamic_wsgi_app when flask_app isn't ready yet — it will
         # automatically route to flask_app once main.py import completes.
+        #
+        # Hypercorn (ASGI) wins for the same reasons as the HARTOS sibling:
+        # asyncio loop multiplexes connection IO so idle keep-alive / SSE
+        # clients don't burn worker threads (waitress was holding one
+        # thread per connection regardless of activity — that's how
+        # /tts/setup-engine queue-depth-68 happened with threads=8).
+        # Sync Flask handlers run in loop.run_in_executor() against
+        # NUNBA_WORKER_THREADS (default 128) so /dashboard/agents and
+        # /health stay responsive while a TTS install grinds.
+        # Falls through to Waitress on ImportError so older bundles /
+        # cx_Freeze installs missing the h2/wsproto chain still boot.
         _wsgi_target = _serving_app if _serving_app is flask_app else _dynamic_wsgi_app
-        # Lazy import — avoids crash if waitress wasn't bundled in frozen exe
         try:
-            from waitress import serve as _serve
-            logger.info(f"Starting Waitress server on port {args.port} (app={'full' if _serving_app is flask_app else 'dynamic-dispatcher'})")
-            _serve(_wsgi_target, host="0.0.0.0", port=args.port, threads=8)
-        except ImportError:
-            logger.warning("waitress not available, falling back to Flask dev server")
-            # Patch stdout/stderr before .run() to prevent click.echo crash
-            # in frozen GUI exes where console file descriptors are closed
-            import io as _io
-            for _attr in ('stdout', 'stderr'):
-                _stream = getattr(sys, _attr, None)
-                if _stream is None:
-                    setattr(sys, _attr, open(os.devnull, 'w', encoding='utf-8'))
-                else:
-                    try:
-                        _stream.fileno()
-                    except (ValueError, OSError, _io.UnsupportedOperation):
+            _worker_threads = int(os.environ.get('NUNBA_WORKER_THREADS', '128'))
+        except (TypeError, ValueError):
+            _worker_threads = 128
+
+        try:
+            # Hypercorn pre-check: it installs signal handlers in
+            # `worker_serve`, which only work in the main thread.  When
+            # start_flask runs in the NunbaGUI worker thread (every
+            # desktop boot — main thread is bound to pywebview),
+            # hypercorn raises `ValueError: signal only works in main
+            # thread of the main interpreter`.  On Windows the asyncio
+            # policy can also raise `NotImplementedError` from
+            # `add_signal_handler` even on the main thread.  Skip the
+            # attempt entirely in those cases so we don't pay the
+            # asyncio-import cost or pollute the log with a boot-error
+            # traceback that's expected.  Re-raised as ImportError so
+            # the existing waitress fallback below catches it.
+            import threading as _th_check
+            _is_main_thread = (
+                _th_check.current_thread() is _th_check.main_thread()
+            )
+            _force_waitress = (
+                os.environ.get('NUNBA_FORCE_WAITRESS', '').strip().lower()
+                in ('1', 'true', 'yes')
+            )
+            if (not _is_main_thread) or _force_waitress:
+                logger.info(
+                    f"Skipping Hypercorn (main_thread={_is_main_thread}, "
+                    f"force_waitress={_force_waitress}) — using Waitress directly"
+                )
+                raise ImportError("hypercorn-skipped-by-pre-check")
+
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+            from hypercorn.asyncio import serve as _hcserve
+            from hypercorn.config import Config
+            from hypercorn.middleware import AsyncioWSGIMiddleware
+
+            _hc_config = Config()
+            _hc_config.bind = [f'0.0.0.0:{args.port}']
+            _hc_config.keep_alive_timeout = 120
+            _hc_config.h11_max_incomplete_size = 16 * 1024 * 1024
+            _hc_config.accesslog = None
+            _hc_config.errorlog = '-'
+
+            _asgi_app = AsyncioWSGIMiddleware(_wsgi_target)
+
+            async def _hc_runner():
+                _loop = asyncio.get_running_loop()
+                _loop.set_default_executor(ThreadPoolExecutor(
+                    max_workers=_worker_threads, thread_name_prefix='nunba'))
+                await _hcserve(_asgi_app, _hc_config)
+
+            logger.info(
+                f"Starting Hypercorn (ASGI) on 0.0.0.0:{args.port} "
+                f"(executor_threads={_worker_threads}, "
+                f"app={'full' if _serving_app is flask_app else 'dynamic-dispatcher'})"
+            )
+            asyncio.run(_hc_runner())
+        except (ImportError, NotImplementedError, ValueError, RuntimeError) as _hc_exc:
+            # Broad on purpose.  Three known failure shapes here, all of
+            # which should degrade to Waitress instead of killing the
+            # server thread:
+            #   * ImportError      - hypercorn not installed.
+            #   * NotImplementedError - asyncio.add_signal_handler() on
+            #     Windows ProactorEventLoop in a non-main thread.
+            #   * ValueError       - hypercorn's worker_serve calls
+            #     signal.signal() which raises "signal only works in
+            #     main thread of the main interpreter" because
+            #     start_flask is invoked from the NunbaGUI thread, not
+            #     the main thread (main thread is bound to pywebview).
+            #     2026-04-28 server.log:114 reproduced this and the
+            #     prior `except ImportError` let it escape to the outer
+            #     `except Exception` which sys.exit(1)'d the worker
+            #     thread, leaving :5000 unbound for the whole boot.
+            #   * RuntimeError     - asyncio loop already running from
+            #     a parent context (rare; covered defensively).
+            # Waitress is signal-handler-free and thread-safe, so the
+            # fallback is the correct behaviour for every case above.
+            logger.warning(
+                f"Hypercorn boot failed ({type(_hc_exc).__name__}: "
+                f"{_hc_exc}) — falling back to Waitress"
+            )
+            try:
+                from waitress import serve as _serve
+                # threads=8 was the historical value; bumped to 64 on the
+                # fallback path so a degraded boot (no hypercorn) still has
+                # enough headroom for the dashboard + SSE + slow installs.
+                _w_threads = int(os.environ.get('NUNBA_WAITRESS_THREADS', '64'))
+                logger.info(
+                    f"Starting Waitress server on port {args.port} "
+                    f"(threads={_w_threads}, "
+                    f"app={'full' if _serving_app is flask_app else 'dynamic-dispatcher'})"
+                )
+                _serve(_wsgi_target, host="0.0.0.0", port=args.port, threads=_w_threads)
+            except ImportError:
+                logger.warning("waitress not available, falling back to Flask dev server")
+                # Patch stdout/stderr before .run() to prevent click.echo crash
+                # in frozen GUI exes where console file descriptors are closed
+                import io as _io
+                for _attr in ('stdout', 'stderr'):
+                    _stream = getattr(sys, _attr, None)
+                    if _stream is None:
                         setattr(sys, _attr, open(os.devnull, 'w', encoding='utf-8'))
-            _serving_app.run(debug=False, host="0.0.0.0", port=args.port, use_reloader=False)
+                    else:
+                        try:
+                            _stream.fileno()
+                        except (ValueError, OSError, _io.UnsupportedOperation):
+                            setattr(sys, _attr, open(os.devnull, 'w', encoding='utf-8'))
+                _serving_app.run(debug=False, host="0.0.0.0", port=args.port, use_reloader=False)
     except Exception as e:
         logger.error(f"Error starting Flask server: {str(e)}")
         logger.error(traceback.format_exc())
