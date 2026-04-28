@@ -198,6 +198,96 @@ if getattr(sys, 'frozen', False):
         # The hartos-init thread will re-attempt and surface a clearer error.
         pass
 
+    # ── Pre-warm the HARTOS heavy chain on the main thread
+    # (2026-04-28, splash-window pre-warm extension) ──
+    #
+    # Truth-grounded from server.log thread dumps showing 5+ worker threads
+    # wedged simultaneously on transformers / langchain / autogen imports
+    # while flask_wait stuck 169s+:
+    #
+    #   Thread-25 _send_loop          → from transformers import GPT2TokenizerFast
+    #     → transformers _LazyModule.__getattr__ recurses 1446-deep on hasattr()
+    #   Thread-23 _background_loop    → from create_recipe import → autogen → llmlingua → nltk
+    #   peerlink-telemetry            → from crossbar_server import → reuse_recipe → autogen
+    #   social-init                   → langchain_classic.schema → langchain_core
+    #
+    # Each of those threads holds one module's import lock while waiting on
+    # another's; the transformers attribute-recursion runs to completion
+    # under whichever thread won the race, while the rest pile up.  Net
+    # effect: 169s of "splash visible, nothing actually progressing".
+    #
+    # The torch pre-warm above already proved the model: do the
+    # heavyweight import on the main thread BEFORE worker threads spawn,
+    # so when they later run `from <module> import X` they hit
+    # sys.modules cache (microseconds, no lock contention).  Extending
+    # to the same coverage for the rest of the HARTOS chain.
+    #
+    # Keep the order: transformers → langchain → autogen → HARTOS top-level.
+    # Each import is wrapped individually so one failure doesn't abort
+    # the rest (the workers will surface a clearer error if any module
+    # is genuinely missing).  Time cost: ~5-10s on cold disk, paid once
+    # on the splash main thread instead of N times across worker threads.
+    _prewarm_modules = [
+        # transformers + the specific lazy lookup that triggers the
+        # _LazyModule.__getattr__ recursion in worker threads.  Doing
+        # the lookup once under the main thread bottoms out the recursion
+        # in a controlled stack; subsequent lookups hit the resolved
+        # attribute and skip __getattr__ entirely.
+        ('transformers', None),
+        ('transformers', 'GPT2TokenizerFast'),
+        # langchain — base for hart_intelligence_entry's first heavy import
+        ('langchain_core.language_models.base', None),
+        ('langchain_classic.llms', None),
+        ('langchain_classic.schema', None),
+        # autogen — pulls llmlingua → nltk transitively (the Thread-23 path)
+        ('autogen', None),
+        # HARTOS top-level - what create_recipe / reuse_recipe / helper
+        # imports actually load.  These pull the autogen + langchain
+        # chains in transitively as a sanity check that the pre-warm
+        # actually unblocked the import graph.
+        ('helper', None),
+        ('create_recipe', None),
+        ('reuse_recipe', None),
+        ('hart_intelligence_entry', None),
+        # Used by world_model_bridge inside peer_discovery's robotics
+        # capability_advertiser path - last to ensure deps are warm.
+        ('hart_intelligence', None),
+    ]
+    import importlib as _il_prewarm
+    import time as _time_prewarm
+    _prewarm_t0 = _time_prewarm.monotonic()
+    for _modname, _attr in _prewarm_modules:
+        _t0 = _time_prewarm.monotonic()
+        try:
+            _mod = _il_prewarm.import_module(_modname)
+            if _attr is not None:
+                # Trigger the lazy-loader path once, under our control,
+                # so worker-thread `hasattr()` calls don't re-fire it.
+                getattr(_mod, _attr, None)
+        except Exception as _pw_err:
+            # Soft-fail: log and continue.  Worker threads will surface
+            # the genuine missing-module error if one is actually broken.
+            try:
+                import logging as _log_pw
+                _log_pw.getLogger(__name__).warning(
+                    "Pre-warm %s failed (%.2fs): %s: %s",
+                    _modname,
+                    _time_prewarm.monotonic() - _t0,
+                    type(_pw_err).__name__, _pw_err,
+                )
+            except Exception:
+                pass
+    try:
+        import logging as _log_pw_done
+        _log_pw_done.getLogger(__name__).info(
+            "HARTOS heavy-chain pre-warm complete in %.1fs (%d modules)",
+            _time_prewarm.monotonic() - _prewarm_t0,
+            len(_prewarm_modules),
+        )
+    except Exception:
+        pass
+    del _prewarm_modules, _il_prewarm, _time_prewarm, _prewarm_t0
+
 # Trace recursion in frozen builds — write to file since Win32GUI has no console
 if getattr(sys, 'frozen', False):
     sys.setrecursionlimit(2000)
