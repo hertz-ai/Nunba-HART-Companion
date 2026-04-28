@@ -232,19 +232,61 @@ if getattr(sys, 'frozen', False):
     # import, every subsequent caller in any thread gets the cached
     # module via sys.modules in microseconds.
     def _prewarm_hartos_chain():
+        # SPECIAL CASE: transformers.GPT2TokenizerFast.
+        #
+        # Truth-grounded from server.log:6418-6439 thread dump
+        # (2026-04-28 16:18, hartos-prewarm thread id=17320):
+        #
+        #   hartos-prewarm
+        #     app.py:264  in _prewarm_hartos_chain
+        #     transformers/utils/import_utils.py:2215  __getattr__
+        #       -> recurses 1465 deep on hasattr() then 21 deep on
+        #          AttributeError raise
+        #
+        # `_LazyModule.__getattr__` does `hasattr(transformers_module,
+        # candidate_name)` which itself calls `__getattr__` again on
+        # the not-yet-loaded attribute -> ~1500-frame recursion that
+        # holds the `transformers` import lock for ~3 minutes on a
+        # cold disk.  Pre-warm doing `getattr(transformers,
+        # 'GPT2TokenizerFast', None)` was the trigger.
+        #
+        # Fix: import the underlying submodule directly and bind the
+        # attribute on `transformers` BEFORE any lazy lookup fires.
+        # Once `transformers.GPT2TokenizerFast` exists in __dict__,
+        # `hasattr()` short-circuits at the dict and never calls
+        # __getattr__.  Every downstream import (langchain_core.
+        # language_models.base does `from transformers import
+        # GPT2TokenizerFast`, etc.) gets the bound attribute
+        # immediately, no recursion.
+        try:
+            import transformers as _tf_prewarm
+            from transformers.models.gpt2.tokenization_gpt2_fast import (
+                GPT2TokenizerFast as _GPT2TokenizerFast_direct,
+            )
+            # Bind on the parent module so subsequent
+            # `from transformers import GPT2TokenizerFast` is a
+            # plain dict lookup, not a _LazyModule.__getattr__ call.
+            if not hasattr(_tf_prewarm, '__dict__') or \
+                    'GPT2TokenizerFast' not in _tf_prewarm.__dict__:
+                _tf_prewarm.__dict__['GPT2TokenizerFast'] = (
+                    _GPT2TokenizerFast_direct
+                )
+        except Exception:
+            # If the direct import path doesn't exist (transformers
+            # version moved the symbol), fall through.  Worker threads
+            # will hit the lazy path and pay the recursion once; bad
+            # but not fatal.
+            pass
+
         _prewarm_modules = [
-            # transformers + the specific lazy lookup that triggers
-            # the _LazyModule.__getattr__ recursion.  Bottoming out
-            # the recursion once on this thread means worker-thread
-            # hasattr() calls hit the resolved attribute and skip
-            # __getattr__ entirely.
+            # transformers — top-level import only.  GPT2TokenizerFast
+            # is already bound directly above, no attribute trigger.
             ('transformers', None),
-            ('transformers', 'GPT2TokenizerFast'),
             # langchain — base for hart_intelligence_entry's first heavy
             ('langchain_core.language_models.base', None),
             ('langchain_classic.llms', None),
             ('langchain_classic.schema', None),
-            # autogen — pulls llmlingua → nltk transitively
+            # autogen — pulls llmlingua -> nltk transitively
             ('autogen', None),
             # HARTOS top-level
             ('helper', None),
