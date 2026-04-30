@@ -544,6 +544,13 @@ build_exe_options = {
         "webview.platforms.qt",
         # pycparser is included as source files in lib_src to avoid circular import
         "pycparser",
+        # `agents` is the openai-agents SDK, an OPTIONAL transitive of
+        # sentry_sdk.integrations.openai_agents.patches.error_tracing.
+        # Sentry guards the imports with try/except, but cx_Freeze's
+        # static tracer reports the missing modules as validation errors
+        # ("Fix import errors above before distributing"), failing the
+        # macOS Build Nunba step. We don't ship openai-agents, so exclude.
+        "agents", "agents.*",
         # Linux-only agent_engine modules (WebKit2/GTK, Conky, PipeWire)
         "integrations.agent_engine.liquid_ui_service",
         "integrations.agent_engine.shell_manifest",
