@@ -173,7 +173,15 @@ def _attempt_hartos_init():
         if _hartos_initialized:
             return True
         try:
-            from hart_intelligence import app as hevolve_app
+            # ── CANONICAL LOADER ──────────────────────────────────────
+            # This single thread is the ONLY place in the entire
+            # ecosystem that may eager-import hart_intelligence.  Every
+            # other reader uses ``core.safe_hartos_attr.safe_hartos_attr``
+            # (a sys.modules dict lookup) so worker threads never race
+            # the import lock.  The TID251 noqa below is intentional and
+            # required — see HARTOS pyproject.toml [tool.ruff.lint.
+            # flake8-tidy-imports.banned-api] for the rule rationale.
+            from hart_intelligence import app as hevolve_app  # noqa: TID251
             _hartos_backend_available = True
             _hevolve_app = hevolve_app
             _active_tier = "Tier-1 (direct in-process LangChain)"
@@ -182,7 +190,7 @@ def _attempt_hartos_init():
             logger.info("=" * 60)
 
             # Patch publish_async for thinking traces
-            import hart_intelligence as _lgapi
+            import hart_intelligence as _lgapi  # noqa: TID251
             _orig = _lgapi.publish_async
 
             def _patched(topic, message, timeout=2.0):

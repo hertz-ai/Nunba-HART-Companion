@@ -201,6 +201,25 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { currentAgentRef.current = currentAgent; }, [currentAgent]);
 
+  // Backfill timestamp on any message added without one — every
+  // setMessages call site (user send, assistant reply, system phase
+  // events, restored history, orphan recovery, …) flows through this
+  // single normalizer so the rendered chat shows consistent times
+  // (ChatMessageList:486 conditionally renders message.timestamp).
+  // Same value is persisted by saveMessagesToStorage so timestamps
+  // survive navigation + reload.  Idempotent: subsequent renders see
+  // every message timestamped, condition is false, no-op.  Latency:
+  // single re-render pass (~ms) — backfill time tracks creation time
+  // closely enough for chat UX.
+  useEffect(() => {
+    if (messages.some((m) => !m.timestamp)) {
+      const now = new Date().toISOString();
+      setMessages((prev) => prev.map((m) =>
+        m.timestamp ? m : { ...m, timestamp: now }
+      ));
+    }
+  }, [messages]);
+
   // Backend health check on mount — fast poll (3s) until healthy, then slow (30s)
   useEffect(() => {
     let intervalId = null;
@@ -826,6 +845,17 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
               allAgents.find(a => a.type === 'local' && !a.create_agent) ||
               allAgents[0];
             setCurrentAgent(defaultAgent);
+            // Symmetric with the saved-agent restore at line 769-771 and
+            // the orphan recovery at line 821 — when the fallback default
+            // is selected on a fresh boot, load any prior conversation
+            // for THIS agent from localStorage.  Without this the user
+            // sees an empty chat even though their previous default-agent
+            // history is intact in storage (whatsapp/teams expectation:
+            // navigation back shows last conversation, not a clean slate).
+            if (defaultAgent?.prompt_id) {
+              const savedMessages = loadMessagesFromStorage(defaultAgent.prompt_id);
+              if (savedMessages.length > 0) setMessages(savedMessages);
+            }
           }
         }
       } catch (error) {
@@ -2993,15 +3023,31 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
           try {
             setIsRequestInFlight(true);
             updateMessageStatus(msgId, { status: 'sending', error: null });
+            // Orphan agents are display-only ghosts (Demopage.js:806-824)
+            // synthesised when localStorage has chat history for an
+            // agent the backend no longer knows about.  We render their
+            // history but new messages must route through the default
+            // local agent — the chat backend rejects `agent_type='orphan'`
+            // with 400 ("Unknown agent type: orphan", chatbot_routes.py:2822).
+            const _isOrphan = currentAgent?.type === 'orphan' || currentAgent?._isOrphan;
+            const _agentTypeForBackend = _isOrphan ? 'local' : (currentAgent?.type || 'local');
+            const _agentIdForBackend = _isOrphan
+              ? 'local_assistant'
+              : (currentAgent?.id || currentAgent?.prompt_id || 'local_assistant');
+            // Orphan ghosts also drop their stale prompt_id so the
+            // backend's "is this a real custom agent?" check
+            // (chatbot_routes.py:2427-2439) doesn't try to read a
+            // non-existent prompt file at PROMPTS_DIR/{prompt_id}.json.
+            const _promptIdForBackend = _isOrphan ? 0 : (currentAgent?.prompt_id ?? 0);
             const localResult = await chatApi.chat({
               text: inputMessage,
               user_id: effectiveUserId,
               request_id: generatedRequestId,
-              agent_id: currentAgent?.id || currentAgent?.prompt_id || 'local_assistant',
-              agent_type: currentAgent?.type || 'local',
+              agent_id: _agentIdForBackend,
+              agent_type: _agentTypeForBackend,
               conversation_id: conversationId,
               media_mode: mediaMode || 'audio',
-              prompt_id: currentAgent?.prompt_id ?? 0,
+              prompt_id: _promptIdForBackend,
               create_agent: currentAgent?.create_agent || false,
               autonomous_creation: currentAgent?.autonomous_creation || false,
               image_url: userImage || null,

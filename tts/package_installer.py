@@ -208,6 +208,43 @@ BACKEND_PACKAGES = _build_backend_packages_from_hartos()
 BACKEND_VENV_PACKAGES = _build_backend_venv_packages_from_hartos()
 
 
+# Boot-time wire: for every venv-eligible engine whose venv already
+# exists on disk (created by a prior install), point the HARTOS
+# ToolWorker's python_exe at the venv's python.  Without this the
+# install-time wire (line ~1313) only persists for the install
+# Python's lifetime — next boot, worker resets to python-embed
+# default and synth subprocess hits the same version conflicts.
+# `is_venv_healthy(backend)` is non-creating: skips engines whose
+# venv hasn't been built yet (those wire later, at install time).
+def _wire_existing_venv_workers() -> None:
+    registry = _hartos_engine_registry()
+    if not registry or not BACKEND_VENV_PACKAGES:
+        return
+    try:
+        from tts.backend_venv import is_venv_healthy, _python_exe_in, venv_path
+    except Exception:
+        return
+    for backend in BACKEND_VENV_PACKAGES:
+        spec = registry.get(backend)
+        if spec is None or not getattr(spec, 'tool_module', None) \
+                or not getattr(spec, 'tool_worker_attr', None):
+            continue
+        if not is_venv_healthy(backend):
+            continue  # venv not yet created — install-time wire handles it
+        try:
+            import importlib
+            worker = getattr(
+                importlib.import_module(spec.tool_module),
+                spec.tool_worker_attr, None)
+            if worker is not None:
+                worker.python_exe = str(_python_exe_in(venv_path(backend)))
+        except Exception as _e:
+            logger.debug("boot wire skipped for %s: %s", backend, _e)
+
+
+_wire_existing_venv_workers()
+
+
 def get_install_target(backend: str) -> str:
     """Return the install_target string ('main' | 'venv' | 'bundled' |
     'cloud' | 'git_clone') HARTOS declares for this backend.
@@ -1141,6 +1178,20 @@ def _self_heal_missing_transitives(
     required_pkg = getattr(spec, 'required_package', None) if spec else None
     if not required_pkg:
         return True, []  # nothing to probe; treat as healthy
+
+    # Venv-eligible engines (install_target='venv') CANNOT be healed in
+    # the main interpreter — chatterbox-tts hard-pins torch==2.6 vs
+    # main's 2.11, parler-tts pins transformers<4.47 vs main's 5.x, etc.
+    # Installing missing transitives into main env one-by-one only ever
+    # exhausts the iter cap and surfaces "Chatterbox Turbo Failed" to
+    # the user (witnessed 2026-04-29: legacy main-env chatterbox install
+    # left over from pre-venv-routing builds keeps tripping this probe).
+    # Bail out: callers fall back to the next engine in the ladder, and
+    # the venv install path (line ~1313) creates the venv when the user
+    # explicitly triggers install.  Treats unhealable-in-main as "not
+    # installed yet" rather than "failed".
+    if getattr(spec, 'install_target', 'main') == 'venv':
+        return True, []
 
     try:
         from tts._torch_probe import check_backend_runnable, _resolve_paths
