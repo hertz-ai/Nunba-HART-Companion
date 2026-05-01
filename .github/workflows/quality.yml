@@ -378,7 +378,13 @@ jobs:
         with:
           working-directory: landing-page
           install: false
-          wait-on: http://localhost:5000
+          # Wait on /health (not /) — Flask returns 404 on / until the
+          # React build is fully served from build/, but /health returns
+          # 200 the moment the Flask process is up and listening.  Using
+          # / made cypress-io/github-action@v6's wait-on poll forever
+          # (default validateStatus accepts only 2xx) and the workflow
+          # timed out at 150s with "Response code 404 (Not Found)".
+          wait-on: http://localhost:5000/health
           wait-on-timeout: 120
           browser: chrome
           spec: ${{ steps.shard.outputs.spec_pattern }}
@@ -542,7 +548,13 @@ jobs:
         with:
           working-directory: landing-page
           install: false
-          wait-on: http://localhost:5000
+          # Wait on /health (not /) — Flask returns 404 on / until the
+          # React build is fully served from build/, but /health returns
+          # 200 the moment the Flask process is up and listening.  Using
+          # / made cypress-io/github-action@v6's wait-on poll forever
+          # (default validateStatus accepts only 2xx) and the workflow
+          # timed out at 150s with "Response code 404 (Not Found)".
+          wait-on: http://localhost:5000/health
           wait-on-timeout: 120
           browser: chrome
           spec: ${{ steps.smoke.outputs.spec_pattern }}
