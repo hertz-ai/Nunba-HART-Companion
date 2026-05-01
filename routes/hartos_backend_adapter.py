@@ -447,11 +447,29 @@ def _fallback_chat(text: str, user_id: str = None, **kwargs) -> dict[str, Any]:
             }
             lang = _lang_names.get(preferred_lang, 'English')
 
+            # Brand identity sourced from HARTOS core.constants so the
+            # draft prompt (HARTOS speculative_dispatcher) and this
+            # cold-boot fallback can never drift on brand wording.
+            # Lazy import + try/except: hart_backend may not be
+            # importable yet at the cold-boot moment _fallback_chat
+            # actually fires — so a hardcoded literal stays as the
+            # safety net.  Keep the literal in sync with
+            # core.constants.NUNBA_BRAND_IDENTITY when either changes.
+            try:
+                from core.constants import NUNBA_BRAND_IDENTITY as _BRAND
+            except ImportError:
+                _BRAND = (
+                    "You are Nunba, a friendly and helpful local AI "
+                    "assistant. Hevolve.ai is the web cloud version "
+                    "of Nunba — same intelligence, different "
+                    "deployment. With hive enabled, you crowdsource "
+                    "intelligence from peer Nunba devices and Hevolve "
+                    "cloud nodes."
+                )
             system_prompt = (
-                f"You are Nunba, a friendly and helpful local AI assistant. "
-                f"You are part of Hevolve — a personal AI platform that runs locally "
-                f"on the user's device. Privacy-first: everything stays on the user's "
-                f"device. Respond in {lang}. Be concise and natural."
+                f"{_BRAND} "
+                f"Privacy-first: everything stays on the user's device. "
+                f"Respond in {lang}. Be concise and natural."
             )
 
             messages = [{"role": "system", "content": system_prompt}]
