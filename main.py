@@ -3282,27 +3282,6 @@ def status():
     return jsonify(response), 200
 
 
-@app.route('/health', methods=["GET"])
-def health():
-    """Liveness probe — returns 200 the moment Flask is bound and
-    routing requests.  Mirrors the /health route on HARTOS standalone
-    (hart_intelligence_entry.py) so wait-on / monitor URLs are
-    portable between bundled-Nunba and standalone-HARTOS deploys.
-
-    Distinct from /status: /health returns ZERO state so it is safe
-    to expose to any caller (load balancer, GH Actions wait-on, k8s
-    liveness probe) without a localhost gate.  /status keeps its
-    loopback-gated device_id payload.
-
-    Workflow context: .github/workflows/quality.yml polls /health
-    in the Wait-for-Flask step AND uses it as the cypress wait-on
-    URL.  Without this route, both 404'd — wait-for tolerated it
-    via `|| echo` but cypress wait-on hard-fails on non-2xx, which
-    timed out the cypress shards at 150s.
-    """
-    return jsonify({'status': 'ok'}), 200
-
-
 # ────────────────────────────────────────────────────────────────
 # Coverage helper endpoints (loopback-only, coverage-run only).
 #

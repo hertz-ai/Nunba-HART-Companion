@@ -378,13 +378,13 @@ jobs:
         with:
           working-directory: landing-page
           install: false
-          # Wait on /health (not /) — Flask returns 404 on / until the
-          # React build is fully served from build/, but /health returns
-          # 200 the moment the Flask process is up and listening.  Using
-          # / made cypress-io/github-action@v6's wait-on poll forever
-          # (default validateStatus accepts only 2xx) and the workflow
-          # timed out at 150s with "Response code 404 (Not Found)".
-          wait-on: http://localhost:5000/health
+          # Wait on /status — main.py exposes that route, returns 200
+          # the moment Flask is bound (just '{"status":"operational"}',
+          # no GPU/VRAM dependencies that /backend/health pulls in).
+          # / would 404 because the React build isn't catch-all-served
+          # by Flask in this CI mode, and /health doesn't exist on
+          # main.py (only HARTOS standalone has it).
+          wait-on: http://localhost:5000/status
           wait-on-timeout: 120
           browser: chrome
           spec: ${{ steps.shard.outputs.spec_pattern }}
@@ -548,13 +548,13 @@ jobs:
         with:
           working-directory: landing-page
           install: false
-          # Wait on /health (not /) — Flask returns 404 on / until the
-          # React build is fully served from build/, but /health returns
-          # 200 the moment the Flask process is up and listening.  Using
-          # / made cypress-io/github-action@v6's wait-on poll forever
-          # (default validateStatus accepts only 2xx) and the workflow
-          # timed out at 150s with "Response code 404 (Not Found)".
-          wait-on: http://localhost:5000/health
+          # Wait on /status — main.py exposes that route, returns 200
+          # the moment Flask is bound (just '{"status":"operational"}',
+          # no GPU/VRAM dependencies that /backend/health pulls in).
+          # / would 404 because the React build isn't catch-all-served
+          # by Flask in this CI mode, and /health doesn't exist on
+          # main.py (only HARTOS standalone has it).
+          wait-on: http://localhost:5000/status
           wait-on-timeout: 120
           browser: chrome
           spec: ${{ steps.smoke.outputs.spec_pattern }}
