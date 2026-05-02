@@ -1609,8 +1609,19 @@ def _clipboard_monitor_thread():
 
 _pump_early_splash('Preparing interface...')
 
-# Default configuration for stop API URL
-DEFAULT_STOP_API_URL = "http://gcp_training2.hertzai.com:5001/stop"
+# Default configuration for stop API URL — resolved from HARTOS so
+# cloud-trainer deployments can override via HEVOLVE_STOP_API_URL.
+# Default is empty string for local installs (no cloud trainer to
+# stop).  Same resolver used by main.py — single source of truth in
+# core.config_cache.get_stop_api_url.  Used to live as a hardcoded
+# `http://gcp_training2.hertzai.com:5001/stop` literal that timed
+# out silently on every shutdown of every local install.
+try:
+    from core.config_cache import get_stop_api_url as _get_stop_api_url
+    DEFAULT_STOP_API_URL = _get_stop_api_url()
+except ImportError:
+    import os as _os
+    DEFAULT_STOP_API_URL = _os.environ.get('HEVOLVE_STOP_API_URL', '')
 
 # Initialize argument parser
 # Enhanced argument parser with sidebar options
@@ -3692,6 +3703,17 @@ def call_stop_api():
     Call the stop API to stop AI control processing
     """
     try:
+        # Skip the cloud-trainer notification when the URL isn't
+        # configured.  Local installs have no cloud trainer to stop,
+        # so an empty stop_api_url is the documented "no-op" path
+        # (see core.config_cache.get_stop_api_url docstring).
+        if not args.stop_api_url:
+            logger.info(
+                "stop API not configured (HEVOLVE_STOP_API_URL unset) — "
+                "skipping cloud-trainer stop notification (no-op for "
+                "local installs)"
+            )
+            return True
         logger.info(f"Calling stop API ay {args.stop_api_url}")
 
         # Try to get user data from storage

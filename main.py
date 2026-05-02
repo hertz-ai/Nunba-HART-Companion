@@ -305,8 +305,18 @@ APP_DIR = get_app_directory()
 # Landing page build directory (built from landing-page source in Nunba)
 LANDING_PAGE_BUILD_DIR = os.path.join(APP_DIR, 'landing-page', 'build')
 
-# Default API Endpoint
-DEFAULT_STOP_API_URL = "http://gcp_training2.hertzai.com:5001/stop"
+# Default stop-API URL — resolved from HARTOS so cloud-trainer
+# deployments can override via HEVOLVE_STOP_API_URL.  Default is empty
+# string for local installs (no cloud trainer to stop) — callers
+# below skip the POST when args.stop_api_url is falsy.  Used to live
+# as a hardcoded `http://gcp_training2.hertzai.com:5001/stop`
+# literal that timed out silently on every shutdown of every local
+# install for years.
+try:
+    from core.config_cache import get_stop_api_url as _get_stop_api_url
+    DEFAULT_STOP_API_URL = _get_stop_api_url()
+except ImportError:
+    DEFAULT_STOP_API_URL = os.environ.get('HEVOLVE_STOP_API_URL', '')
 
 # Setting global variables to track LLM Control Status
 llm_control_active = False
@@ -862,6 +872,18 @@ def call_stop_api():
                 logger.error(f"Error preparing stop payload: {str(e)}")
                 stop_payload = {}
 
+
+        # Skip the cloud-trainer notification when the URL isn't
+        # configured.  Local installs have no cloud trainer to stop,
+        # so an empty stop_api_url is the documented "no-op" path
+        # (see core.config_cache.get_stop_api_url docstring).
+        if not args.stop_api_url:
+            logger.info(
+                "stop API not configured (HEVOLVE_STOP_API_URL unset) — "
+                "skipping cloud-trainer stop notification (no-op for "
+                "local installs)"
+            )
+            return True
 
         # Make the API Call
         logger.info(f"Calling the stop API at {args.stop_api_url} with payload: {stop_payload}")
