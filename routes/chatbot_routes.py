@@ -2544,25 +2544,23 @@ def chat_route():
         # --- Tier 1: Try LangChain pipeline via adapter (port 6777) ---
         if HEVOLVE_CHAT_AVAILABLE:
             try:
-                # Determine langchain prompt_id:
-                # - Built-in local agents (local_assistant, etc.) → None → regular LangChain chat
-                # - Custom agents with numeric prompt_id AND a HARTOS prompt file → create/reuse flow
-                # - Agents without a prompt file → casual chat (no prompt_id)
+                # Determine langchain prompt_id from _resolve_agent's
+                # already-classified result (single source of truth -
+                # the prior inline file-check here was a parallel path
+                # that double-stripped prompt_id, hiding the missing-
+                # recipe case from HARTOS even when create_agent=True
+                # was set by step 4 of _resolve_agent).
+                #
+                # Three cases _resolve_agent returns map cleanly to:
+                #   step 1 / step 3 (digit + file exists)  → pass int
+                #   step 2 (registry hit, e.g. local_assistant) → None
+                #   step 4 (forced create-mode) → keep prompt_id so
+                #     HARTOS gather/create can use the same id the
+                #     user clicked instead of auto-generating a new one
+                #     and creating a stranger agent
                 langchain_prompt_id = None
-                _candidate_pid = prompt_id or agent_id
-                if _candidate_pid and str(_candidate_pid).isdigit():
-                    # Only pass prompt_id to HARTOS if the agent has a prompt file
-                    # (user-created agents). Hardcoded default agents (e.g. id=54)
-                    # don't have prompt files and should go to casual LangChain chat.
-                    try:
-                        from core.platform_paths import get_prompts_dir
-                        _prompt_file = os.path.join(get_prompts_dir(), f'{_candidate_pid}.json')
-                    except ImportError:
-                        _prompt_file = os.path.join(
-                            os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts',
-                            f'{_candidate_pid}.json')
-                    if os.path.isfile(_prompt_file):
-                        langchain_prompt_id = int(_candidate_pid)
+                if prompt_id and str(prompt_id).isdigit():
+                    langchain_prompt_id = int(prompt_id)
 
                 # Intent routing (casual_conv / create_agent / channel
                 # connect nudge) is performed inside HARTOS by the
