@@ -773,20 +773,34 @@ def find_hevolve_modules():
 hevolve_files = find_hevolve_modules()
 build_exe_options["include_files"].extend(hevolve_files)
 
-# Always include agent_ledger from sibling dir (namespace package issue)
-if True:
-    _agent_ledger_candidates = [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     '..', '..', 'HARTOS', 'agent-ledger-opensource', 'agent_ledger'),
-        os.path.join('hartos_backend_src', 'agent_ledger'),
-    ]
-    for _al_path in _agent_ledger_candidates:
-        if os.path.isdir(_al_path) and os.path.isfile(os.path.join(_al_path, '__init__.py')):
-            build_exe_options["include_files"].append((os.path.normpath(_al_path), "agent_ledger"))
-            print(f"Including agent_ledger package <- {os.path.normpath(_al_path)}")
-            break
-    else:
-        print("WARNING: agent_ledger package not found — distributed agent features will be unavailable")
+# Always include agent_ledger from sibling dir (namespace package issue).
+# agent_ledger is core to distributed coordination (TaskLedger UI,
+# DistributedTaskCoordinator, LedgerPubSub delegation broadcasts) and
+# is consumed by HARTOS itself (create_recipe, lifecycle_hooks,
+# integrations/agent_engine/api.py) plus Nunba tts_engine.  Shipping a
+# build without it produces a runtime ImportError that the admin UI
+# surfaces as 501 from /api/agent-engine/ledger/tasks → "No tasks
+# found" with no diagnostic trail.  Treat missing source as a hard
+# build-abort, not a warning.
+_agent_ledger_candidates = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 '..', '..', 'HARTOS', 'agent-ledger-opensource', 'agent_ledger'),
+    os.path.join('hartos_backend_src', 'agent_ledger'),
+]
+_agent_ledger_resolved = None
+for _al_path in _agent_ledger_candidates:
+    if os.path.isdir(_al_path) and os.path.isfile(os.path.join(_al_path, '__init__.py')):
+        build_exe_options["include_files"].append((os.path.normpath(_al_path), "agent_ledger"))
+        _agent_ledger_resolved = os.path.normpath(_al_path)
+        print(f"Including agent_ledger package <- {_agent_ledger_resolved}")
+        break
+if _agent_ledger_resolved is None:
+    raise RuntimeError(
+        "agent_ledger package source not found.  Searched:\n  - "
+        + "\n  - ".join(_agent_ledger_candidates)
+        + "\nClone HARTOS as a sibling directory or vendor the package "
+        "into hartos_backend_src/agent_ledger before building."
+    )
 
 # Include HARTOS package directories if not pip-installed (integrations, core, security)
 _hartos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
