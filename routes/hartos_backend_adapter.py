@@ -669,7 +669,17 @@ def get_prompts(user_id: str = None) -> dict[str, Any]:
         try:
             with _hevolve_app.test_client() as client:
                 resp = client.get('/prompts', query_string=params)
-                return resp.get_json() or {}
+                data = resp.get_json() or {}
+                # HARTOS /prompts returns a LIST of prompts directly;
+                # coerce to {"prompts": [...]} so callers using
+                # data.get('error') / data.get('prompts') don't crash
+                # with AttributeError on the list shape.  Was a real
+                # bug: chatbot_routes.py:2210 tried result.get('error')
+                # on a list and the agent dropdown silently lost the
+                # HARTOS-side agents 3x per chat.
+                if isinstance(data, list):
+                    data = {"prompts": data}
+                return data
         except Exception as e:
             logger.warning(f"Direct get_prompts failed: {e}")
 
@@ -691,7 +701,12 @@ def get_prompts(user_id: str = None) -> dict[str, Any]:
             timeout=(CONNECT_TIMEOUT, REQUEST_TIMEOUT),
         )
         _http_fail_count = 0
-        return _handle_response(response)
+        data = _handle_response(response)
+        # Same list-vs-dict coerce as the in-process path - keeps the
+        # contract identical for both transports.
+        if isinstance(data, list):
+            data = {"prompts": data}
+        return data
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         _http_fail_count += 1
         _http_fail_time = time.time()

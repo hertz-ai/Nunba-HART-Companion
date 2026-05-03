@@ -2358,10 +2358,25 @@ def chat_route():
         """Return (agent_config, resolved_agent_id, resolved_type, resolved_prompt_id).
 
         Resolution order:
-          1. prompt_id > 0 with prompt file → user agent (type='local').
-          2. agent_id_legacy in registry (LOCAL_AGENTS/CLOUD_AGENTS) → built-in.
-          3. agent_id_legacy as digit with prompt file → user agent.
-          4. Anything else → silent fallback to default (no 400, ever).
+          1. prompt_id > 0 with prompt file -> user agent (type='local').
+          2. agent_id_legacy in registry (LOCAL_AGENTS/CLOUD_AGENTS) -> built-in.
+          3. agent_id_legacy as digit with prompt file -> user agent.
+          4. Caller sent a real prompt_id but no recipe is on disk
+             (cross-device user, recipe missing locally) -> PRESERVE
+             prompt_id + signal create-mode so HARTOS enters
+             gather_info / create_recipe instead of casually chatting
+             with local_assistant in disguise.  See chat-routing
+             trace 2026-05-04 (Speech Therapy from Recents): prior
+             behaviour silently swapped prompt_id to None and routed
+             to local_assistant, hiding the recipe-missing fact from
+             both the user and the dispatcher.
+          5. No prompt_id at all -> silent fallback to default
+             (no 400, the casual-chat case).
+
+        Returns ``(agent_config, resolved_agent_id, resolved_type,
+        resolved_prompt_id, force_create_agent)``.  ``force_create_agent``
+        is the new field; legacy callers that unpack 4 values get a
+        compat wrapper below this function.
         """
         _pid_int = _coerce_int(_prompt_id)
         # 1. User agent via prompt_id
@@ -2373,12 +2388,14 @@ def chat_route():
                 _prompts_dir = os.path.join(
                     os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts')
             if os.path.isfile(os.path.join(_prompts_dir, f'{_pid_int}.json')):
-                return ({'id': _pid_int, 'type': 'local'}, _pid_int, 'local', _pid_int)
+                return ({'id': _pid_int, 'type': 'local'}, _pid_int,
+                        'local', _pid_int, False)
         # 2. Registry lookup by string key
         if _agent_id_legacy:
             for _a in all_agents:
                 if _a.get('id') == _agent_id_legacy:
-                    return (_a, _agent_id_legacy, _a.get('type', 'local'), _pid_int)
+                    return (_a, _agent_id_legacy, _a.get('type', 'local'),
+                            _pid_int, False)
         # 3. agent_id legacy as digit (some old clients sent prompt_id in agent_id)
         _aid_int = _coerce_int(_agent_id_legacy)
         if _aid_int is not None and _aid_int > 0:
@@ -2389,11 +2406,43 @@ def chat_route():
                 _prompts_dir = os.path.join(
                     os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts')
             if os.path.isfile(os.path.join(_prompts_dir, f'{_aid_int}.json')):
-                return ({'id': _aid_int, 'type': 'local'}, _aid_int, 'local', _aid_int)
-        # 4. Default fallback — orphan/stale/synthetic IDs land here without 400
-        return (_default_agent, _default_agent['id'], _default_agent.get('type', 'local'), None)
+                return ({'id': _aid_int, 'type': 'local'}, _aid_int,
+                        'local', _aid_int, False)
+        # 4. Caller sent a real prompt_id but the recipe isn't local.
+        #    Preserve it + force create-mode so HARTOS enters the
+        #    gather_info -> create_recipe pipeline.  No casual chat
+        #    during agent creation - that's the design intent.
+        if _pid_int is not None and _pid_int > 0:
+            logger.warning(
+                'Recipe missing locally for prompt_id=%s - forcing '
+                'create_agent=True so HARTOS routes to gather_info / '
+                'create_recipe (was previously silently falling back '
+                'to local_assistant which hid the cross-device sync '
+                'gap from the user)', _pid_int)
+            return ({'id': _pid_int, 'type': 'local'}, _pid_int,
+                    'local', _pid_int, True)
+        if _agent_id_legacy:
+            logger.warning(
+                'Recipe missing locally for agent_id=%r - forcing '
+                'create_agent=True (no casual fallback to local_assistant)',
+                _agent_id_legacy)
+            return ({'id': _agent_id_legacy, 'type': 'local'},
+                    _agent_id_legacy, 'local', _pid_int, True)
+        # 5. No prompt_id / agent_id at all -> default casual chat.
+        return (_default_agent, _default_agent['id'],
+                _default_agent.get('type', 'local'), None, False)
 
-    agent_config, agent_id, agent_type, prompt_id = _resolve_agent(prompt_id, agent_id)
+    agent_config, agent_id, agent_type, prompt_id, _force_create_agent = \
+        _resolve_agent(prompt_id, agent_id)
+    # When _resolve_agent had to fall back due to missing recipe (step 4),
+    # force create_agent=True so HARTOS hard-routes to autogen instead of
+    # casually chatting via the draft-first path.  Per design intent: no
+    # point in casual chat when we know we need to (re)create an agent.
+    if _force_create_agent and not create_agent:
+        create_agent = True
+        logger.info(
+            'create_agent forced True by _resolve_agent fallback - '
+            'HARTOS will route to gather_info/create_recipe pipeline')
     # Log when client-supplied agent_type differed from the derived one — helps
     # us confirm the back-compat shim is the only path being exercised once
     # frontend Phase 2 lands.
