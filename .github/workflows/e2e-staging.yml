@@ -37,11 +37,15 @@ jobs:
       # models/catalog.py and the rest of the HARTOS shim layer can
       # resolve `import integrations.service_tools.model_catalog` once
       # PYTHONPATH=/app/hartos_backend_src kicks in (set in the staging
-      # compose file).  Sparse-checkout would speed this up further if
-      # needed, but a full shallow clone is fine for the live-probe job.
+      # compose file).  Uses HEVOLVE_REPO_TOKEN (org PAT) so the clone
+      # works whether HARTOS is private or public.
       - name: Clone HARTOS source into hartos_backend_src/
+        env:
+          GH_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          git clone --depth=1 https://github.com/hertz-ai/HARTOS.git hartos_backend_src
+          git clone --depth=1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git" \
+            hartos_backend_src
           echo "HARTOS source layout (top-level):"
           ls hartos_backend_src | head -20
 
