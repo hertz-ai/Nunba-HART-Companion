@@ -669,6 +669,41 @@ def _run_pip(args: list[str], progress_cb: Callable | None = None,
                 msg = f"pip timed out after {timeout}s"
                 if progress_cb:
                     progress_cb(msg)
+                # Surface the timeout to the agent self-heal pipeline.
+                # Pre-fix this returned False silently — no exception
+                # raised → handle_exception never called → agent never
+                # saw it.  Synthesize a TimeoutError (deterministic
+                # fingerprint for the throttle dedup) and route via
+                # error_advice so an autonomous fix path exists.
+                try:
+                    from core.error_advice import handle_exception
+                    handle_exception(
+                        TimeoutError(msg),
+                        category='tts.install.pip_timeout',
+                        severity='high',
+                        agent_remediation=True,
+                        context={
+                            'timeout_s': timeout,
+                            'last_pkg': state.get('current_pkg') or '',
+                            'last_lines_tail': '\n'.join(
+                                state.get('lines', [])[-10:]
+                            ),
+                            'remediation_hint': (
+                                "pip install hit absolute wall-clock "
+                                "ceiling.  Either the network is slow, "
+                                "the index is unreachable, or a single "
+                                "package (e.g. parler-tts pulling "
+                                "transformers + torch) needs more time. "
+                                "Bump timeout_s in the EngineSpec or "
+                                "split the install plan into smaller "
+                                "single-package passes (the "
+                                "_self_heal_missing_transitives loop "
+                                "already does this for transitives)."
+                            ),
+                        },
+                    )
+                except Exception:
+                    pass
                 return False, msg
             _time.sleep(0.5)
 

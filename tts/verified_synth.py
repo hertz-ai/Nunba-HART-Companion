@@ -117,6 +117,46 @@ def _surface_backend_exception(backend: str, err: BaseException) -> None:
     except OSError:
         pass
 
+    # Also route the failure to the agent self-heal pipeline so an
+    # autonomous coding agent can investigate.  Previously every TTS
+    # probe failure (chatterbox CUDA crash, f5_tts argparse exit=2,
+    # indic_parler missing transitive, kokoro/melo missing primary)
+    # landed in the .err sidecar and stopped there — the agent never
+    # saw it (only 2 production sites called handle_exception per the
+    # 2026-05-04 audit: gpu_worker.py:501 and package_installer.py:1001).
+    # Wire it in here at the single chokepoint so all probe paths
+    # benefit at once.  Best-effort: never raises, matches the
+    # "probing must never raise" contract from the caller.  5-min
+    # throttle in error_advice keys on (category, fingerprint) so
+    # repeated failures of the SAME shape only file ONE goal per
+    # window — chatterbox failing 50× per session = 1 goal, not 50.
+    try:
+        from core.error_advice import handle_exception
+        handle_exception(
+            err,
+            category='tts.probe',
+            severity='high',
+            agent_remediation=True,
+            context={
+                'backend': backend,
+                'err_log_path': _backend_err_log_path(backend),
+                'remediation_hint': (
+                    f"Probe of TTS backend '{backend}' failed.  Read "
+                    f"the per-backend .err sidecar (path in "
+                    f"context.err_log_path) for the full traceback, "
+                    f"then check tts/package_installer.py for the "
+                    f"install plan and integrations/channels/media/"
+                    f"tts_router.py for the EngineSpec.  Common "
+                    f"patterns: missing primary package (re-run "
+                    f"install_backend_full), CUDA conflict (move to "
+                    f"venv quarantine like indic_parler), worker "
+                    f"argparse mismatch (check tts/<backend>_worker.py)."
+                ),
+            },
+        )
+    except Exception:
+        pass
+
 
 def _pick_test_phrase(backend: str, lang: str | None) -> str:
     """Pick a test phrase based on backend capability + requested lang.

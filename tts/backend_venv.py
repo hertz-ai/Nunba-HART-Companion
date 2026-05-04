@@ -58,6 +58,16 @@ from pathlib import Path
 
 logger = logging.getLogger("NunbaBackendVenv")
 
+# Import-validate timeout for `python -c "import <pkg>"` probes.  Default
+# is 90s (was 30s — too short for backends that initialize CUDA on import,
+# notably chatterbox_turbo which observed a hard rc=124 timeout in
+# venv_chatterbox_turbo.log on 2026-05-04).  Env-overridable so a future
+# even-heavier backend can bump this without a code change.  Lower bound
+# is 30s — anything below that is wishful thinking on a cold-cache start.
+_IMPORT_PROBE_TIMEOUT = max(
+    30, int(os.environ.get("NUNBA_TTS_IMPORT_PROBE_TIMEOUT", "90"))
+)
+
 # ── Venv root resolution ─────────────────────────────────────────────
 
 def _reset_cache_for_tests() -> None:
@@ -421,7 +431,7 @@ def install_into_venv(
                 backend,
                 mod,
                 ["--version-probe"],
-                timeout=30,
+                timeout=_IMPORT_PROBE_TIMEOUT,
                 _probe_mode=True,
             )
             log_f.write(
@@ -514,7 +524,8 @@ def is_venv_healthy(backend: str, probe_module: str | None = None) -> bool:
     if probe_module is None:
         return True
     rc, _, _ = invoke_in_venv(
-        backend, probe_module, [], timeout=30, _probe_mode=True,
+        backend, probe_module, [], timeout=_IMPORT_PROBE_TIMEOUT,
+        _probe_mode=True,
     )
     return rc == 0
 

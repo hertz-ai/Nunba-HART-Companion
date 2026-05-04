@@ -142,6 +142,36 @@ class LlamaLoader(ModelLoader):
             pass
         return False
 
+    def is_loaded(self, entry: ModelEntry) -> bool:
+        """Live HTTP probe of llama-server, not the catalog flag.
+
+        Same pattern as TTSLoader.is_loaded (line 283), STTLoader.is_loaded
+        (line 503), and VLMLoader.is_loaded (line 710) — every other
+        loader in this file overrides is_loaded with a live signal.
+        LlamaLoader was the lone exception, which is why an external
+        crash of llama-server (CUDA hang, OOM, segfault) left
+        entry.loaded=True permanently and ensure_loaded_async returned
+        "Model already loaded" without respawning.  See task #80 — the
+        14-minute "Draft boot decision" loop on 2026-05-04 was caused
+        by exactly this divergence.
+
+        check_llama_health() is the canonical liveness probe (defined
+        at llama_config.py:2114) — it sweeps configured port + 8082 +
+        8081 + 8080 with a 1s timeout and returns True iff at least
+        one /health endpoint replies 200.  Using it here means the
+        orchestrator's "is this loaded" query reflects the actual
+        process state, not a stale flag.
+        """
+        try:
+            from llama.llama_config import check_llama_health
+            return bool(check_llama_health())
+        except Exception:
+            # If the probe itself fails (e.g. import error, network
+            # stack down), fall back to the catalog flag rather than
+            # reporting a working server as dead.  Conservative — we'd
+            # rather over-report alive than spuriously evict + reload.
+            return bool(getattr(entry, 'loaded', False))
+
 
 class TTSLoader(ModelLoader):
     """Loader for TTS engines via tts_engine + subprocess ToolWorker.
