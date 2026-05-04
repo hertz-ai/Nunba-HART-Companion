@@ -1341,6 +1341,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     _build_lib = os.path.join(os.path.abspath(build_exe_options["build_exe"]), "lib")
     if os.path.isdir(_build_lib):
         _compiled = 0
+        _post_build_failures = []
         for _py_file in glob.glob(os.path.join(_build_lib, "*.py")):
             _base = os.path.splitext(_py_file)[0]
             _pyc_file = _base + ".pyc"
@@ -1349,9 +1350,18 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
                 os.remove(_py_file)
                 _compiled += 1
             except py_compile.PyCompileError as _pce:
-                print(f"  WARNING: Failed to compile {os.path.basename(_py_file)}: {_pce}")
+                # Was: print WARNING + continue.  That let broken bytecode
+                # ship to users (the bundled app crashed at first import,
+                # not at build time).  Now: collect + abort hard at end.
+                _post_build_failures.append((_py_file, str(_pce)))
         if _compiled:
             print(f"Post-build: compiled {_compiled} HARTOS .py files to .pyc in lib/")
+        if _post_build_failures:
+            print(f"\nPost-build: {len(_post_build_failures)} compile failures - "
+                  f"refusing to ship broken bytecode:")
+            for _f, _msg in _post_build_failures:
+                print(f"  {os.path.basename(_f)}: {_msg}")
+            sys.exit(1)
     # Also remove any raw .py files in root (leftover from previous builds)
     _build_root = os.path.abspath(build_exe_options["build_exe"])
     _root_cleaned = 0

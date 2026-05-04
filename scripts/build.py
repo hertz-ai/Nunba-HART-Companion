@@ -979,6 +979,21 @@ def build_windows(python_exe, app_only=False, installer_only=False):
         except OSError:
             stored_hash = None
 
+    # Forward-only atomic rebuild contract (2026-05-02):
+    #   - rebuild_python_embed.py works in python-embed.building/ and
+    #     atomic-swaps into python-embed/ ONLY after end-to-end
+    #     verification passes (torch + torch._C + transformers +
+    #     hevolveai canaries all loadable).
+    #   - On any failure the live python-embed/ is unchanged and the
+    #     scratch dir is preserved for forensics.  The script exits
+    #     non-zero and we abort the build rather than ship a broken
+    #     bundle.  Recovery is forward-only: re-run after fixing the
+    #     root cause; the next run wipes the scratch dir at step 1.
+    #   - The venv + ensurepip + launcher overlay is part of every
+    #     full rebuild (no presence-gate forcing rebuilds for it).
+    #     If you have an older python-embed snapshot without the
+    #     overlay and don't want to bump deps, run:
+    #       python scripts/rebuild_python_embed.py --overlay-only
     _needs_full_rebuild = (
         not os.path.isdir(embed_src)
         or not os.listdir(embed_src)
@@ -987,24 +1002,32 @@ def build_windows(python_exe, app_only=False, installer_only=False):
     rebuild_script = os.path.join('scripts', 'rebuild_python_embed.py')
 
     if _needs_full_rebuild:
-        _reason = ('missing' if not os.path.isdir(embed_src) or not os.listdir(embed_src)
-                    else f'EMBED_DEPS hash changed ({stored_hash} -> {current_hash})')
-        print_header(f"Rebuilding python-embed ({_reason})")
-        if os.path.isfile(rebuild_script):
-            if run_command([python_exe, rebuild_script],
-                            "Building python-embed from scratch..."):
-                # Stamp the new hash so subsequent builds skip the rebuild
-                try:
-                    with open(hash_file, 'w', encoding='utf-8') as _hf:
-                        _hf.write(current_hash)
-                    print_info(f"Wrote python-embed.hash = {current_hash}")
-                except OSError as _e:
-                    print_warn(f"Failed to write {hash_file}: {_e}")
-            else:
-                print_warn("python-embed creation failed — TTS/STT/VLM features will be unavailable")
-                print_warn("You can run 'python scripts/rebuild_python_embed.py' manually later")
+        if not os.path.isdir(embed_src) or not os.listdir(embed_src):
+            _reason = 'missing'
         else:
-            print_warn("rebuild_python_embed.py not found — skipping python-embed")
+            _reason = f'EMBED_DEPS hash changed ({stored_hash} -> {current_hash})'
+        print_header(f"Rebuilding python-embed ({_reason})")
+        if not os.path.isfile(rebuild_script):
+            print_error(f"rebuild_python_embed.py not found at {rebuild_script}")
+            print_error("Aborting build — refusing to ship without a current python-embed.")
+            sys.exit(1)
+        if run_command([python_exe, rebuild_script],
+                       "Building python-embed (atomic, scratch -> swap)..."):
+            # Stamp the new hash so subsequent builds skip the rebuild.
+            try:
+                with open(hash_file, 'w', encoding='utf-8') as _hf:
+                    _hf.write(current_hash)
+                print_info(f"Wrote python-embed.hash = {current_hash}")
+            except OSError as _e:
+                print_warn(f"Failed to write {hash_file}: {_e}")
+        else:
+            print_error("python-embed rebuild FAILED — atomic swap was not performed.")
+            print_error("Live python-embed/ is unchanged; scratch dir python-embed.building/")
+            print_error("preserved for forensics.  Refusing to ship a broken/stale bundle.")
+            print_error("Inspect the rebuild output above, fix the root cause, and re-run")
+            print_error("'python scripts/build.py'.  The next run wipes the scratch dir")
+            print_error("at step 1 and starts fresh.")
+            sys.exit(1)
     else:
         print_info(f"python-embed exists and hash matches ({embed_src}, {current_hash})")
 
@@ -1062,6 +1085,56 @@ def build_windows(python_exe, app_only=False, installer_only=False):
                 _purged += 1
                 _dirs.remove('__pycache__')
     print_info(f"Purged {_purged} __pycache__ directories")
+
+    # Pre-build syntax gate: ast.parse every Python source file so a
+    # stray typo (e.g. accidental keystrokes landing in main.py) never
+    # ships.  cx_Freeze itself does NOT abort on syntax errors during
+    # the bytecode-trace phase - it just emits a warning and the
+    # broken file lands in the .exe.  setup_freeze_nunba.py:1340-1354
+    # has a post-build py_compile step but it (a) runs AFTER cx_Freeze
+    # has already shipped the broken bytecode, (b) only checks
+    # build_exe/lib/*.py not the source tree, and (c) just logs a
+    # WARNING on failure without aborting.  Real users hit
+    # "main.py:5493 expected 'except' or 'finally' block" at app
+    # startup with no signal during build.  This gate fails loud.
+    print_info("Pre-build syntax gate: ast.parse all .py sources...")
+    import ast as _ast
+    _src_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    _bad: list = []
+    _checked = 0
+    for _walk_root, _walk_dirs, _walk_files in os.walk(_src_root):
+        # Skip vendored / generated dirs that aren't shipped Python.
+        _walk_dirs[:] = [
+            _d for _d in _walk_dirs
+            if _d not in {
+                '.git', '.venv', 'venv', 'venv310', 'venv-build',
+                'node_modules', 'build', 'dist', '__pycache__',
+                'python-embed', 'python-embed-broken-20260502',
+                'landing-page',  # JS tree, no .py to gate
+                '.eggs', '.pytest_cache',
+            }
+        ]
+        for _fname in _walk_files:
+            if not _fname.endswith('.py'):
+                continue
+            _path = os.path.join(_walk_root, _fname)
+            try:
+                with open(_path, 'r', encoding='utf-8') as _f:
+                    _ast.parse(_f.read(), filename=_path)
+                _checked += 1
+            except SyntaxError as _se:
+                _bad.append((_path, _se))
+            except (IOError, OSError, UnicodeDecodeError) as _e:
+                # Read failure is its own class of broken; surface it.
+                _bad.append((_path, _e))
+    if _bad:
+        print_error(
+            f"Pre-build syntax gate: {len(_bad)}/{_checked + len(_bad)} files "
+            f"failed to parse - aborting build to prevent shipping broken code:")
+        for _path, _err in _bad:
+            print_error(f"  {os.path.relpath(_path, _src_root)}: {_err}")
+        return False
+    print_info(f"Syntax gate: {_checked} .py files parse clean")
 
     # Run cx_Freeze
     if not run_command([python_exe, os.path.join('scripts', 'setup_freeze_nunba.py'), 'build'],
