@@ -5,9 +5,6 @@ Creates a WebApp with reliable startup and system tray functionality + Sidebar C
 Connect to Hivemind with your friends' agents.
 """
 # app.py (VERY TOP — before any other imports)
-import os
-import sys
-
 # ── Defang importlib.metadata.packages_distributions() before transformers ──
 # (Mirror of HARTOS hart_intelligence_entry.py:21-52 — installed here too
 # because Nunba's frozen entry point is app.py, NOT hart_intelligence_entry.py,
@@ -36,6 +33,9 @@ import sys
 # Monkey-patch applies BEFORE any langchain/transformers reach this
 # interpreter so the swap takes effect for the import-time call.
 import importlib.metadata as _md_safe
+import os
+import sys
+
 _orig_pd = getattr(_md_safe, 'packages_distributions', None)
 if _orig_pd is not None and not getattr(_orig_pd, '_hartos_guarded', False):
     def _safe_packages_distributions():
@@ -116,7 +116,7 @@ if getattr(sys, 'frozen', False):
         except OSError:
             _exe_mtime = 0
         _ch = _h_cc.sha256()
-        _ch.update(f"{_exe}|{_exe_mtime}".encode('utf-8'))
+        _ch.update(f"{_exe}|{_exe_mtime}".encode())
         os.environ.setdefault('HEVOLVE_CODE_HASH_PRECOMPUTED', _ch.hexdigest())
         del _h_cc, _exe, _exe_mtime, _ch
     except Exception:
@@ -180,6 +180,7 @@ if getattr(sys, 'frozen', False):
             pass  # Non-Windows or no WinAPI — fall through; log file is still the source of truth.
     try:
         import importlib.util
+
         import torch  # noqa: F401  — full torch.__init__ under stock importer
         import torch.autograd  # noqa: F401  — belt-and-braces: ensure attr bound
         import torch.nested  # noqa: F401  — warm before wrapper sees it
@@ -2327,6 +2328,7 @@ _root_logger = logging.getLogger()
 _root_logger.setLevel(logging.INFO)
 
 from logging.handlers import RotatingFileHandler as _RFH
+
 # 25MB × 5 = 125MB cap (was unbounded → 347MB witnessed 2026-04-21).
 _gui_fh = _RFH(log_file, mode='a', encoding='utf-8',
                maxBytes=25 * 1024 * 1024, backupCount=5)
@@ -5839,8 +5841,8 @@ def start_flask():
             # is intentionally left in place for the lifetime of the
             # process (hypercorn never returns from `serve`; no other
             # call site needs the original behaviour).
-            import threading as _th_check
             import signal as _sig_patch
+            import threading as _th_check
             if _th_check.current_thread() is not _th_check.main_thread():
                 _orig_signal_signal = _sig_patch.signal
                 def _silent_signal(signum, handler):
@@ -5859,6 +5861,7 @@ def start_flask():
 
             import asyncio
             from concurrent.futures import ThreadPoolExecutor
+
             from hypercorn.asyncio import serve as _hcserve
             from hypercorn.config import Config
             from hypercorn.middleware import AsyncioWSGIMiddleware

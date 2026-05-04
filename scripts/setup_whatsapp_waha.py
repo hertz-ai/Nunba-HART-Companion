@@ -37,13 +37,11 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 from typing import Optional
-
-import urllib.error
-import urllib.request
-
 
 # ─── Constants ────────────────────────────────────────────────────────
 CONTAINER_NAME = "nunba-waha"
@@ -89,8 +87,8 @@ def run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.
     )
 
 
-def http_json(url: str, method: str = "GET", body: Optional[dict] = None,
-              api_key: Optional[str] = None, timeout: int = HTTP_TIMEOUT) -> tuple[int, Optional[dict]]:
+def http_json(url: str, method: str = "GET", body: dict | None = None,
+              api_key: str | None = None, timeout: int = HTTP_TIMEOUT) -> tuple[int, dict | None]:
     """Tiny HTTP client — stdlib only, returns (status, body_json_or_none)."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
@@ -145,7 +143,7 @@ def container_running(name: str) -> bool:
     return r.stdout.strip() == name
 
 
-def container_api_key(name: str) -> Optional[str]:
+def container_api_key(name: str) -> str | None:
     """Read the API key from the container's env (so re-runs reuse it)."""
     r = run(
         ["docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", name],

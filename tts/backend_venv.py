@@ -60,71 +60,47 @@ logger = logging.getLogger("NunbaBackendVenv")
 
 # ── Venv root resolution ─────────────────────────────────────────────
 
-_VENV_ROOT_CACHE: Path | None = None
-
-
 def _reset_cache_for_tests() -> None:
-    """Reset the cached venv root. Test hook only."""
-    global _VENV_ROOT_CACHE
-    _VENV_ROOT_CACHE = None
+    """Reset the cached venv root.  Test hook only.
+
+    Delegates to ``core.venv_paths._reset_cache_for_tests`` since the
+    actual cache moved there as part of the parallel-path elimination
+    (2026-05-03).  9 journey tests (J215–J219) call this to clear state
+    between cases that mutate ``NUNBA_VENV_ROOT_OVERRIDE`` — the
+    forwarding here keeps them green without rewriting every call site.
+    """
+    from core.venv_paths import _reset_cache_for_tests as _canonical_reset
+    _canonical_reset()
 
 
 def venv_root() -> Path:
     """Return the root directory that holds every backend venv.
 
-    Priority:
-      1. NUNBA_VENV_ROOT_OVERRIDE env var (tests)
-      2. core.platform_paths.get_data_dir() / "venvs"
-      3. ~/Documents/Nunba/data/venvs (Windows fallback)
-      4. ~/.nunba/venvs (POSIX fallback)
+    Single source of truth lives in ``core.venv_paths.venv_root()`` so
+    this install path and HARTOS's ``gpu_worker._resolve_backend_venv_python``
+    spawn path can never disagree.  Returned as ``Path`` (not str) for
+    backward compat with the rest of this module.
     """
-    global _VENV_ROOT_CACHE
-    override = os.environ.get("NUNBA_VENV_ROOT_OVERRIDE", "").strip()
-    if override:
-        p = Path(override)
-        p.mkdir(parents=True, exist_ok=True)
-        return p
-
-    if _VENV_ROOT_CACHE is not None:
-        return _VENV_ROOT_CACHE
-
-    try:
-        from core.platform_paths import get_data_dir  # type: ignore
-
-        base = Path(get_data_dir()) / "data" / "venvs"
-    except Exception:
-        # Fallback for environments where HARTOS core isn't importable
-        # (e.g. pure-Nunba lint run). Mirrors the platform_paths default.
-        home = Path.home()
-        if sys.platform == "win32":
-            base = home / "Documents" / "Nunba" / "data" / "venvs"
-        elif sys.platform == "darwin":
-            base = home / "Library" / "Application Support" / "Nunba" / "data" / "venvs"
-        else:
-            base = home / ".config" / "nunba" / "data" / "venvs"
-
-    base.mkdir(parents=True, exist_ok=True)
-    _VENV_ROOT_CACHE = base
-    return base
+    from core.venv_paths import venv_root as _canonical_venv_root
+    return Path(_canonical_venv_root())
 
 
 def venv_path(backend: str) -> Path:
     """Return the directory for a specific backend's venv."""
-    _validate_backend_name(backend)
-    return venv_root() / backend
+    from core.venv_paths import venv_path as _canonical_venv_path
+    return Path(_canonical_venv_path(backend))
 
 
 def _validate_backend_name(backend: str) -> None:
-    """Reject unsafe backend names before they touch the filesystem."""
-    if not backend or not isinstance(backend, str):
-        raise ValueError(f"backend must be a non-empty string, got {backend!r}")
-    if not backend.replace("_", "").replace("-", "").isalnum():
-        raise ValueError(
-            f"backend name must be alphanumeric / underscore / dash only, "
-            f"got {backend!r}"
-        )
-    if backend.startswith("."):
-        raise ValueError(f"backend name must not start with a dot: {backend!r}")
+    """Reject unsafe backend names before they touch the filesystem.
+
+    Thin shim — single source of truth lives in ``core.venv_paths``.
+    Kept module-local because 5 callers in this file already use the
+    bare name and the public API in PHASE6_RESULTS.md documents it
+    here.
+    """
+    from core.venv_paths import _validate_backend_name as _canonical
+    _canonical(backend)
 
 
 # ── Venv python exe resolution ───────────────────────────────────────
@@ -140,6 +116,65 @@ def _python_exe_in(vpath: Path) -> Path:
 # ── ensure_venv ──────────────────────────────────────────────────────
 
 
+def _resolve_venv_creator_python() -> str:
+    """Return the path to the python interpreter that should drive
+    ``python -m venv``.
+
+    In a cx_Freeze bundled install, ``sys.executable`` is the **app
+    binary** (``Nunba.exe``) — not a real Python interpreter.  Spawning
+    ``Nunba.exe -m venv <path>`` boots Nunba's main entry, which sees
+    the running Nunba on :5000, exits as a duplicate-instance, and
+    leaves the venv directory empty.  Symptom (logged 2026-05-01):
+
+        venv module output: 'Nunba is already running on port 5000.
+        Exiting duplicate instance.'
+        venv created but python exe missing at .../Scripts/python.exe
+
+    Resolution:
+      1. Frozen mode — look for ``python-embed/python.exe`` next to
+         the app binary.  python.org's embeddable distribution strips
+         ``Lib/venv/`` and ``Lib/ensurepip/``, which made bare
+         ``python-embed/python.exe -m venv`` crash with
+         ``No module named venv.__main__`` (logged 2026-05-02).  The
+         build pipeline now overlays both packages from the matching
+         CPython source tarball — see
+         ``scripts/rebuild_python_embed.py:_overlay_venv_and_ensurepip``.
+         Bundles produced after that change have a working ``venv``
+         module under ``python-embed/Lib/venv/``.
+      2. Dev mode — ``sys.executable`` is a real Python, use it.
+
+    The bundled interpreter is the same Python version Nunba was
+    built against, so the venv it creates is binary-compatible with
+    everything Nunba already imported.
+    """
+    if getattr(sys, 'frozen', False):
+        # Frozen — sys.executable is Nunba.exe.  Look for the bundled
+        # interpreter at <app-dir>/python-embed/python.exe.
+        app_dir = Path(sys.executable).resolve().parent
+        candidate = app_dir / 'python-embed' / 'python.exe'
+        if candidate.is_file():
+            return str(candidate)
+        # Linux/macOS bundle layout — interpreter typically under
+        # python-embed/bin/python or similar.
+        for alt in (
+            app_dir / 'python-embed' / 'bin' / 'python3',
+            app_dir / 'python-embed' / 'bin' / 'python',
+        ):
+            if alt.is_file():
+                return str(alt)
+        # If we somehow can't find the bundled python, raise loudly
+        # rather than silently invoking Nunba.exe again — that path
+        # produces the misleading "duplicate instance" error.
+        raise RuntimeError(
+            f"frozen mode: could not find bundled python interpreter "
+            f"under {app_dir / 'python-embed'}; refusing to spawn "
+            f"{sys.executable!r} which would re-launch the app and "
+            f"trigger the duplicate-instance guard."
+        )
+    # Dev / source-run mode — sys.executable is a real Python.
+    return sys.executable
+
+
 def ensure_venv(backend: str, python_version: str = "3.11") -> Path:
     """Create the venv for `backend` if missing, and return its python exe.
 
@@ -147,10 +182,11 @@ def ensure_venv(backend: str, python_version: str = "3.11") -> Path:
 
     The ``python_version`` argument is advisory in this base
     implementation (matches the operator-supplied contract) — the venv
-    is created with ``sys.executable`` since that is the Python the
-    current Nunba runtime is running, and cross-version virtualenv
-    bootstrap is out of scope. A future enhancement can honor the arg
-    by shelling out to pyenv / py -<ver> when available.
+    is created with the bundled python interpreter (frozen mode) or
+    ``sys.executable`` (dev mode), see ``_resolve_venv_creator_python``.
+    Cross-version virtualenv bootstrap is out of scope.  A future
+    enhancement can honor the arg by shelling out to pyenv / py -<ver>
+    when available.
     """
     _validate_backend_name(backend)
     vpath = venv_path(backend)
@@ -172,8 +208,12 @@ def ensure_venv(backend: str, python_version: str = "3.11") -> Path:
     #
     # Except: on Windows the bundled venv + pip is already cached, so
     # we skip --without-pip to avoid a second ensurepip roundtrip.
-    cmd = [sys.executable, "-m", "venv", str(vpath)]
-    logger.info("Creating venv for backend %r at %s", backend, vpath)
+    creator_python = _resolve_venv_creator_python()
+    cmd = [creator_python, "-m", "venv", str(vpath)]
+    logger.info(
+        "Creating venv for backend %r at %s (creator=%s)",
+        backend, vpath, creator_python,
+    )
     try:
         # Hide subprocess console window on Windows via the same helper
         # the rest of tts/ uses. Lazy import so non-Windows hosts don't
@@ -197,7 +237,7 @@ def ensure_venv(backend: str, python_version: str = "3.11") -> Path:
         ) from e
     except FileNotFoundError as e:
         raise RuntimeError(
-            f"could not spawn {sys.executable!r} to create venv: {e}"
+            f"could not spawn {creator_python!r} to create venv: {e}"
         ) from e
 
     if r.returncode != 0:
@@ -294,23 +334,36 @@ def install_into_venv(
             except Exception:
                 si = cf = None
 
-        # Upgrade pip first — parler-tts has sdist deps (sentencepiece,
-        # descript-audio-codec) that need recent pip for wheel selection.
+        # Upgrade pip + setuptools + wheel.  All three are required:
+        #   pip:        recent versions resolve wheels for parler-tts
+        #               sdist deps (sentencepiece, descript-audio-codec).
+        #   setuptools: chatterbox-tts pulls antlr4-python3-runtime==4.9.3,
+        #               an old PEP 517 sdist whose default backend is
+        #               ``setuptools.build_meta``.  Pip's build-isolation
+        #               env tries to import that backend; if setuptools
+        #               isn't installable into the parent venv (the
+        #               source pip uses as a fallback when the isolation
+        #               env's setuptools resolution is incomplete), the
+        #               build aborts with ``BackendUnavailable: Cannot
+        #               import 'setuptools.build_meta'``.  Pre-installing
+        #               setuptools here covers that fallback path.
+        #   wheel:      installs cleanly when sdists ARE built.
         try:
             up = subprocess.run(
-                [str(pyexe), "-m", "pip", "install", "--upgrade", "pip", "wheel"],
+                [str(pyexe), "-m", "pip", "install", "--upgrade",
+                 "pip", "setuptools", "wheel"],
                 capture_output=True,
                 text=True,
                 timeout=300,
                 startupinfo=si,
                 creationflags=cf or 0,
             )
-            log_f.write(f"-- pip upgrade rc={up.returncode}\n")
+            log_f.write(f"-- pip+setuptools+wheel upgrade rc={up.returncode}\n")
             log_f.write(up.stdout or "")
             log_f.write(up.stderr or "")
             log_f.flush()
         except subprocess.TimeoutExpired:
-            log_f.write("-- pip upgrade TIMEOUT (300s) — continuing\n")
+            log_f.write("-- pip+setuptools+wheel upgrade TIMEOUT (300s) — continuing\n")
 
         # Install packages one-by-one so a failure localises to the
         # offending spec. Retry transient failures (network blip, mirror

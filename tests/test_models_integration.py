@@ -118,6 +118,7 @@ class TestLoaderClasses:
     ])
     def test_loader_is_class(self, cls_name):
         import inspect
+
         import models.orchestrator as orch
         cls = getattr(orch, cls_name)
         assert inspect.isclass(cls)

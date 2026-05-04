@@ -13,6 +13,7 @@ Connect to Hivemind to collaborate with your friends' agents.
 # from an older bundled app.py.  Safe to run even when the source is
 # already patched (no-ops if __spec__ is already set).
 import sys as _s_spec
+
 try:
     from importlib.machinery import ModuleSpec as _MS_spec
     for _mod_name in ('torch', 'torch.autograd', 'torch.cuda',
@@ -38,9 +39,10 @@ except Exception:
 # and never touches WMI.  Witnessed 2026-04-21: startup blocked 70s+
 # in desktop/ai_key_vault + 50s+ in mouseinfo (transitive via
 # pyautogui).
+import os as _o_wmi
 import platform as _p_wmi
 import sys as _s_wmi
-import os as _o_wmi
+
 try:
     import socket as _sk_wmi
     _hn_wmi = _sk_wmi.gethostname()
@@ -1322,7 +1324,8 @@ def api_chat_sync_files_pull():
     if err:
         return err
     try:
-        from desktop.file_sync import fetch as _fetch, list_since as _list
+        from desktop.file_sync import fetch as _fetch
+        from desktop.file_sync import list_since as _list
     except ImportError:
         return jsonify({'error': 'file_sync_unavailable'}), 501
 
@@ -5507,6 +5510,7 @@ if __name__ == '__main__':
         try:
             import asyncio
             from concurrent.futures import ThreadPoolExecutor
+
             from hypercorn.asyncio import serve as _hcserve
             from hypercorn.config import Config
             from hypercorn.middleware import AsyncioWSGIMiddleware

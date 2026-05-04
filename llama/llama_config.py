@@ -56,10 +56,56 @@ KNOWN_LLM_ENDPOINTS = [
 ]
 
 
+def _scan_via_canonical_resolver() -> dict | None:
+    """First-priority scan: ask HARTOS's canonical LLM URL resolver.
+
+    ``core.port_registry.get_local_llm_url()`` walks 7 candidate
+    sources (env vars, ``~/.nunba/llama_config.json:server_port``,
+    ``external_llm_endpoint.base_url``, port-registry default, …) and
+    probes each.  If a Nunba-managed llama-server is running on a
+    non-default port (e.g. 8082), the legacy KNOWN_LLM_ENDPOINTS list
+    misses it but this resolver finds it.  Routing through
+    ``core.health_probe.probe_llm`` keeps a SINGLE source of truth —
+    no parallel "is the LLM up?" implementations (Gate 4 / DRY).
+
+    Returns the legacy shape that ``scan_existing_llm_endpoints``
+    callers expect, or None when the resolver can't reach anything.
+    """
+    try:
+        from core.health_probe import probe_llm
+    except ImportError:
+        return None
+    info = probe_llm()
+    if info.get('status') != 'up':
+        return None
+    url = info.get('url') or ''
+    if not url:
+        return None
+    base = url.rstrip('/').rstrip('/v1').rstrip('/')
+    models = info.get('models') or []
+    name = models[0] if models else 'llama.cpp (canonical resolver)'
+    logger.info(
+        f"Canonical LLM resolver found running server at {base} "
+        f"(model={name}) — reusing instead of starting a new one")
+    return {
+        "name": name,
+        "base_url": base,
+        "completions": base + "/v1/chat/completions",
+        "type": "openai",
+    }
+
+
 def scan_existing_llm_endpoints() -> dict | None:
     """
     Scan for existing LLM endpoints on the system.
     Returns the first working endpoint found, or None if none found.
+
+    Lookup order:
+      1. ``core.health_probe.probe_llm`` — canonical Nunba/HARTOS
+         resolver (covers env, llama_config.json, port_registry).
+      2. Legacy KNOWN_LLM_ENDPOINTS list — third-party LLMs (Ollama,
+         LM Studio, vLLM, …) that the canonical resolver doesn't know
+         about.
 
     Returns:
         Dict with endpoint info if found: {"name", "base_url", "completions", "type"}
@@ -67,6 +113,13 @@ def scan_existing_llm_endpoints() -> dict | None:
     """
     logger.info("Scanning for existing LLM endpoints...")
 
+    # 1. Canonical resolver first — finds Nunba's own llama-server on
+    # whatever port it actually bound to (8082 etc.), not just :8080.
+    canonical = _scan_via_canonical_resolver()
+    if canonical:
+        return canonical
+
+    # 2. Legacy third-party LLM scan — Ollama, LM Studio, vLLM, etc.
     for endpoint in KNOWN_LLM_ENDPOINTS:
         try:
             # Try the health endpoint

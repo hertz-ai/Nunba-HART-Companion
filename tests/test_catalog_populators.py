@@ -516,6 +516,7 @@ class TestPopulateMediaGenNoDirectMutation(unittest.TestCase):
     def _get_function_ast(self):
         import ast
         import inspect
+
         from models import catalog as _mc
         src = inspect.getsource(_mc.populate_media_gen)
         return ast.parse(src).body[0]

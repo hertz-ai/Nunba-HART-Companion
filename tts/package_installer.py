@@ -221,7 +221,7 @@ def _wire_existing_venv_workers() -> None:
     if not registry or not BACKEND_VENV_PACKAGES:
         return
     try:
-        from tts.backend_venv import is_venv_healthy, _python_exe_in, venv_path
+        from tts.backend_venv import _python_exe_in, is_venv_healthy, venv_path
     except Exception:
         return
     for backend in BACKEND_VENV_PACKAGES:
@@ -1194,7 +1194,7 @@ def _self_heal_missing_transitives(
         return True, []
 
     try:
-        from tts._torch_probe import check_backend_runnable, _resolve_paths
+        from tts._torch_probe import _resolve_paths, check_backend_runnable
     except Exception:
         return True, []  # probe unavailable in dev mode — treat as healthy
 

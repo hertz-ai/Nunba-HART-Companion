@@ -45,13 +45,14 @@ from conftest import (  # type: ignore  # noqa: E402,F401
     ephemeral_port,
     isolated_nunba_home,
     llama_mock_server,
-    nunba_flask_app as _fixture_nunba_flask_app,
     nunba_subprocess_factory,
     piper_voice_path,
     real_piper_engine,
     wait_for_port,
 )
-
+from conftest import (
+    nunba_flask_app as _fixture_nunba_flask_app,
+)
 
 # ── NUNBA_USE_LIVE override ─────────────────────────────────────────
 # When NUNBA_USE_LIVE=1, we bypass the in-process Flask fixture and

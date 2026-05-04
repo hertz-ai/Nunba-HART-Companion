@@ -199,7 +199,7 @@ def export(
             seen: dict[str, dict[str, Any]] = {}
             for col in ('source_id', 'target_id'):
                 link_rows = conn.execute(
-                    f"SELECT id, source_id, target_id, link_type, context, created_at "
+                    f"SELECT id, source_id, target_id, link_type, context, created_at "  # noqa: S608 — col is hardcoded tuple, ids is parameterized
                     f"FROM memory_links "
                     f"WHERE {col} IN ({placeholders})",
                     ids,

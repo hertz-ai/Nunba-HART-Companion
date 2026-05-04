@@ -5,27 +5,50 @@ The old python-embed uses Python 3.10.11, but cx_Freeze builds with Python 3.12.
 All .pyd extensions compiled for cp310 fail to load on the 3.12 runtime -> torch
 (and everything else with C extensions) is broken in the bundled Nunba app.
 
+Atomic forward-only build:
+  All work happens inside ``python-embed.building/`` (the scratch dir).
+  The live ``python-embed/`` tree is never touched until the very last
+  step — an atomic rename that ONLY runs after every install + every
+  verification has passed.  On any failure the scratch dir is preserved
+  for forensics and the live tree is left exactly as it was, so the
+  build process never ships a half-finished python-embed.  The script
+  exits non-zero on failure, and ``scripts/build.py`` aborts the build
+  rather than packaging a stale or broken bundle.
+
+  No backup / restore step.  Recovery is forward-only: re-run after
+  fixing the underlying error.
+
 Usage:
-    python rebuild_python_embed.py              # default: delete backup on success
-    python rebuild_python_embed.py --keep-backup  # preserve backup (paranoid mode)
+    python rebuild_python_embed.py             # full rebuild (default)
+    python rebuild_python_embed.py --overlay-only
+        # apply venv + ensurepip + launcher overlay to the existing
+        # python-embed/ in place — useful when deps are unchanged
+        # but the overlay is missing.
 
 This script:
-1. Backs up python-embed -> python-embed-310-backup (transient; deleted on success)
-2. Downloads Python 3.12 embeddable zip from python.org
-3. Extracts to python-embed/
-4. Installs pip via get-pip.py
-5. Installs all packages from python-embed-requirements.txt
-6. Installs HevolveAI (Embodied Continual Learner With Hiveintelligence) — must come BEFORE hart-backend
-7. Installs hart-backend (HARTOS)
-8. Verifies torch loads correctly
-9. Deletes the backup (Step 1's snapshot) unless --keep-backup is passed
+1. Prepares the scratch dir (deletes any leftover from a prior failed run)
+2. Downloads Python 3.12 embeddable zip from python.org -> scratch
+3. Extracts to scratch
+3b. Overlays venv + ensurepip + launcher binaries onto scratch
+4. Configures ._pth + creates Lib/site-packages in scratch
+5. Installs pip via get-pip.py into scratch
+6. Installs all packages from deps.py into scratch
+7. Installs HevolveAI (Embodied Continual Learner With Hiveintelligence)
+   then hart-backend, then writes sitecustomize.py into scratch
+8. Verifies torch + torch._C + every HevolveAI Cython submodule load.
+   ANY failure here aborts the rebuild (scratch retained, live tree
+   untouched).
+9. Atomic swap: rename live python-embed -> .discard, scratch -> live,
+   then delete .discard.  Only reached if every prior step succeeded.
 """
 
 import argparse
+import datetime
 import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import urllib.request
 import zipfile
@@ -33,8 +56,15 @@ import zipfile
 # --- Config ---
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPTS_DIR)
-EMBED_DIR = os.path.join(PROJECT_DIR, "python-embed")
-BACKUP_DIR = os.path.join(PROJECT_DIR, "python-embed-310-backup")
+# Atomic rebuild model: build into a scratch dir, atomic-swap into the
+# live location only after end-to-end verification succeeds.  EMBED_DIR
+# below points at the SCRATCH dir during rebuild — every helper that
+# writes into "python-embed" goes into the scratch tree.  EMBED_DIR_FINAL
+# is the canonical install location used by build.py + the cx_Freeze
+# build.  --overlay-only mode points EMBED_DIR at the live tree because
+# it patches in place (no atomic swap needed for a tiny <10MB overlay).
+EMBED_DIR_FINAL = os.path.join(PROJECT_DIR, "python-embed")
+EMBED_DIR = EMBED_DIR_FINAL + ".building"
 REQUIREMENTS_FILE = os.path.join(SCRIPTS_DIR, "python-embed-requirements.txt")
 HARTOS_BACKEND_SRC = os.path.join(PROJECT_DIR, "hartos_backend_src")
 HEVOLVEAI_SRC = os.path.join(os.path.dirname(PROJECT_DIR), "hevolveai")
@@ -55,7 +85,185 @@ def step(msg):
     print(f"\n{'='*60}\n  {msg}\n{'='*60}")
 
 
-def run(cmd, **kwargs):
+def _overlay_venv_and_ensurepip():
+    """Restore venv + ensurepip + their launcher .exe files in the
+    embeddable distribution.
+
+    The python.org Windows embeddable distribution intentionally
+    strips three things needed for `python -m venv` to work:
+
+      1. ``Lib/venv/`` — the venv module itself
+      2. ``Lib/ensurepip/`` — bootstraps pip into a new venv
+      3. ``venvlauncher.exe`` + ``venvwlauncher.exe`` — Windows
+         redirector binaries that the venv module copies into the
+         new venv as its ``python.exe`` / ``pythonw.exe``
+
+    Without them, runtime venv creation fails:
+      - Without (1):  ``No module named venv.__main__``
+      - Without (1)+(2):  venv module imports but `ensurepip` errors on
+        ``--with-pip`` (default)
+      - Without (3):  venv creates structure then errors out:
+        ``Unable to copy 'venvlauncher.exe'`` and the new venv has
+        no ``python.exe``.
+
+    Source for (1)+(2): python.org's source tarball (pure-Python,
+    version-locked, ZIP-extractable on every OS).
+    Source for (3): NuGet ``python`` package — Microsoft's official
+    redistribution of the regular Windows install as a portable ZIP.
+    Same version, same launcher binaries the regular installer ships.
+
+    Total overlay size: ~6 MB (mostly the pip+setuptools wheels in
+    ``ensurepip/_bundled/`` and the two launcher binaries).
+
+    Verified post-overlay by:
+      a. ``python.exe -m venv --help`` exits 0 (module reachable)
+      b. ``python.exe -m venv --without-pip <tmp>`` produces a
+         ``python.exe`` inside ``<tmp>/Scripts/`` (launcher reachable)
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        # ---- Part 1: Lib/venv + Lib/ensurepip from source tarball ----
+        src_url = f"https://www.python.org/ftp/python/{PY_VERSION}/Python-{PY_VERSION}.tgz"
+        print(f"  Source tarball: {src_url}")
+        tgz_path = os.path.join(tmp, "python-source.tgz")
+        urllib.request.urlretrieve(src_url, tgz_path)
+        size_mb = os.path.getsize(tgz_path) / 1e6
+        print(f"  Downloaded: {size_mb:.1f} MB")
+
+        prefix = f"Python-{PY_VERSION}/Lib/"
+        wanted_pkgs = ("venv", "ensurepip")
+        with tarfile.open(tgz_path, "r:gz") as tf:
+            members = [
+                m for m in tf.getmembers()
+                if any(m.name.startswith(f"{prefix}{p}/") for p in wanted_pkgs)
+                or m.name in {f"{prefix}{p}.py" for p in wanted_pkgs}
+            ]
+            if not members:
+                raise RuntimeError(
+                    f"venv/ensurepip not found inside {src_url} — "
+                    f"PY_VERSION={PY_VERSION} may be wrong"
+                )
+            tf.extractall(tmp, members=members)  # noqa: S202 — source is python.org tarball verified by URL pin + filtered member list
+
+        src_lib = os.path.join(tmp, f"Python-{PY_VERSION}", "Lib")
+        dst_lib = os.path.join(EMBED_DIR, "Lib")
+        os.makedirs(dst_lib, exist_ok=True)
+
+        for pkg in wanted_pkgs:
+            src_pkg = os.path.join(src_lib, pkg)
+            dst_pkg = os.path.join(dst_lib, pkg)
+            if not os.path.isdir(src_pkg):
+                raise RuntimeError(
+                    f"missing {pkg}/ in extracted source under {src_lib}"
+                )
+            if os.path.isdir(dst_pkg):
+                shutil.rmtree(dst_pkg)
+            shutil.copytree(src_pkg, dst_pkg)
+            file_count = sum(len(files) for _, _, files in os.walk(dst_pkg))
+            byte_count = sum(
+                os.path.getsize(os.path.join(r, f))
+                for r, _, files in os.walk(dst_pkg)
+                for f in files
+            )
+            print(f"  Overlaid Lib/{pkg}/ — {file_count} files, "
+                  f"{byte_count / 1e6:.1f} MB")
+
+        # ---- Part 2: venvlauncher.exe + venvwlauncher.exe from NuGet ----
+        # NuGet's "python" package is Microsoft's official redistribution
+        # of the regular Windows install as a portable ZIP; it includes
+        # the launcher .exe files that the embeddable strips.  URL is
+        # stable across versions (just swap the version segment).
+        nuget_url = f"https://globalcdn.nuget.org/packages/python.{PY_VERSION}.nupkg"
+        print(f"  NuGet package: {nuget_url}")
+        nupkg_path = os.path.join(tmp, "python.nupkg")
+        try:
+            urllib.request.urlretrieve(nuget_url, nupkg_path)
+        except Exception as e:
+            raise RuntimeError(
+                f"failed to download NuGet python package from {nuget_url}: "
+                f"{e!r}"
+            ) from e
+        size_mb = os.path.getsize(nupkg_path) / 1e6
+        print(f"  Downloaded: {size_mb:.1f} MB")
+
+        # Python 3.12+ venv looks for the launcher at
+        # ``Lib/venv/scripts/nt/{python,pythonw}.exe`` first
+        # (CPython 3.12.6 source: Lib/venv/__init__.py:284-287), then
+        # falls back to legacy ``<base>/venvlauncher.exe``.  We use the
+        # modern path so a venv create succeeds without leaning on the
+        # fallback. NuGet's regular Python install ships the launcher
+        # templates at exactly that relative path under tools/.
+        launcher_arc_to_local = {
+            "tools/Lib/venv/scripts/nt/python.exe":
+                os.path.join("Lib", "venv", "scripts", "nt", "python.exe"),
+            "tools/Lib/venv/scripts/nt/pythonw.exe":
+                os.path.join("Lib", "venv", "scripts", "nt", "pythonw.exe"),
+        }
+        with zipfile.ZipFile(nupkg_path) as zf:
+            for arc_name, local_path in launcher_arc_to_local.items():
+                try:
+                    member = zf.getinfo(arc_name)
+                except KeyError:
+                    raise RuntimeError(
+                        f"{arc_name} not found in NuGet python "
+                        f"{PY_VERSION}; package layout may have changed"
+                    )
+                dst_full = os.path.join(EMBED_DIR, local_path)
+                os.makedirs(os.path.dirname(dst_full), exist_ok=True)
+                with zf.open(member) as src, open(dst_full, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                size_kb = os.path.getsize(dst_full) / 1024
+                print(f"  Overlaid {local_path} — {size_kb:.0f} KB")
+
+    # Verify the overlay end-to-end.  Two checks:
+    #   (a) the venv module is reachable (--help exits 0)
+    #   (b) creating an actual venv produces a working python.exe.
+    # Catching both protects against a partial overlay where the .py
+    # modules land but the launchers don't (or vice versa).
+    py_exe = os.path.join(EMBED_DIR, "python.exe")
+    print(f"  Verifying (a): {py_exe} -m venv --help ...")
+    result = subprocess.run(
+        [py_exe, "-m", "venv", "--help"],
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"venv module verification failed (rc={result.returncode})\n"
+            f"  stdout: {(result.stdout or '')[:300]}\n"
+            f"  stderr: {(result.stderr or '')[:300]}"
+        )
+
+    with tempfile.TemporaryDirectory() as smoke_tmp:
+        smoke_venv = os.path.join(smoke_tmp, "smoke_venv")
+        print(f"  Verifying (b): {py_exe} -m venv --without-pip {smoke_venv}")
+        result2 = subprocess.run(
+            [py_exe, "-m", "venv", "--without-pip", smoke_venv],
+            capture_output=True, text=True, timeout=60,
+        )
+        smoke_py = os.path.join(smoke_venv, "Scripts", "python.exe")
+        if result2.returncode != 0 or not os.path.isfile(smoke_py):
+            raise RuntimeError(
+                f"venv launcher verification failed (rc={result2.returncode})\n"
+                f"  stdout: {(result2.stdout or '')[:300]}\n"
+                f"  stderr: {(result2.stderr or '')[:300]}\n"
+                f"  smoke venv python.exe present? {os.path.isfile(smoke_py)}"
+            )
+    print("  OK: venv module + launcher overlay verified end-to-end")
+
+
+def run(cmd, check=True, **kwargs):
+    """Run a subprocess and raise on non-zero rc unless ``check=False``.
+
+    Forward-only rebuild: install steps must NOT cascade silently.  A
+    failed pip install is the difference between a working python-embed
+    and a half-baked one that would later fail in cx_Freeze with the
+    real cause buried under hundreds of lines of import errors.  Default
+    behavior is "raise immediately" so the surrounding try/except in
+    main() catches the failure, prints the postscript, and exits clean.
+
+    Use ``check=False`` for verification-style calls where the caller
+    inspects ``result.returncode`` itself (e.g. probing whether torch
+    loads, listing installed packages).
+    """
     print(f"  > {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     # Force packages to install INTO python-embed, not user site-packages.
     # Without this, pip sees packages in AppData\Roaming\Python\Python312\
@@ -64,9 +272,16 @@ def run(cmd, **kwargs):
     env['PYTHONNOUSERSITE'] = '1'
     result = subprocess.run(cmd, env=env, **kwargs)
     if result.returncode != 0:
-        print(f"  FAILED (exit code {result.returncode})")
+        _cmd_str = ' '.join(cmd) if isinstance(cmd, list) else cmd
+        print(f"  FAILED (exit code {result.returncode}): {_cmd_str}")
         if hasattr(result, 'stderr') and result.stderr:
             print(f"  stderr: {result.stderr[:500]}")
+        if check:
+            raise subprocess.CalledProcessError(
+                result.returncode, cmd,
+                output=getattr(result, 'stdout', None),
+                stderr=getattr(result, 'stderr', None),
+            )
     return result
 
 
@@ -214,11 +429,11 @@ def _rebuild_hevolveai_cython(python_exe, hevolveai_src):
     if not build_python:
         py_ver = f"{target_tag[2]}.{target_tag[3:]}"  # cp312 -> 3.12
         print(f"  ERROR: no full CPython {py_ver} install found on host.")
-        print(f"         A full install (with include/ + libs/) is required to")
-        print(f"         rebuild HevolveAI's Cython extensions for the target ABI.")
+        print("         A full install (with include/ + libs/) is required to")
+        print("         rebuild HevolveAI's Cython extensions for the target ABI.")
         print("")
         print(f"  FIX: install Python {py_ver} from python.org (NOT the embeddable")
-        print(f"       zip — that one lacks headers), then re-run this script.")
+        print("       zip — that one lacks headers), then re-run this script.")
         print(f"       Or make sure `py -{py_ver}` resolves to your Python {py_ver}.")
         sys.exit(1)
     print(f"  Build interpreter: {build_python}")
@@ -250,7 +465,7 @@ def _rebuild_hevolveai_cython(python_exe, hevolveai_src):
         print(f"  Creating build venv: {venv_dir}")
         venv_result = run(
             [build_python, "-m", "venv", venv_dir],
-            capture_output=True, text=True, timeout=120,
+            check=False, capture_output=True, text=True, timeout=120,
         )
         if venv_result.returncode != 0:
             print("  ERROR: venv creation failed.")
@@ -268,7 +483,7 @@ def _rebuild_hevolveai_cython(python_exe, hevolveai_src):
         [venv_python, "-m", "pip", "install",
          "cython", "setuptools", "wheel",
          "--no-warn-script-location"],
-        capture_output=True, text=True, timeout=180,
+        check=False, capture_output=True, text=True, timeout=180,
     )
     if cy_install.returncode != 0:
         print("  ERROR: Cython install failed; rebuild cannot proceed.")
@@ -282,7 +497,7 @@ def _rebuild_hevolveai_cython(python_exe, hevolveai_src):
     print(f"  Rebuilding Cython extensions in {pkg_dir} ...")
     build_result = run(
         [venv_python, "setup_cython.py"],
-        cwd=hevolveai_src,
+        check=False, cwd=hevolveai_src,
         timeout=1800,
     )
     if build_result.returncode != 0:
@@ -312,38 +527,158 @@ def _rebuild_hevolveai_cython(python_exe, hevolveai_src):
         print(f"  Canary present: {os.path.relpath(canary, hevolveai_src)}")
 
 
+def _print_failure_postscript():
+    """Diagnostic block printed whenever the rebuild aborts.
+
+    The cardinal rule of the forward-only design: if anything fails,
+    the live ``python-embed/`` is unchanged and the scratch tree is
+    left intact for forensics.  A subsequent re-run will wipe the
+    scratch dir at step 1 and start fresh.
+    """
+    print()
+    print("  Rebuild ABORTED — atomic swap NOT performed.")
+    if os.path.isdir(EMBED_DIR_FINAL):
+        print(f"  Live tree (untouched):   {EMBED_DIR_FINAL}")
+    else:
+        print(f"  Live tree:               {EMBED_DIR_FINAL} (does not exist)")
+    if os.path.isdir(EMBED_DIR):
+        try:
+            sz = sum(
+                os.path.getsize(os.path.join(r, f))
+                for r, _, files in os.walk(EMBED_DIR)
+                for f in files
+            ) / 1e6
+            print(f"  Scratch tree (forensic): {EMBED_DIR} ({sz:.0f} MB)")
+        except OSError:
+            print(f"  Scratch tree (forensic): {EMBED_DIR}")
+    print()
+    print("  Re-run after fixing the underlying error.  The next run")
+    print("  will wipe the scratch dir at step 1 and start fresh.")
+
+
+def _do_overlay_only():
+    """Apply the venv + ensurepip + launcher overlay to the live tree.
+
+    Useful when EMBED_DEPS is unchanged (so a full rebuild would be
+    wasteful) but the existing ``python-embed/`` predates the overlay.
+    Modifies the live tree in place — the overlay only adds files
+    (Lib/venv/, Lib/ensurepip/, the two launcher .exe binaries), so a
+    crash mid-overlay leaves the tree usable for everything else; the
+    next run can simply re-apply.
+    """
+    if not os.path.isdir(EMBED_DIR_FINAL):
+        print(f"  ERROR: {EMBED_DIR_FINAL} does not exist.")
+        print( "         --overlay-only patches an existing python-embed in place.")
+        print( "         Run without --overlay-only to do a full rebuild.")
+        sys.exit(1)
+    # _overlay_venv_and_ensurepip() writes into module-level EMBED_DIR.
+    # In overlay-only mode we want it to write into the LIVE tree, so
+    # rebind EMBED_DIR for the duration of this call.
+    global EMBED_DIR
+    saved = EMBED_DIR
+    EMBED_DIR = EMBED_DIR_FINAL
+    try:
+        step(f"Overlay-only: applying venv + ensurepip + launcher onto {EMBED_DIR_FINAL}")
+        _overlay_venv_and_ensurepip()
+    finally:
+        EMBED_DIR = saved
+    print()
+    print("  Overlay applied successfully.")
+
+
+def _atomic_swap():
+    """Replace EMBED_DIR_FINAL with the freshly built scratch tree.
+
+    Reached only after step 8 verification has succeeded.  Sequence:
+      1. Move existing live tree -> ``<live>.discard-<timestamp>``
+      2. Move scratch tree -> live location
+      3. Best-effort rmtree of the discarded prior tree
+
+    Step 1 is atomic on Windows when both source and target are on the
+    same volume (which they always are — sibling dirs in PROJECT_DIR).
+    Step 2 is similarly atomic.  If step 3 fails (file held open by
+    another process, antivirus lock, etc.) the build is still complete
+    and correct — leftover dir is safe to rm manually later.
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    discard_dir = f"{EMBED_DIR_FINAL}.discard-{timestamp}"
+    if os.path.isdir(EMBED_DIR_FINAL):
+        print(f"  Moving live tree aside: {EMBED_DIR_FINAL} -> {os.path.basename(discard_dir)}")
+        os.rename(EMBED_DIR_FINAL, discard_dir)
+    print(f"  Promoting scratch:      {os.path.basename(EMBED_DIR)} -> {os.path.basename(EMBED_DIR_FINAL)}")
+    os.rename(EMBED_DIR, EMBED_DIR_FINAL)
+    if os.path.isdir(discard_dir):
+        try:
+            shutil.rmtree(discard_dir)
+            print(f"  Removed prior tree:     {os.path.basename(discard_dir)}")
+        except OSError as _e:
+            print(f"  WARN: could not remove {discard_dir}: {_e}")
+            print( "        Build is complete and correct; safe to delete manually.")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Rebuild python-embed for cx_Freeze runtime parity"
     )
     parser.add_argument(
-        "--keep-backup",
+        "--overlay-only",
         action="store_true",
         help=(
-            "Preserve python-embed-310-backup/ after a successful rebuild "
-            "(~1.4GB).  Default: delete once step 8 verifies the new "
-            "python-embed loads torch.  Use this flag only if you plan to "
-            "inspect the old tree for diffing."
+            "Apply only the venv + ensurepip + launcher overlay to the "
+            "EXISTING python-embed/ in place.  Skips download + pip install "
+            "+ verification.  Use when deps are unchanged but the overlay "
+            "is missing from a prior snapshot."
         ),
     )
     args = parser.parse_args()
 
+    if args.overlay_only:
+        _do_overlay_only()
+        return
+
+    # Forward-only atomic rebuild: every step writes to the scratch dir.
+    # Live python-embed/ is untouched until _atomic_swap() at the end,
+    # which only runs if every install + verify succeeds.
+    try:
+        _run_rebuild_steps()
+    except SystemExit:
+        # A step called sys.exit(N) explicitly (e.g. canary failure).
+        # Diagnostic was already printed; just emit the standard
+        # postscript so the user sees the scratch path + next steps.
+        _print_failure_postscript()
+        raise
+    except BaseException as e:
+        # subprocess.CalledProcessError, network failure, disk full,
+        # KeyboardInterrupt, anything else.  The live tree is safe.
+        print()
+        print(f"  FATAL: {type(e).__name__}: {e}")
+        _print_failure_postscript()
+        sys.exit(1)
+
+
+def _run_rebuild_steps():
+    """Execute steps 1-9 of the atomic rebuild.
+
+    Every step writes into ``EMBED_DIR`` (the scratch tree).  Step 9
+    is the atomic swap into ``EMBED_DIR_FINAL``.  Any uncaught
+    exception leaves the scratch tree in place and the live tree
+    untouched.
+    """
     # Deps come from deps.py; fall back to requirements file if it exists
     embed_deps = get_embed_install_list(include_torch=False)
     print(f"  deps.py: {len(embed_deps)} embed deps + torch (separate)")
     if os.path.isfile(REQUIREMENTS_FILE):
         print(f"  NOTE: {REQUIREMENTS_FILE} exists but deps.py is authoritative")
 
-    # 1. Backup old python-embed
-    step("1. Backing up python-embed -> python-embed-310-backup")
+    # 1. Prepare the scratch dir.  Forward-only design: we never touch
+    # EMBED_DIR_FINAL until step 9's atomic swap, which only runs after
+    # every install + every verification has passed.
+    step("1. Preparing scratch dir for atomic build")
     if os.path.isdir(EMBED_DIR):
-        if os.path.isdir(BACKUP_DIR):
-            print(f"  Backup already exists at {BACKUP_DIR}, skipping backup")
-        else:
-            shutil.move(EMBED_DIR, BACKUP_DIR)
-            print(f"  Moved to {BACKUP_DIR}")
-    else:
-        print("  No existing python-embed to backup")
+        print(f"  Removing leftover scratch dir: {EMBED_DIR}")
+        shutil.rmtree(EMBED_DIR)
+    print(f"  Scratch dir:        {EMBED_DIR}")
+    print(f"  Live (swap target): {EMBED_DIR_FINAL} (untouched until step 9)")
 
     # 2. Download Python 3.12 embeddable zip
     step(f"2. Downloading Python {PY_VERSION} embeddable zip")
@@ -353,14 +688,23 @@ def main():
         urllib.request.urlretrieve(PY_EMBED_URL, zip_path)
         print(f"  Downloaded: {os.path.getsize(zip_path) / 1e6:.1f} MB")
 
-        # 3. Extract
-        step("3. Extracting to python-embed/")
+        # 3. Extract into the scratch dir
+        step("3. Extracting to python-embed.building/")
         os.makedirs(EMBED_DIR, exist_ok=True)
         with zipfile.ZipFile(zip_path) as zf:
-            zf.extractall(EMBED_DIR)
+            zf.extractall(EMBED_DIR)  # noqa: S202 — source is python.org embed zip verified by URL pin
         print(f"  Extracted {len(os.listdir(EMBED_DIR))} files")
 
-    # 4. Enable pip: edit ._pth file to enable site packages
+    # 4. Enable pip: edit ._pth file to enable site packages.
+    #
+    # MUST run BEFORE step 3b's overlay verification.  The default
+    # embeddable ._pth ships with only ``python312.zip`` and ``.`` on
+    # sys.path — it does NOT include ``Lib``.  Without ``Lib`` in the
+    # path the freshly overlaid ``Lib/venv/`` is unreachable and
+    # ``python -m venv --help`` fails with ``No module named venv``,
+    # which aborts the rebuild at step 3b.  We therefore configure
+    # ._pth first so that step 3b's verification gates can actually
+    # find the overlay it just dropped on disk.
     step("4. Configuring ._pth for site packages")
     pth_files = [f for f in os.listdir(EMBED_DIR) if f.endswith("._pth")]
     if pth_files:
@@ -381,6 +725,15 @@ def main():
     # Create Lib/site-packages directory
     sp_dir = os.path.join(EMBED_DIR, "Lib", "site-packages")
     os.makedirs(sp_dir, exist_ok=True)
+
+    # 3b. Restore venv + ensurepip from the regular Python source.
+    # The embeddable distribution strips both, which breaks every
+    # runtime `python -m venv` call (TTS backend isolation, etc.).
+    # See _overlay_venv_and_ensurepip() docstring for full rationale.
+    # Runs AFTER step 4 so the overlay's own verification (`python
+    # -m venv --help`) can see Lib on sys.path.
+    step("3b. Overlaying venv + ensurepip from CPython source")
+    _overlay_venv_and_ensurepip()
 
     # 5. Install pip
     step("5. Installing pip via get-pip.py")
@@ -543,32 +896,50 @@ _inject_path(_lib_dir, front=False)
 ''')
     print(f"  Wrote: {sitecustomize_path}")
 
-    # 8. Verify key imports
-    step("8. Verification")
-    result = run([python_exe, "-c",
-                  "import torch; print(f'torch {torch.__version__} OK, CUDA={torch.cuda.is_available()}')"],
-                 capture_output=True, text=True)
-    if result.returncode == 0:
-        print(f"  PASS: {result.stdout.strip()}")
-    else:
-        print(f"  FAIL: {result.stderr[:500]}")
-
-    result = run([python_exe, "-c", "import torch._C; print('torch._C loaded OK')"],
-                 capture_output=True, text=True)
-    if result.returncode == 0:
-        print(f"  PASS: {result.stdout.strip()}")
-    else:
-        print(f"  FAIL: torch._C still broken: {result.stderr[:300]}")
-
-    # Verify HevolveAI (Continual Learner).
+    # 8. Verification — HARD GATE for the atomic swap.
     #
-    # We specifically import a SUBMODULE that's backed by a Cython .pyd
-    # (visual_encoding), not just the top-level `hevolveai` package.  The
-    # package is mostly an __init__.pyd which can load even when the rest
-    # of the ABI is wrong — that's the exact trap we fell into before
-    # (top-level import succeeded but every submodule failed with
-    # `DLL load failed while importing visual_encoding` at Nunba runtime).
-    # If any of these canaries fail, the bundle is unusable — abort.
+    # All checks below run with check=False so we can collect every
+    # failure into _failures rather than aborting on the first one
+    # (more diagnostic value).  At the end of step 8 we inspect the
+    # list: if anything critical failed, sys.exit(1) — which the outer
+    # main() catches and turns into a clean abort with the postscript.
+    # The atomic swap (_atomic_swap()) is only reached when this list
+    # is empty.
+    step("8. Verification (hard gate — atomic swap only on full pass)")
+    _failures = []
+
+    def _verify(label, cmd, critical=True, _capture=True):
+        r = run(cmd, check=False, capture_output=True, text=True)
+        if r.returncode == 0:
+            print(f"  PASS: {label}: {(r.stdout or '').strip() or 'ok'}")
+            return True
+        err_head = (r.stderr or r.stdout or '').strip()[:400]
+        if critical:
+            print(f"  FAIL: {label}: {err_head}")
+            _failures.append((label, err_head))
+        else:
+            print(f"  WARN (non-critical): {label}: {err_head}")
+        return False
+
+    _verify("torch import",
+            [python_exe, "-c",
+             "import torch; print(f'torch {torch.__version__} CUDA={torch.cuda.is_available()}')"])
+    _verify("torch._C load",
+            [python_exe, "-c", "import torch._C; print('torch._C OK')"])
+    _verify("transformers import",
+            [python_exe, "-c",
+             "import transformers; print(f'transformers {transformers.__version__}')"])
+
+    # HevolveAI (Continual Learner) Cython submodules.
+    #
+    # We specifically import SUBMODULES backed by Cython .pyd files
+    # (visual_encoding, etc.), not just the top-level `hevolveai`
+    # package.  The package is mostly an __init__.pyd which can load
+    # even when the rest of the ABI is wrong — that's the exact trap
+    # we fell into before (top-level import succeeded but every
+    # submodule failed with `DLL load failed while importing
+    # visual_encoding` at Nunba runtime).  If any canary fails the
+    # bundle is unusable, so they're critical.
     canaries = [
         "hevolveai",
         "hevolveai.embodied_ai.utils.visual_encoding",
@@ -576,60 +947,52 @@ _inject_path(_lib_dir, front=False)
         "hevolveai.embodied_ai.memory.episodic_memory",
     ]
     for mod in canaries:
-        r = run([python_exe, "-c", f"import {mod}; print('{mod} OK')"],
+        _verify(f"hevolveai canary: {mod}",
+                [python_exe, "-c", f"import {mod}; print('{mod} OK')"])
+
+    # hart-backend is non-critical at this stage — its install can
+    # legitimately fail in dev setups where the source tree isn't
+    # checked out, and the cx_Freeze step can still bundle.  Surface
+    # the failure but don't block the swap.
+    _verify("hart-backend import",
+            [python_exe, "-c", "import hartos_backend; print('hart-backend OK')"],
+            critical=False)
+
+    # Informational — package count + python version
+    pkg_list = run([python_exe, "-m", "pip", "list", "--format=columns"],
+                   check=False, capture_output=True, text=True)
+    if pkg_list.returncode == 0:
+        pkg_count = len((pkg_list.stdout or '').strip().split("\n")) - 2
+        print(f"  Total packages installed: {pkg_count}")
+    pyver = run([python_exe, "--version"], check=False,
                 capture_output=True, text=True)
-        if r.returncode == 0:
-            print(f"  PASS: {r.stdout.strip()}")
-        else:
-            err = (r.stderr or "")[:400]
-            print(f"  FAIL: {mod}: {err}")
-            print("")
-            print("  HevolveAI submodule import failed — the bundled Nunba app")
-            print("  WILL fall back to numpy for every visual encoding call and")
-            print("  silently degrade.  Cython .pyd ABI is most likely wrong.")
-            print(f"  Check: look for .cp*-win_amd64.pyd files in python-embed/")
-            print(f"         Lib/site-packages/hevolveai/ whose ABI tag != cp312.")
-            sys.exit(1)
+    if pyver.returncode == 0:
+        print(f"  Python: {(pyver.stdout or '').strip()}")
 
-    # Verify hart-backend
-    result = run([python_exe, "-c",
-                  "import hartos_backend; print('hart-backend OK')"],
-                 capture_output=True, text=True)
-    if result.returncode == 0:
-        print(f"  PASS: {result.stdout.strip()}")
-    else:
-        print(f"  WARN: hart-backend import: {result.stderr[:200]}")
+    if _failures:
+        print()
+        print(f"  {len(_failures)} critical verification(s) FAILED:")
+        for label, err in _failures:
+            print(f"    - {label}")
+            for ln in err.splitlines()[:4]:
+                print(f"        {ln}")
+        print()
+        print("  HevolveAI submodule failure means Nunba's visual encoder")
+        print("  would silently fall back to numpy at runtime.  Refusing")
+        print("  to ship.")
+        print("  Look for .cp*-win_amd64.pyd files in")
+        print(f"  {EMBED_DIR}/Lib/site-packages/hevolveai/")
+        print("  whose ABI tag != cp312.")
+        sys.exit(1)
 
-    result = run([python_exe, "-m", "pip", "list", "--format=columns"],
-                 capture_output=True, text=True)
-    pkg_count = len(result.stdout.strip().split("\n")) - 2
-    print(f"  Total packages installed: {pkg_count}")
-
-    # Show Python version
-    result = run([python_exe, "--version"], capture_output=True, text=True)
-    print(f"  Python: {result.stdout.strip()}")
-
-    # Step 9 — delete the transient backup unless the user opted to keep it.
-    # Step 8 already verified torch loads, so the backup has done its job
-    # (rollback target in case download/install broke anything).  Leaving
-    # it around silently costs ~1.4GB per rebuild.
-    step("9. Cleaning up python-embed-310-backup")
-    if os.path.isdir(BACKUP_DIR):
-        if args.keep_backup:
-            print(f"  --keep-backup set: preserving {BACKUP_DIR}")
-        else:
-            try:
-                shutil.rmtree(BACKUP_DIR)
-                print(f"  Deleted {BACKUP_DIR} (torch load verified; backup no longer needed)")
-            except Exception as _cleanup_err:
-                print(f"  WARN: could not delete backup ({_cleanup_err}); safe to rm manually")
-    else:
-        print(f"  {BACKUP_DIR} not present (skipped)")
+    # 9. Atomic swap — verification passed, promote scratch to live.
+    # This is the ONLY moment EMBED_DIR_FINAL is touched in the entire
+    # rebuild.  After the swap the scratch dir no longer exists.
+    step("9. Atomic swap: python-embed.building -> python-embed")
+    _atomic_swap()
 
     step("DONE")
-    print("  python-embed rebuilt with Python 3.12")
-    if args.keep_backup and os.path.isdir(BACKUP_DIR):
-        print("  Old version preserved at: python-embed-310-backup/ (--keep-backup)")
+    print("  python-embed rebuilt with Python 3.12 and atomic-swapped into place")
     print("  Next: rebuild the frozen exe with setup_freeze_nunba.py")
 
 

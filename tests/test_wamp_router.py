@@ -446,7 +446,7 @@ class TestPerUserDelivery:
     def test_subscribe_to_own_encounter_topic_allowed(self):
         """The legitimate path must keep working — a session whose
         authid matches the topic suffix must be SUBSCRIBED."""
-        from wamp_router import SUBSCRIBED, SUBSCRIBE, _handle_subscribe
+        from wamp_router import SUBSCRIBE, SUBSCRIBED, _handle_subscribe
 
         session, proto, sent = self._setup_session('alice')
         try:
@@ -588,6 +588,7 @@ class TestShutdownOrdering:
     def test_atexit_registered_only_once(self):
         """start_wamp_router idempotency must not stack atexit callbacks."""
         import atexit
+
         import wamp_router as wr
 
         # Reset the module-level guard so this test is deterministic

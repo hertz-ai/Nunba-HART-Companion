@@ -64,10 +64,11 @@ def test_every_supported_lang_has_a_light_tier_engine():
       3. NEVER raise LIGHT_TIER_VRAM_CEILING_GB to make the test pass.
     """
     from core.constants import SUPPORTED_LANG_DICT
+
     from tts.tts_engine import (
-        _FALLBACK_LANG_ENGINE_PREFERENCE,
-        _FALLBACK_ENGINE_CAPABILITIES,
         _DEFAULT_PREFERENCE,
+        _FALLBACK_ENGINE_CAPABILITIES,
+        _FALLBACK_LANG_ENGINE_PREFERENCE,
     )
 
     uncovered: list[tuple[str, list[str]]] = []
@@ -119,10 +120,10 @@ def test_new_engines_present_in_capabilities():
     Guards against accidental deletion / VRAM-key inflation.
     """
     from tts.tts_engine import (
-        BACKEND_MELOTTS,
-        BACKEND_XTTS_V2,
-        BACKEND_MMS_TTS,
         _FALLBACK_ENGINE_CAPABILITIES,
+        BACKEND_MELOTTS,
+        BACKEND_MMS_TTS,
+        BACKEND_XTTS_V2,
     )
 
     for backend in (BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS):
@@ -149,10 +150,10 @@ def test_new_engines_have_registry_keys():
     matching entry in _BACKEND_TO_REGISTRY_KEY so RuntimeToolManager
     can dispatch synth requests through HARTOS service_tools."""
     from tts.tts_engine import (
-        BACKEND_MELOTTS,
-        BACKEND_XTTS_V2,
-        BACKEND_MMS_TTS,
         _BACKEND_TO_REGISTRY_KEY,
+        BACKEND_MELOTTS,
+        BACKEND_MMS_TTS,
+        BACKEND_XTTS_V2,
     )
 
     for backend in (BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS):

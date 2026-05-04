@@ -1465,7 +1465,8 @@ class TestProbeIsolation:
     """
 
     def test_probe_subprocess_disables_user_site(self):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from tts import _torch_probe as tp
         captured = {}
 
@@ -1523,7 +1524,7 @@ class TestRunPipEnv:
     """
 
     def test_run_pip_does_not_force_setuptools_stdlib_distutils(self):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
         captured = {}
 
         def fake_popen(cmd, **kwargs):

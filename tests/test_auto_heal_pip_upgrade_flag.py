@@ -32,7 +32,6 @@ This test fails CI if either branch regresses to plain
 import ast
 import pathlib
 
-
 _PACKAGE_INSTALLER = (
     pathlib.Path(__file__).parent.parent
     / 'tts' / 'package_installer.py'

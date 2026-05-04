@@ -36,6 +36,7 @@ def _tight_quota(tmp_path, monkeypatch):
     monkeypatch.setenv('NUNBA_FILE_SYNC_USER_QUOTA', str(512 * 1024))
     monkeypatch.setenv('NUNBA_FILE_SYNC_MAX_FILE', str(128 * 1024))
     import importlib
+
     from desktop import file_sync
     importlib.reload(file_sync)
     monkeypatch.setattr(file_sync, '_data_dir', lambda: str(tmp_path))

@@ -1595,7 +1595,7 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
                 if not os.path.isfile(_meta_path):
                     continue
                 _name, _version, _summary = 'hevolveai', '0.1.0', 'HevolveAI compiled binary'
-                with open(_meta_path, 'r', encoding='utf-8', errors='replace') as _mf:
+                with open(_meta_path, encoding='utf-8', errors='replace') as _mf:
                     for _ln in _mf:
                         _lns = _ln.rstrip()
                         if _lns.startswith('Name:'):

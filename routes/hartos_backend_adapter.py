@@ -228,9 +228,9 @@ def _attempt_hartos_init():
             #     HF tokens / API keys (transformers errors love to echo
             #     ``HF_TOKEN=hf_...`` in their messages).
             try:
-                import traceback as _tb
                 import io as _io
                 import re as _re_scrub
+                import traceback as _tb
                 _err_path = os.path.join(
                     os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
                     'hartos_init_error.log',

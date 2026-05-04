@@ -90,7 +90,10 @@ class TestFallbackEngineCapabilities:
         # MMS-TTS) added 2026-04-29 to fill the 1-3 GB coverage gap so
         # every SUPPORTED_LANG_DICT code has a light-tier engine.
         from tts.tts_engine import (
-            BACKEND_KOKORO, BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS,
+            BACKEND_KOKORO,
+            BACKEND_MELOTTS,
+            BACKEND_MMS_TTS,
+            BACKEND_XTTS_V2,
         )
         expected = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
                     BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
@@ -175,8 +178,10 @@ class TestLangEnginePreference:
         policy doc.
         """
         from tts.tts_engine import (
-            BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS,
             _FALLBACK_ENGINE_CAPABILITIES,
+            BACKEND_MELOTTS,
+            BACKEND_MMS_TTS,
+            BACKEND_XTTS_V2,
         )
         first = _FALLBACK_LANG_ENGINE_PREFERENCE['es'][0]
         assert first in {BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS}, (
@@ -230,7 +235,10 @@ class TestCatalogMapping:
         # because they never ship as their own backend, they fall
         # through to the CPU in-process path.
         from tts.tts_engine import (
-            BACKEND_KOKORO, BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS,
+            BACKEND_KOKORO,
+            BACKEND_MELOTTS,
+            BACKEND_MMS_TTS,
+            BACKEND_XTTS_V2,
         )
         primary = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,

@@ -1119,12 +1119,12 @@ def build_windows(python_exe, app_only=False, installer_only=False):
                 continue
             _path = os.path.join(_walk_root, _fname)
             try:
-                with open(_path, 'r', encoding='utf-8') as _f:
+                with open(_path, encoding='utf-8') as _f:
                     _ast.parse(_f.read(), filename=_path)
                 _checked += 1
             except SyntaxError as _se:
                 _bad.append((_path, _se))
-            except (IOError, OSError, UnicodeDecodeError) as _e:
+            except (OSError, UnicodeDecodeError) as _e:
                 # Read failure is its own class of broken; surface it.
                 _bad.append((_path, _e))
     if _bad:
