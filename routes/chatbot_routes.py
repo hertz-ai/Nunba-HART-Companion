@@ -2375,8 +2375,8 @@ def chat_route():
 
         Returns ``(agent_config, resolved_agent_id, resolved_type,
         resolved_prompt_id, force_create_agent)``.  ``force_create_agent``
-        is the new field; legacy callers that unpack 4 values get a
-        compat wrapper below this function.
+        is the new field added 2026-05-04 (commit b719eb47); the only
+        caller is the unpack at the call site below.
         """
         _pid_int = _coerce_int(_prompt_id)
         # 1. User agent via prompt_id
@@ -2408,10 +2408,23 @@ def chat_route():
             if os.path.isfile(os.path.join(_prompts_dir, f'{_aid_int}.json')):
                 return ({'id': _aid_int, 'type': 'local'}, _aid_int,
                         'local', _aid_int, False)
-        # 4. Caller sent a real prompt_id but the recipe isn't local.
-        #    Preserve it + force create-mode so HARTOS enters the
-        #    gather_info -> create_recipe pipeline.  No casual chat
-        #    during agent creation - that's the design intent.
+        # 4. Caller sent a real numeric prompt_id but the recipe
+        #    isn't local. Preserve it + force create-mode so HARTOS
+        #    enters the gather_info -> create_recipe pipeline.  No
+        #    casual chat during agent creation - that's the design
+        #    intent for cross-device users (recipe was created on
+        #    another device and hasn't synced yet).
+        #
+        #    NOTE: this branch is intentionally narrow to the
+        #    numeric-prompt_id case.  We do NOT force-create for a
+        #    synthetic-string _agent_id_legacy ('orphan_49',
+        #    'ghost_*') here — that contradicts the lines 2329-2331
+        #    contract: "Any client-minted synthetic string silently
+        #    falls back to default instead of returning 400 — the
+        #    user keeps chatting under Hevolve."  Forcing create
+        #    on a synthetic string would send HARTOS into create_recipe
+        #    with a bogus identifier and produce an agent the user
+        #    never asked for.  Synthetic strings fall through to step 5.
         if _pid_int is not None and _pid_int > 0:
             logger.warning(
                 'Recipe missing locally for prompt_id=%s - forcing '
@@ -2421,14 +2434,9 @@ def chat_route():
                 'gap from the user)', _pid_int)
             return ({'id': _pid_int, 'type': 'local'}, _pid_int,
                     'local', _pid_int, True)
-        if _agent_id_legacy:
-            logger.warning(
-                'Recipe missing locally for agent_id=%r - forcing '
-                'create_agent=True (no casual fallback to local_assistant)',
-                _agent_id_legacy)
-            return ({'id': _agent_id_legacy, 'type': 'local'},
-                    _agent_id_legacy, 'local', _pid_int, True)
-        # 5. No prompt_id / agent_id at all -> default casual chat.
+        # 5. No usable prompt_id and either no agent_id_legacy OR a
+        #    synthetic string we can't resolve -> default casual chat
+        #    under Hevolve, per the lines 2329-2331 contract.
         return (_default_agent, _default_agent['id'],
                 _default_agent.get('type', 'local'), None, False)
 
