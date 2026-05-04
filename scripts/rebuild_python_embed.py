@@ -65,6 +65,13 @@ PROJECT_DIR = os.path.dirname(SCRIPTS_DIR)
 # it patches in place (no atomic swap needed for a tiny <10MB overlay).
 EMBED_DIR_FINAL = os.path.join(PROJECT_DIR, "python-embed")
 EMBED_DIR = EMBED_DIR_FINAL + ".building"
+# Snapshot of a previously-working python-embed kept around when a
+# rebuild detects the live tree is broken.  Suffix is the date the
+# rescue snapshot was taken.  No automatic restore is performed —
+# operator copies it back manually if the new build misbehaves.  The
+# dir-name pattern is asserted by tests/test_rebuild_python_embed.py
+# (must start with PROJECT_DIR + contain 'backup' lower-cased).
+BACKUP_DIR = os.path.join(PROJECT_DIR, "python-embed-backup")
 REQUIREMENTS_FILE = os.path.join(SCRIPTS_DIR, "python-embed-requirements.txt")
 HARTOS_BACKEND_SRC = os.path.join(PROJECT_DIR, "hartos_backend_src")
 HEVOLVEAI_SRC = os.path.join(os.path.dirname(PROJECT_DIR), "hevolveai")
