@@ -96,6 +96,13 @@ services:
       # as one of the documented skip-keys (see app.py _check_single_instance
       # and the _test_envs tuple).
       - NUNBA_SKIP_SINGLE_INSTANCE=1
+      # models/catalog.py imports `integrations.service_tools.model_catalog`
+      # from the bundled HARTOS source tree.  Production desktop builds
+      # freeze that tree into the Python path; in CI we mount the repo
+      # at /app and need to extend PYTHONPATH explicitly so the import
+      # resolves.  Without this, e2e-staging crashes at startup with
+      # ModuleNotFoundError: No module named 'integrations'.
+      - PYTHONPATH=/app/hartos_backend_src
       - PYTHONUNBUFFERED=1
     depends_on:
       llama: { condition: service_healthy }
