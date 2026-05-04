@@ -420,6 +420,140 @@ describe('gamesApi', () => {
   });
 });
 
+// ── Friends API (Phase 7c.1) ──────────────────────────────────────────────
+describe('friendsApi', () => {
+  const {friendsApi} = socialApiModule;
+
+  it('sendRequest → POST /friends/request with target_user_id', async () => {
+    await friendsApi.sendRequest('user-42');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/request', {target_user_id: 'user-42'});
+  });
+
+  it('accept → POST /friends/request/<id>/accept', async () => {
+    await friendsApi.accept('f-123');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/request/f-123/accept');
+  });
+
+  it('reject → POST /friends/request/<id>/reject', async () => {
+    await friendsApi.reject('f-123');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/request/f-123/reject');
+  });
+
+  it('cancel → POST /friends/request/<id>/cancel', async () => {
+    await friendsApi.cancel('f-9');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/request/f-9/cancel');
+  });
+
+  it('unfriend → POST /friends/<userId>/unfriend', async () => {
+    await friendsApi.unfriend('u-77');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/u-77/unfriend');
+  });
+
+  it('block(userId, reason) → POST /friends/<userId>/block with reason', async () => {
+    await friendsApi.block('u-99', 'spam');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/u-99/block', {reason: 'spam'});
+  });
+
+  it('block(userId) without reason → POST without reason field', async () => {
+    await friendsApi.block('u-99');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/u-99/block', undefined);
+  });
+
+  it('unblock → POST /friends/<userId>/unblock', async () => {
+    await friendsApi.unblock('u-99');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/friends/u-99/unblock');
+  });
+
+  it('list defaults to status=active → GET /friends?status=active', async () => {
+    await friendsApi.list();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      '/friends', {params: {status: 'active'}});
+  });
+
+  it('listPending → GET /friends?status=pending', async () => {
+    await friendsApi.listPending();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      '/friends', {params: {status: 'pending'}});
+  });
+
+  it('listBlocks → GET /friends/blocks', async () => {
+    await friendsApi.listBlocks();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/friends/blocks');
+  });
+});
+
+// ── Invites API (Phase 7c.2) ──────────────────────────────────────────────
+describe('invitesApi', () => {
+  const {invitesApi} = socialApiModule;
+
+  it('send targeted-user → POST /invites with invitee_id', async () => {
+    await invitesApi.send({
+      parent_kind: 'community', parent_id: 'c-1',
+      invitee_id: 'u-7', role_offered: 'member',
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith('/invites', {
+      parent_kind: 'community', parent_id: 'c-1',
+      invitee_id: 'u-7', invitee_email: undefined,
+      role_offered: 'member', expires_in_days: undefined,
+    });
+  });
+
+  it('send shareable link → POST without invitee_id', async () => {
+    await invitesApi.send({
+      parent_kind: 'community', parent_id: 'c-1',
+      role_offered: 'member', expires_in_days: 7,
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith('/invites', {
+      parent_kind: 'community', parent_id: 'c-1',
+      invitee_id: undefined, invitee_email: undefined,
+      role_offered: 'member', expires_in_days: 7,
+    });
+  });
+
+  it('send off-platform email → POST with invitee_email', async () => {
+    await invitesApi.send({
+      parent_kind: 'community', parent_id: 'c-1',
+      invitee_email: 'friend@example.test',
+      role_offered: 'member',
+    });
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/invites',
+      expect.objectContaining({invitee_email: 'friend@example.test'}));
+  });
+
+  it('accept → POST /invites/<id>/accept', async () => {
+    await invitesApi.accept('inv-42');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/invites/inv-42/accept');
+  });
+
+  it('reject → POST /invites/<id>/reject', async () => {
+    await invitesApi.reject('inv-42');
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/invites/inv-42/reject');
+  });
+
+  it('listIncoming → GET /invites/incoming (no params)', async () => {
+    await invitesApi.listIncoming();
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      '/invites/incoming', undefined);
+  });
+
+  it('resolveCode → GET /invites/code/<code>', async () => {
+    await invitesApi.resolveCode('abc-xyz-123');
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      '/invites/code/abc-xyz-123');
+  });
+});
+
 // ── Compute API ───────────────────────────────────────────────────────────
 describe('computeApi', () => {
   it('optIn calls POST /compute/opt-in', async () => {

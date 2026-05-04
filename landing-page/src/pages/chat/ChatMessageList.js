@@ -5,7 +5,36 @@ import hourglassAnimation from '../../assets/hourglass-lottie.json';
 
 import Lottie from 'lottie-react';
 import {FileText} from 'lucide-react';
+import Markdown from 'markdown-to-jsx';
 import React, {useState, useEffect} from 'react';
+
+// Markdown renderer for assistant replies — the model emits standard
+// Markdown (**bold**, _italic_, lists, code fences, links).  Without
+// this, the bubble shows literal asterisks and underscores instead
+// of formatted text.  ``markdown-to-jsx`` is already in the bundle
+// (``pages/blogs/Markdown.js``) and sanitizes by default — no
+// new dependency, no XSS risk from raw HTML.  ``forceBlock`` keeps
+// paragraph wrapping consistent with the prior ``<div>`` layout so
+// the bubble height doesn't visually shift.
+const ASSISTANT_MD_OPTS = {
+  forceBlock: true,
+  overrides: {
+    a: {
+      props: {
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        className: 'underline',
+      },
+    },
+    code: {props: {className: 'px-1 py-0.5 rounded bg-white/10 text-xs'}},
+    pre: {props: {className: 'p-2 my-2 rounded bg-black/20 overflow-x-auto text-xs'}},
+    ul: {props: {className: 'list-disc pl-5 my-2 space-y-1'}},
+    ol: {props: {className: 'list-decimal pl-5 my-2 space-y-1'}},
+    h1: {props: {className: 'text-base font-semibold mt-2 mb-1'}},
+    h2: {props: {className: 'text-sm font-semibold mt-2 mb-1'}},
+    h3: {props: {className: 'text-sm font-semibold mt-2 mb-1'}},
+  },
+};
 
 
 
@@ -460,15 +489,26 @@ const ChatMessageList = ({
                   {message.type === 'assistant' && (
                     <>
                       {isTextMode ? (
-                        <div>{message.content}</div>
+                        <div>
+                          <Markdown options={ASSISTANT_MD_OPTS}>
+                            {message.content || ''}
+                          </Markdown>
+                        </div>
                       ) : animatingMessageIndex === index && duration > 0 ? (
+                        // Typewriter animation needs raw chars — Markdown
+                        // post-renders once the typewriter completes via
+                        // the next state transition into the static branch.
                         <TypeWriterForSubtitle
                           text={message.content}
                           duration={duration}
                           isIdle={isIdleVideo(videoUrl)}
                         />
                       ) : (
-                        <div>{message.content}</div>
+                        <div>
+                          <Markdown options={ASSISTANT_MD_OPTS}>
+                            {message.content || ''}
+                          </Markdown>
+                        </div>
                       )}
                       {/* Intelligence source badge + timestamp */}
                       <div className="flex items-center gap-2 mt-2 text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>

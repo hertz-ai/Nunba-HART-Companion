@@ -75,6 +75,11 @@ export default function CommunityDetailPage() {
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  // Phase 7c — sort tabs (Plan D.1).  Server supports new/hot/top/
+  // discussed in PostService.list_posts; the RN client picks the
+  // same set.  Defaulting to 'new' matches both the RN
+  // CommunityDetailScreen and the existing pre-7c web behavior.
+  const [sort, setSort] = useState('new');
   const limit = 20;
 
   // Phase 11a: Members + HART agents
@@ -167,7 +172,8 @@ export default function CommunityDetailPage() {
       const o = reset ? 0 : offset;
       setPostsLoading(true);
       try {
-        const res = await communitiesApi.posts(communityId, {limit, offset: o});
+        const res = await communitiesApi.posts(
+          communityId, {limit, offset: o, sort});
         const items = res.data || [];
         setPosts(reset ? items : (prev) => [...prev, ...items]);
         setHasMore(res.meta ? res.meta.has_more : items.length === limit);
@@ -177,7 +183,7 @@ export default function CommunityDetailPage() {
       }
       setPostsLoading(false);
     },
-    [communityId, offset]
+    [communityId, offset, sort]
   );
 
   useEffect(() => {
@@ -186,7 +192,9 @@ export default function CommunityDetailPage() {
     setOffset(0);
     setHasMore(true);
     loadPosts(true);
-  }, [loadPosts, community]);
+    // Re-run when sort changes — fresh page from offset=0.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [community, sort]);
 
   // ── Phase 11b: WAMP real-time subscription ──────────────────────────
   useEffect(() => {
@@ -731,6 +739,47 @@ export default function CommunityDetailPage() {
             </Box>
           </Fade>
         )}
+
+        {/* Phase 7c — sort tabs (Plan D.1).  Hot / Top / New /
+            Discussed mirrors the RN CommunityDetailScreen tab row.
+            'Discussed' is HARTOS's name for the comment-volume sort
+            ('controversial' in the original Reddit-style plan; the
+            server uses 'discussed').  Clicking a tab triggers a
+            full re-fetch from offset=0 via the loadPosts deps. */}
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1,
+            mb: 1.5,
+            mt: 1,
+            overflowX: 'auto',
+          }}
+          role="tablist"
+          aria-label="Sort posts"
+        >
+          {[
+            {key: 'hot', label: 'Hot'},
+            {key: 'top', label: 'Top'},
+            {key: 'new', label: 'New'},
+            {key: 'discussed', label: 'Discussed'},
+          ].map((tab) => {
+            const isActive = sort === tab.key;
+            return (
+              <Chip
+                key={tab.key}
+                label={tab.label}
+                clickable
+                onClick={() => setSort(tab.key)}
+                color={isActive ? 'primary' : 'default'}
+                variant={isActive ? 'filled' : 'outlined'}
+                role="tab"
+                aria-selected={isActive}
+                size="small"
+                sx={{fontWeight: isActive ? 700 : 500}}
+              />
+            );
+          })}
+        </Box>
 
         {/* Posts list */}
         <InfiniteScroll
