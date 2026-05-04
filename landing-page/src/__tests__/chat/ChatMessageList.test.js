@@ -57,6 +57,18 @@ jest.mock('lucide-react', () => ({
   FileText: (props) => <svg data-testid="file-text-icon" {...props} />,
 }));
 
+// markdown-to-jsx@9.7.16 ships a CJS bundle (dist/index.cjs) that does
+// `require('markdown-to-jsx/entities')` — a self-referential subpath
+// that Jest's resolver can't follow without exports-field support.
+// Mocking the public surface bypasses the CJS resolution path entirely.
+jest.mock('markdown-to-jsx', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: ({children}) => <div data-testid="markdown">{children}</div>,
+  };
+});
+
 import ChatMessageList from '../../pages/chat/ChatMessageList';
 
 const defaultProps = {

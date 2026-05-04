@@ -87,6 +87,15 @@ services:
       - NUNBA_DISABLE_VLM=1           # skip MiniCPM sidecar
       - NUNBA_LLAMA_URL=http://llama:8080
       - NUNBA_CROSSBAR_URL=ws://crossbar:8088/ws
+      # main.py:472 sets CBURL=ws://localhost:{NUNBA_WAMP_PORT}/ws but
+      # only `if not os.environ.get('CBURL')` — i.e. the env var is the
+      # authoritative override.  Staging needs the WAMP client to point
+      # at the `crossbar` service hostname instead of localhost.  Same
+      # for WAMP_URL (HTTP publish bridge) — there's no separate
+      # crossbarhttp3 bridge in this stack, so route HTTP publishes
+      # to the Flask app's own /publish endpoint at port 5000.
+      - CBURL=ws://crossbar:8088/ws
+      - WAMP_URL=http://localhost:5000/publish
       - NUNBA_MCP_BEARER=staging-e2e-token-do-not-use-in-prod
       # Single-instance lock at ~/.nunba/nunba.lock can spuriously fail
       # under containerized restarts (overlayfs flock quirks, healthcheck
@@ -109,6 +118,8 @@ services:
       crossbar: { condition: service_healthy }
     command: >
       bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq --no-install-recommends libsndfile1 curl &&
         pip install --no-cache-dir -r requirements.txt &&
         python main.py --port 5000 --background
       "
