@@ -57,11 +57,16 @@ jobs:
           echo "Stack launched. PID table:"
           docker compose -f docker-compose.staging.yml ps
 
-      - name: Wait for nunba healthy (max 8 min)
+      - name: Wait for nunba healthy (max 12 min)
+        # Bumped from 8min to 12min: the staging container does pip
+        # install of the full requirements.txt on every boot (~3min)
+        # plus the Flask app's own startup (~30s).  Combined with the
+        # docker healthcheck's 5min start_period, the previous 8min
+        # cap occasionally clipped real green runs.
         run: |
-          for i in $(seq 1 48); do
+          for i in $(seq 1 72); do
             status=$(docker inspect --format '{{.State.Health.Status}}' nunba-staging-app 2>/dev/null || echo starting)
-            echo "  [$i/48] nunba: $status"
+            echo "  [$i/72] nunba: $status"
             if [ "$status" = "healthy" ]; then exit 0; fi
             sleep 10
           done

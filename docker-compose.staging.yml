@@ -124,8 +124,18 @@ services:
         python main.py --port 5000 --background
       "
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      # Python-based probe — `python` is always present in this base
+      # image, while `curl` is only available after the apt-get install
+      # in the entrypoint completes.  During the slow first-boot pip
+      # install (~3min) curl is missing AND apt-get install hasn't run
+      # yet, so a curl-based healthcheck latches "unhealthy" before
+      # the entrypoint even gets to install curl.  Switching to a
+      # urllib-based probe avoids that race entirely.
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; r=urllib.request.urlopen(\"http://localhost:5000/health\",timeout=5); sys.exit(0 if r.status==200 else 1)' || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 40
-      start_period: 180s
+      # pip install of the full requirements.txt takes ~3min on a
+      # cold runner; bumping start_period to 5min keeps the unhealthy
+      # latch from snapping shut before the Flask app even boots.
+      start_period: 300s
