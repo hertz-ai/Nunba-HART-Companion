@@ -88,6 +88,14 @@ services:
       - NUNBA_LLAMA_URL=http://llama:8080
       - NUNBA_CROSSBAR_URL=ws://crossbar:8088/ws
       - NUNBA_MCP_BEARER=staging-e2e-token-do-not-use-in-prod
+      # Single-instance lock at ~/.nunba/nunba.lock can spuriously fail
+      # under containerized restarts (overlayfs flock quirks, healthcheck
+      # restart loops re-importing app.py before old fd is GC'd).  The
+      # docker container IS the isolation boundary here, so we don't need
+      # app-level single-instance protection.  app.py honours this env var
+      # as one of the documented skip-keys (see app.py _check_single_instance
+      # and the _test_envs tuple).
+      - NUNBA_SKIP_SINGLE_INSTANCE=1
       - PYTHONUNBUFFERED=1
     depends_on:
       llama: { condition: service_healthy }
