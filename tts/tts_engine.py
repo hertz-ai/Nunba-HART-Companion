@@ -569,10 +569,34 @@ _BACKEND_TO_REGISTRY_KEY: dict[str, str] = {
     BACKEND_MELOTTS:          'melotts',
     BACKEND_XTTS_V2:          'xtts_v2',
     BACKEND_MMS_TTS:          'mms_tts',
-    # CPU engines — also run via HARTOS RuntimeToolManager subprocess
-    'luxtts':                 'luxtts',  # kept for frozen HARTOS compat until rebuild
-    'pocket_tts':             'pocket_tts',
 }
+
+# CPU-only catalog entries with NO native Nunba implementation —
+# they ALL collapse to BACKEND_PIPER.  Single source of truth for
+# "HARTOS exposed this engine in the catalog but Nunba can't run it
+# in-process; route to Piper which IS bundled in python-embed".
+# Both hyphen and underscore forms accepted because HARTOS catalog
+# uses hyphens, ENGINE_REGISTRY uses underscores.
+#
+# 2026-05-04 root-cause fix: pre this date the engines below were
+# self-mapped INSIDE _BACKEND_TO_REGISTRY_KEY (e.g. ``'pocket_tts':
+# 'pocket_tts'``).  The inverse-derivation at the setdefault loop
+# below then produced ``_CATALOG_TO_BACKEND['pocket_tts'] =
+# 'pocket_tts'`` (a literal echo).  The catalog ladder "selected"
+# pocket_tts as a real backend, the dispatcher tried to spawn it,
+# and audio synthesis silently failed with "No TTS engine available
+# (install pocket-tts or espeak-ng)" on every install missing those
+# extras.  Live evidence in user's gui_app.log 2026-04-30 → 2026-05-04.
+#
+# Fix: keep _BACKEND_TO_REGISTRY_KEY pure (only Nunba native GPU
+# backends), declare CPU fallbacks explicitly here, and the inverse
+# map gets a correct alias instead of a self-referential trap.
+# Adding a new CPU-only HARTOS engine = ONE entry in this tuple.
+_CPU_FALLBACK_CATALOG_IDS: tuple[str, ...] = (
+    'pocket-tts', 'pocket_tts',  # tiny-pocket TTS — not bundled in Nunba
+    'espeak',                    # system binary — not always present
+    'luxtts',                    # internal HARTOS tool — Nunba doesn't run it
+)
 
 
 def _get_engine_registry():
@@ -609,11 +633,18 @@ _CATALOG_TO_BACKEND: dict[str, str] = {
 # so both 'f5-tts' (catalog) and 'f5_tts' (registry key) map back.
 for _backend, _key in _BACKEND_TO_REGISTRY_KEY.items():
     _CATALOG_TO_BACKEND.setdefault(_key, _backend)
-# CPU alias fallbacks — all route to Piper in Nunba
-_CATALOG_TO_BACKEND.setdefault('pocket-tts', BACKEND_PIPER)
-_CATALOG_TO_BACKEND.setdefault('pocket_tts', BACKEND_PIPER)
-_CATALOG_TO_BACKEND.setdefault('espeak', BACKEND_PIPER)
-_CATALOG_TO_BACKEND.setdefault('chatterbox_multilingual', BACKEND_CHATTERBOX_ML)  # legacy name
+# CPU fallback aliases — single writer, no setdefault gymnastics, no
+# parallel-path drift.  These IDs do NOT appear in
+# _BACKEND_TO_REGISTRY_KEY (the GPU bridge is now pure), so the prior
+# setdefault loop cannot shadow this assignment.  Adding a new CPU-only
+# HARTOS engine = one entry in _CPU_FALLBACK_CATALOG_IDS above.
+for _alias in _CPU_FALLBACK_CATALOG_IDS:
+    _CATALOG_TO_BACKEND[_alias] = BACKEND_PIPER
+# Legacy ENGINE_REGISTRY key kept for backwards compat — pre-2026-04
+# HARTOS used 'chatterbox_multilingual' before the dual-form rule was
+# established.  Different mapping target, so kept separate from the
+# CPU fallback list above.
+_CATALOG_TO_BACKEND.setdefault('chatterbox_multilingual', BACKEND_CHATTERBOX_ML)
 
 
 def _entry_to_legacy_caps(entry) -> dict:

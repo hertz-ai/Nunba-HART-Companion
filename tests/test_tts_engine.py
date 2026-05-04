@@ -229,11 +229,19 @@ class TestCatalogMapping:
         # _BACKEND_TO_CATALOG is derived from _BACKEND_TO_REGISTRY_KEY,
         # so any new BACKEND_* constant added there flows through here
         # automatically.  Carries the 10 primary backends (7 original
-        # + 3 mid-VRAM tier added 2026-04-29) PLUS two string-only keys
-        # ('luxtts', 'pocket_tts') retained for frozen-HARTOS
-        # compatibility — they have no top-level BACKEND_* constant
-        # because they never ship as their own backend, they fall
-        # through to the CPU in-process path.
+        # + 3 mid-VRAM tier added 2026-04-29).
+        #
+        # 2026-05-04 fix: the dict no longer carries 'luxtts' /
+        # 'pocket_tts' string-only keys.  Those were self-mappings
+        # inside _BACKEND_TO_REGISTRY_KEY ("kept for frozen HARTOS
+        # compat until rebuild") that produced a literal-echo entry
+        # in _CATALOG_TO_BACKEND ('pocket_tts' → 'pocket_tts'),
+        # causing the catalog ladder to "select" pocket_tts as a
+        # real backend and audio synthesis to silently fail.  CPU
+        # fallback aliases now live in _CPU_FALLBACK_CATALOG_IDS and
+        # only appear in _CATALOG_TO_BACKEND (one-way mapping to
+        # BACKEND_PIPER) — they were never valid Nunba backend
+        # constants in the first place.
         from tts.tts_engine import (
             BACKEND_KOKORO,
             BACKEND_MELOTTS,
@@ -245,8 +253,7 @@ class TestCatalogMapping:
                    BACKEND_PIPER,
                    # Mid-VRAM tier — 2026-04-29
                    BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS}
-        compat = {'luxtts', 'pocket_tts'}
-        assert set(_BACKEND_TO_CATALOG.keys()) == primary | compat
+        assert set(_BACKEND_TO_CATALOG.keys()) == primary
 
 
 class TestKokoroEnglishLadder:

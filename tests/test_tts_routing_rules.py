@@ -265,13 +265,20 @@ class TestCatalogMapping:
         for b in backends:
             assert b in _BACKEND_TO_CATALOG, f"Backend {b} has no catalog mapping"
 
-    def test_pocket_tts_is_its_own_backend(self):
-        # pocket_tts was promoted from a Piper-fallback alias to its own
-        # HARTOS-registered backend (via ENGINE_REGISTRY in tts_router). The
-        # catalog entry 'pocket-tts' now resolves to the 'pocket_tts'
-        # backend key, which has its own CPU in-process synthesizer in
-        # integrations/service_tools/pocket_tts_tool.py.
-        assert _CATALOG_TO_BACKEND['pocket-tts'] == 'pocket_tts'
+    def test_pocket_tts_routes_to_piper(self):
+        # 2026-05-04 root-cause fix: pocket_tts has NO native loader in
+        # Nunba's python-embed.  Pre-fix, _BACKEND_TO_REGISTRY_KEY held
+        # the self-mapping 'pocket_tts': 'pocket_tts' which made the
+        # inverse derivation produce a literal-echo entry in
+        # _CATALOG_TO_BACKEND.  When the catalog ladder picked it,
+        # Nunba activated literal pocket_tts, the dispatcher tried to
+        # spawn an unavailable subprocess, and synthesis silently failed
+        # ("No TTS engine available (install pocket-tts or espeak-ng)"
+        # — confirmed in user's gui_app.log 2026-04-30 → 2026-05-04).
+        # Post-fix: pocket-tts/pocket_tts route to BACKEND_PIPER which
+        # IS bundled in python-embed and IS in every fallback ladder.
+        assert _CATALOG_TO_BACKEND['pocket-tts'] == BACKEND_PIPER
+        assert _CATALOG_TO_BACKEND['pocket_tts'] == BACKEND_PIPER
 
     def test_espeak_maps_to_piper(self):
         # espeak remains a Piper fallback — there is no standalone espeak
