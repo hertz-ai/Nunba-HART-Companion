@@ -124,14 +124,14 @@ services:
         python main.py --port 5000 --background
       "
     healthcheck:
-      # Python-based probe — `python` is always present in this base
-      # image, while `curl` is only available after the apt-get install
-      # in the entrypoint completes.  During the slow first-boot pip
-      # install (~3min) curl is missing AND apt-get install hasn't run
-      # yet, so a curl-based healthcheck latches "unhealthy" before
-      # the entrypoint even gets to install curl.  Switching to a
-      # urllib-based probe avoids that race entirely.
-      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; r=urllib.request.urlopen(\"http://localhost:5000/health\",timeout=5); sys.exit(0 if r.status==200 else 1)' || exit 1"]
+      # Python-based TCP probe — `python` is always present, `curl`
+      # only after apt-get install completes.  Using CMD (list form,
+      # no shell) avoids YAML quote-escaping issues that left the
+      # previous CMD-SHELL probe stuck in `starting` for all 720s.
+      # TCP-only check is more reliable than HTTP /health: it
+      # succeeds the moment hypercorn binds the port, regardless
+      # of whether the /health endpoint registration finished yet.
+      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',5000)); s.close()"]
       interval: 15s
       timeout: 10s
       retries: 40
