@@ -108,7 +108,13 @@ jobs:
       - name: Install HARTOS (hart-backend) from source
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer HEVOLVE_REPO_TOKEN (the org-wide PAT used by every
+          # other actions/checkout step in this workflow) over the
+          # default GITHUB_TOKEN, which only has scope on the Nunba
+          # repo and 401s against hertz-ai/HARTOS.  Fall back to the
+          # default token so fork PRs still attempt the clone (they
+          # can't access secrets and will hit the warning branch).
+          GH_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           echo "::notice title=hartos install::attempting git clone hertz-ai/HARTOS"
           if git clone --depth 1 \
@@ -117,7 +123,7 @@ jobs:
             pip install --no-deps ../HARTOS || true
             echo "::notice title=hartos install::OK — hart-backend installed"
           else
-            echo "::warning title=hartos install::FAILED — default GITHUB_TOKEN cannot reach hertz-ai/HARTOS; 19+ Nunba tests will ImportError on core.*/integrations.*.  Add a NUNBA_HARTOS_TOKEN secret with repo read scope and wire it into env.GH_TOKEN."
+            echo "::warning title=hartos install::FAILED — neither HEVOLVE_REPO_TOKEN nor GITHUB_TOKEN reached hertz-ai/HARTOS; 19+ Nunba tests will ImportError on core.*/integrations.*."
           fi
 
       - name: Run backend tests
