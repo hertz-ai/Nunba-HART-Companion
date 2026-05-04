@@ -32,6 +32,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # hartos_backend_src/ is .gitignored — developers `git clone` HARTOS
+      # into it manually for desktop builds.  CI does the same here so
+      # models/catalog.py and the rest of the HARTOS shim layer can
+      # resolve `import integrations.service_tools.model_catalog` once
+      # PYTHONPATH=/app/hartos_backend_src kicks in (set in the staging
+      # compose file).  Sparse-checkout would speed this up further if
+      # needed, but a full shallow clone is fine for the live-probe job.
+      - name: Clone HARTOS source into hartos_backend_src/
+        run: |
+          git clone --depth=1 https://github.com/hertz-ai/HARTOS.git hartos_backend_src
+          echo "HARTOS source layout (top-level):"
+          ls hartos_backend_src | head -20
+
       - name: Install jq + curl (probe deps)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq curl
 
