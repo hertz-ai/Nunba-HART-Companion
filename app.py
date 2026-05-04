@@ -7130,11 +7130,27 @@ def main():
                 # React either didn't mount OR WebView2 compositor is suspended.
                 # In both cases the reload path (with post-load resize kick)
                 # is the safest recovery.
+                # Preserve the URL the user is currently on — the
+                # taskbar-restore / shown / events.restored watchdogs all
+                # fire AFTER the user has been navigating, so reloading
+                # _local_url ('/local') yanks them back to the home page
+                # from wherever they were (/admin, /chat, /agents/...).
+                # Same get_current_url-then-fallback pattern used at
+                # app.py:5036 for the focus-route reload path.
+                try:
+                    _cur = (_window.get_current_url() or '').strip()
+                except Exception:
+                    _cur = ''
+                _target = (
+                    _local_url if (not _cur or 'about:blank' in _cur)
+                    else _cur
+                )
                 logger.warning(
                     f"[REMOUNT:{origin}] React not mounted ({state}) — "
-                    f"{'navigating' if attempt == 0 else 'reloading'}")
+                    f"{'navigating' if attempt == 0 else 'reloading'} "
+                    f"to {_target}")
                 try:
-                    _window.load_url(_local_url)
+                    _window.load_url(_target)
                 except Exception as e:
                     logger.warning(f"[REMOUNT:{origin}] load_url failed: {e}")
                     continue

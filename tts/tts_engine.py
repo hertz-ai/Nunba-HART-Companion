@@ -1931,6 +1931,40 @@ class TTSEngine:
         if self.auto_init:
             self.initialize(force_backend=new_backend)
 
+    def set_backend(self, backend: str) -> bool:
+        """Force-set the active TTS backend, instantiating it if needed.
+
+        Public counterpart to ``initialize(force_backend=...)`` — exists so
+        that ``tts.verified_synth.verify_backend_synth`` (and any other
+        caller that needs to probe a specific backend) can pin the engine
+        to a chosen backend before calling ``synthesize``.
+
+        Without this method, verify_backend_synth's probe path silently
+        falls through to auto-routing — the canonical handshake reports
+        "backend X PASS" while actually exercising whatever
+        ``_select_backend_for_language('en')`` selected (typically Piper
+        on CPU-only hosts).  That defeats per-backend health gating in
+        the admin UI's Validate button AND in scripts/probe_all_tts_live.py.
+
+        Args:
+            backend: Backend constant (BACKEND_KOKORO, 'piper', etc.) —
+                must be a key in _BACKEND_TO_REGISTRY_KEY or the BACKEND_PIPER
+                CPU fallback.
+
+        Returns:
+            True iff the backend instance is now active and ready to
+            ``synthesize()``.  False if instantiation failed (worker
+            crash, missing pip dependency, OOM); the active backend is
+            left unchanged in that case.
+        """
+        prev = self._active_backend
+        ok = self.initialize(force_backend=backend, blocking=True)
+        if not ok:
+            # Restore previous active backend so the engine isn't left
+            # in a half-pinned state that confuses the next caller.
+            self._active_backend = prev
+        return ok
+
     def initialize(self, force_backend: str | None = None,
                    blocking: bool = True) -> bool:
         """Initialize the TTS backend.
