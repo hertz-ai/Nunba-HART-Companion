@@ -524,6 +524,10 @@ def _find_local_hartos_backend():
     parent = os.path.dirname(project_dir)
 
     candidates = [
+        # CI: actions/checkout puts sibling repos under _deps/
+        os.path.join(project_dir, '_deps', 'HARTOS'),
+        os.path.join(project_dir, '_deps', 'hart-backend'),
+        # Local dev: sibling directory next to Nunba
         os.path.join(parent, 'HARTOS'),
         os.path.join(parent, 'hart-backend'),
     ]
@@ -537,6 +541,25 @@ def _find_local_hartos_backend():
     return None
 
 
+def _configure_github_auth():
+    """Inject HEVOLVE_REPO_TOKEN into git's HTTPS URL rewrite so that
+    `pip install package@git+https://github.com/hertz-ai/PrivateRepo.git`
+    succeeds on CI runners that have no interactive credential prompt.
+
+    Safe to call multiple times — git config --global is idempotent.
+    No-ops silently when the token is absent (local dev / fork builds).
+    """
+    token = os.environ.get('HEVOLVE_REPO_TOKEN') or os.environ.get('GITHUB_TOKEN', '')
+    if not token:
+        return
+    subprocess.run(
+        ['git', 'config', '--global',
+         f'url.https://{token}@github.com/.insteadOf',
+         'https://github.com/'],
+        check=False,
+    )
+
+
 def _install_hevolve_database(python_exe):
     """Install hevolve-database (single source of truth for all DB models) from local sibling.
 
@@ -544,16 +567,22 @@ def _install_hevolve_database(python_exe):
     declares hevolve-database as a git dependency. Pre-installing from local
     sibling satisfies the dependency so pip skips the git URL.
     """
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parent = os.path.dirname(project_dir)
     candidates = [
-        # 1. Sibling directory (canonical repo clone)
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'Hevolve_Database'),
-        # 2. User's PycharmProjects directory (fallback)
+        # CI: actions/checkout puts sibling repos under _deps/
+        os.path.join(project_dir, '_deps', 'Hevolve_Database'),
+        # Local dev: sibling directory next to Nunba
+        os.path.join(parent, 'Hevolve_Database'),
+        # User's PycharmProjects directory (fallback)
         os.path.join(os.path.expanduser('~'), 'PycharmProjects', 'Hevolve_Database'),
     ]
     for path in candidates:
-        if os.path.exists(os.path.join(path, 'setup.py')):
+        has_setup = (os.path.exists(os.path.join(path, 'setup.py'))
+                     or os.path.exists(os.path.join(path, 'pyproject.toml')))
+        if has_setup:
             if run_command(
-                [python_exe, '-m', 'pip', 'install', path],
+                [python_exe, '-m', 'pip', 'install', '--no-deps', path],
                 "Installing hevolve-database from local project...",
                 check=False,
             ):
@@ -581,8 +610,15 @@ def _install_embodied_ai(python_exe):
     the user's git credentials for private repo access).
     """
     # Try local sibling first
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parent = os.path.dirname(project_dir)
     candidates = [
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'hevolveai'),
+        # CI: actions/checkout puts sibling repos under _deps/
+        os.path.join(project_dir, '_deps', 'hevolveai'),
+        # Local dev: sibling directory next to Nunba
+        os.path.join(parent, 'hevolveai'),
+        os.path.join(parent, 'HevolveAI'),
+        # User's PycharmProjects directory (fallback)
         os.path.join(os.path.expanduser('~'), 'PycharmProjects', 'hevolveai'),
     ]
     for path in candidates:
@@ -620,6 +656,10 @@ def _install_hartos_backend(python_exe):
     says >=0.0.230 which pip resolves to 1.x (slim package without llms/chains/etc.),
     breaking `from langchain.llms import OpenAI` in hart_intelligence (hart_intelligence.py).
     """
+    # Ensure git can authenticate to private GitHub repos in case any fallback
+    # pip install hits a git+https:// URL (e.g. local _deps/ checkout missing).
+    _configure_github_auth()
+
     # Pre-install dependencies from local siblings so pip doesn't try git URLs
     _install_hevolve_database(python_exe)
     _install_embodied_ai(python_exe)
@@ -703,18 +743,22 @@ def build_react_landing_page():
     # 4GB was insufficient on the current landing-page bundle size
     # (webpack + tailwind + all lazy-split chunks): saw `FATAL ERROR:
     # CALL_AND_RETRY_LAST Allocation failed - JavaScript heap out of
-    # memory` at 4096MB on 2026-04-15.  Bumped to 8192MB.  If CI runners
-    # have less than 8GB available, scale via env override.
+    # memory` at 4096MB on 2026-04-15.  Bumped to 6144MB for CI
+    # (Windows runner has ~14GB free but Python/torch consume ~6GB,
+    # leaving ~8GB; 8192MB was pushing the runner into OOM which sent
+    # Ctrl+C to the process group).  Override via NUNBA_NODE_HEAP_MB.
     env = os.environ.copy()
     env['CI'] = 'false'
     env['ESLINT_NO_DEV_ERRORS'] = 'true'
     env['DISABLE_ESLINT_PLUGIN'] = 'true'  # skip ESLint entirely during build
-    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', '8192')
+    _default_heap = '6144' if os.environ.get('NUNBA_CI') else '8192'
+    _node_heap_mb = os.environ.get('NUNBA_NODE_HEAP_MB', _default_heap)
     env['NODE_OPTIONS'] = f'--max-old-space-size={_node_heap_mb}'
 
     result = subprocess.run(
         [npm_cmd, 'run', 'build'],
-        cwd=landing_dir, env=env, check=False
+        cwd=landing_dir, env=env, check=False,
+        stdin=subprocess.DEVNULL,  # prevents "Terminate batch job (Y/N)?" hang on Windows CI
     )
     if result.returncode != 0:
         print_error("React build failed! Fix the build errors before freezing.")
@@ -1593,6 +1637,7 @@ def build_macos(python_exe, app_only=False, installer_only=False):
                 '--icon', 'Nunba.app', '150', '190',
                 '--app-drop-link', '450', '190',
                 '--hide-extension', 'Nunba.app',
+                '--no-internet-enable',  # prevents hdiutil internet-enable which fails on CI
                 output_dmg,
                 app_path
             ]
@@ -1705,6 +1750,7 @@ def sign_macos():
                 '--icon', 'Nunba.app', '150', '190',
                 '--app-drop-link', '450', '190',
                 '--hide-extension', 'Nunba.app',
+                '--no-internet-enable',  # prevents hdiutil internet-enable which fails on CI
                 output_dmg,
                 app_path
             ]
