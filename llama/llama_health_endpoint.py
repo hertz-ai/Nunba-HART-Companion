@@ -26,9 +26,17 @@ class LlamaHealthWrapper:
             llama_port: Port where llama.cpp server is running
             wrapper_port: Port to run wrapper on (defaults to llama_port)
         """
+        import os
         self.llama_port = llama_port
         self.wrapper_port = wrapper_port or llama_port
-        self.llama_base_url = f"http://127.0.0.1:{llama_port}"
+        # Respect NUNBA_LLAMA_URL so Docker / regional topologies (where
+        # llama.cpp runs on a different host) don't time-out every /health
+        # probe against the wrong 127.0.0.1 address.
+        nunba_llama_url = os.environ.get('NUNBA_LLAMA_URL', '').rstrip('/')
+        if nunba_llama_url:
+            self.llama_base_url = nunba_llama_url
+        else:
+            self.llama_base_url = f"http://127.0.0.1:{llama_port}"
 
     def get_llama_health(self) -> dict:
         """

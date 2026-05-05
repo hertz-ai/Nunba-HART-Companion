@@ -84,7 +84,10 @@ _LEGACY_BACKEND_PACKAGES_FALLBACK = {
     'cosyvoice3':              [],
     'f5':                      ['torchaudio', 'f5-tts'],
     'piper':                   [],
-    'kokoro':                  [_HF_HUB_PIN, 'kokoro', 'espeakng'],
+    # Kokoro is venv-routed below when HARTOS metadata is unavailable.
+    # Keep it out of the shared app site-packages so pip cannot pull a
+    # fresh torch/transformers/numpy stack into the main interpreter.
+    'kokoro':                  [],
     'luxtts':                  [],
     'pocket_tts':              ['pocket-tts'],
 }
@@ -139,7 +142,7 @@ def _build_backend_packages_from_hartos() -> dict:
         # install_backend_packages() router below uses install_target
         # to decide what install path to actually take.
         if target == 'main':
-            out[engine_id] = list(spec.pip_install_plan)
+            out[engine_id] = list(getattr(spec, 'pip_install_plan', ()))
         else:
             out[engine_id] = []
 
@@ -176,13 +179,18 @@ def _build_backend_venv_packages_from_hartos() -> dict:
                 'parler-tts==0.2.2', 'soundfile',
                 _HF_HUB_PIN,
             ],
+            'kokoro': [
+                _HF_HUB_PIN,
+                'kokoro',
+                'espeakng',
+            ],
         }
 
     out: dict[str, list[str]] = {}
     for engine_id, spec in registry.items():
         target = getattr(spec, 'install_target', 'main')
         if target == 'venv':
-            out[engine_id] = list(spec.pip_install_plan)
+            out[engine_id] = list(getattr(spec, 'pip_install_plan', ()))
     return out
 
 
@@ -229,7 +237,12 @@ def _wire_existing_venv_workers() -> None:
         if spec is None or not getattr(spec, 'tool_module', None) \
                 or not getattr(spec, 'tool_worker_attr', None):
             continue
-        if not is_venv_healthy(backend):
+        try:
+            healthy = is_venv_healthy(backend)
+        except Exception as _e:
+            logger.debug("boot venv health check skipped for %s: %s", backend, _e)
+            continue
+        if not healthy:
             continue  # venv not yet created — install-time wire handles it
         try:
             import importlib
@@ -1375,6 +1388,11 @@ def install_backend_full(backend: str,
 
     try:
         display_name = BACKEND_DISPLAY_NAMES.get(backend, backend)
+        if backend not in BACKEND_PACKAGES and backend not in BACKEND_VENV_PACKAGES:
+            return False, (
+                f"{display_name} is not registered in HARTOS ENGINE_REGISTRY; "
+                "no startup install plan is available"
+            )
         if progress_cb:
             progress_cb(f"Setting up {display_name}...")
 
@@ -1653,7 +1671,10 @@ def get_backend_status() -> dict[str, dict]:
     """
     # Probe module per venv backend — single source of truth so UI
     # reflects reality post-install.
-    _VENV_PROBE = {'indic_parler': 'parler_tts'}
+    _VENV_PROBE = {
+        'indic_parler': 'parler_tts',
+        'kokoro': 'kokoro',
+    }
 
     status = {}
     for backend, packages in BACKEND_PACKAGES.items():

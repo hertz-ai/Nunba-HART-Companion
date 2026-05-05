@@ -10,9 +10,9 @@ name: Regression (all tiers)
 
 on:
   push:
-    branches: [main]
+    branches: [main, test-local-deployment-with-gpu]
   pull_request:
-    branches: [main]
+    branches: [main, test-local-deployment-with-gpu]
   workflow_dispatch:
     inputs:
       include_live:

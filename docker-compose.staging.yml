@@ -97,6 +97,11 @@ services:
       - CBURL=ws://crossbar:8088/ws
       - WAMP_URL=http://localhost:5000/publish
       - NUNBA_MCP_BEARER=staging-e2e-token-do-not-use-in-prod
+      # NUNBA_API_TOKEN is checked by require_local_or_token for admin
+      # endpoints that can't use _is_local_request() in Docker (the
+      # probe hits from outside the container via the mapped port, so
+      # remote_addr is the Docker bridge gateway, not 127.0.0.1).
+      - NUNBA_API_TOKEN=staging-e2e-token-do-not-use-in-prod
       # Single-instance lock at ~/.nunba/nunba.lock can spuriously fail
       # under containerized restarts (overlayfs flock quirks, healthcheck
       # restart loops re-importing app.py before old fd is GC'd).  The
@@ -131,14 +136,12 @@ services:
         python main.py --port 5000 --background
       "
     healthcheck:
-      # Python-based TCP probe — `python` is always present, `curl`
-      # only after apt-get install completes.  Using CMD (list form,
-      # no shell) avoids YAML quote-escaping issues that left the
-      # previous CMD-SHELL probe stuck in `starting` for all 720s.
-      # TCP-only check is more reliable than HTTP /health: it
-      # succeeds the moment hypercorn binds the port, regardless
-      # of whether the /health endpoint registration finished yet.
-      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',5000)); s.close()"]
+      # Verify the actual Nunba Flask route map is serving, not merely
+      # that some process has bound port 5000. A TCP-only check let the
+      # workflow proceed into staging_e2e_probe.sh with every expected
+      # HTTP route returning 404, which hid the real boot/route issue.
+      # Use Python stdlib instead of curl because python is always present.
+      test: ["CMD", "python", "-c", "import sys, urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/status', timeout=3); sys.exit(0 if r.status == 200 else 1)"]
       interval: 15s
       timeout: 10s
       retries: 40

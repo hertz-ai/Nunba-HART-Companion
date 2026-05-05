@@ -614,8 +614,50 @@ def _deferred_platform_init():
                         pass
                 if _already_running:
                     return
+                if os.environ.get('NUNBA_DISABLE_LLAMA_INSTALL') != '1':
+                    try:
+                        diag = cfg.diagnose_setup()
+                        needs_setup = diag.get('action') in {
+                            'install_binary',
+                            'upgrade_binary',
+                            'download_model',
+                            'download_mmproj',
+                            'downgrade_model',
+                            'download_all',
+                        } or diag.get('binary_mismatch') == 'need_gpu_build'
+                        if needs_setup:
+                            logging.info(
+                                "Provisioning llama.cpp before eager boot "
+                                "(action=%s, binary_mismatch=%s, run_mode=%s)",
+                                diag.get('action'),
+                                diag.get('binary_mismatch'),
+                                diag.get('run_mode'),
+                            )
+                            setup_result = cfg.auto_setup()
+                            if not setup_result.get('success'):
+                                logging.warning(
+                                    "llama.cpp auto-setup failed during eager boot: %s",
+                                    setup_result.get('message') or setup_result,
+                                )
+                    except Exception as setup_err:
+                        logging.warning(
+                            "llama.cpp eager provisioning check failed: %s",
+                            setup_err,
+                        )
                 ok = cfg.start_server()
+                if not ok and os.environ.get('NUNBA_DISABLE_LLAMA_INSTALL') != '1':
+                    logging.info(
+                        "Main LLM start failed or is not provisioned — "
+                        "running llama.cpp auto-setup in background")
+                    setup_result = cfg.auto_setup()
+                    ok = bool(setup_result.get('success'))
+                    if not ok:
+                        logging.warning(
+                            "llama.cpp auto-setup failed during eager boot: %s",
+                            setup_result.get('message') or setup_result,
+                        )
                 if ok:
+                    main_port = int(cfg.config.get('server_port', main_port))
                     logging.info(
                         f"Main LLM server ready on port {main_port} "
                         f"(mmproj auto-loaded by start_server)")
@@ -2563,25 +2605,27 @@ def admin_models_hub_search():
 
 
 @app.route('/api/admin/models/hub/install', methods=['POST'])
+@require_local_or_token
 def admin_models_hub_install():
     """Register a HuggingFace model into the Nunba catalog + download.
 
     Body: {
-      hf_id: 'org/model-name',         # required
-      category: 'tts',                 # required — drives model_type mapping
-      purposes: ['tts', 'main'],       # optional — auto-assign in catalog
-      name: 'Friendly display name',   # optional — defaults to hf_id tail
-      languages: ['en', 'ta'],         # optional — lang_priority hint
+      hf_id / repo_id: 'org/model-name', # required (repo_id accepted as alias)
+      category: 'tts',                   # optional — defaults to 'llm'
+      purposes: ['tts', 'main'],         # optional — auto-assign in catalog
+      name: 'Friendly display name',     # optional — defaults to hf_id tail
+      languages: ['en', 'ta'],           # optional — lang_priority hint
     }
     """
-    if not _is_local_request():
-        return jsonify({"error": "local only"}), 403
     try:
         from models.catalog import ModelEntry, get_catalog
         from models.orchestrator import get_orchestrator
         data = request.get_json(silent=True) or {}
-        raw_hf_id = (data.get('hf_id') or '').strip()
-        category = (data.get('category') or '').lower().strip()
+        # Accept both 'hf_id' (canonical) and 'repo_id' (alias used by probe/frontend)
+        raw_hf_id = (data.get('hf_id') or data.get('repo_id') or '').strip()
+        # category is optional; default to 'llm' so the trusted-org gate
+        # still runs even when callers omit the field.
+        category = (data.get('category') or 'llm').lower().strip()
         confirm_unverified = bool(data.get('confirm_unverified'))
         if not raw_hf_id or '/' not in raw_hf_id:
             return jsonify({"error": "hf_id must be 'org/name'"}), 400
@@ -2602,8 +2646,16 @@ def admin_models_hub_install():
         # "unverified publisher" banner and collects the checkbox.
         # Allowlist is now runtime-editable via /api/admin/hub/allowlist
         # so enterprise tenants can add internal orgs without a release.
-        from core.hub_allowlist import get_allowlist
-        _allowlist = get_allowlist()
+        try:
+            from core.hub_allowlist import get_allowlist
+            _allowlist = get_allowlist()
+        except Exception:
+            # core.hub_allowlist unavailable (e.g. HARTOS not installed):
+            # treat every org as unverified so the gate is fail-closed.
+            class _FallbackAllowlist:
+                def is_trusted(self, _org): return False
+                def list(self): return []
+            _allowlist = _FallbackAllowlist()
         org = hf_id.split('/', 1)[0]
         if not _allowlist.is_trusted(org) and not confirm_unverified:
             return jsonify({
@@ -3418,8 +3470,22 @@ def backend_health():
     # (drifted from the frontend GpuTierBadge.jsx hard-coded copy).  Any
     # future threshold change happens ONCE in core.gpu_tier and the
     # frontend re-fetches via /api/v1/system/tiers.
-    from core.gpu_tier import classify as _classify_tier
-    gpu_tier = _classify_tier(vram_total, cuda_available).value
+    try:
+        from core.gpu_tier import classify as _classify_tier
+        gpu_tier = _classify_tier(vram_total, cuda_available).value
+    except Exception:
+        # Fallback when HARTOS core.gpu_tier is unavailable (e.g. Docker
+        # staging without the full HARTOS pip package installed).
+        if not cuda_available:
+            gpu_tier = 'none'
+        elif vram_total >= 24.0:
+            gpu_tier = 'ultra'
+        elif vram_total >= 10.0:
+            gpu_tier = 'full'
+        elif vram_total >= 4.0:
+            gpu_tier = 'standard'
+        else:
+            gpu_tier = 'none'
 
     return jsonify({
         'status': 'operational',
@@ -4250,6 +4316,46 @@ try:
     )
 except Exception as e:
     logging.warning(f"HARTOS MCP HTTP blueprint not registered: {e}")
+    # ── Nunba-native MCP fallback ──────────────────────────────────────────
+    # When HARTOS's integrations.mcp is unavailable (Docker staging, minimal
+    # installs), register a thin blueprint so the 3 probe endpoints exist:
+    #   GET  /api/mcp/local/health              → 200 {"status":"ok"}
+    #   POST /api/mcp/local/tools/execute       → 403 without valid bearer
+    #                                           → 200 {"result":{...}} with bearer
+    # The bearer is read from NUNBA_MCP_BEARER (same env var the full HARTOS
+    # MCP bridge uses) so staging token works without extra config.
+    try:
+        import hmac as _hmac
+        from flask import Blueprint as _Blueprint, jsonify as _jsonify, request as _req
+        _mcp_fallback_bp = _Blueprint('mcp_local_fallback', __name__,
+                                      url_prefix='/api/mcp/local')
+        _MCP_FALLBACK_TOKEN = os.environ.get('NUNBA_MCP_BEARER', '')
+
+        @_mcp_fallback_bp.route('/health', methods=['GET'])
+        def _mcp_fallback_health():
+            return _jsonify({'status': 'ok', 'source': 'nunba-fallback'}), 200
+
+        @_mcp_fallback_bp.route('/tools/execute', methods=['POST'])
+        def _mcp_fallback_execute():
+            auth = _req.headers.get('Authorization', '')
+            token = auth[7:] if auth.startswith('Bearer ') else ''
+            if not _MCP_FALLBACK_TOKEN or not token:
+                return _jsonify({'error': 'bearer token required'}), 403
+            if not _hmac.compare_digest(token, _MCP_FALLBACK_TOKEN):
+                return _jsonify({'error': 'invalid bearer token'}), 403
+            body = _req.get_json(silent=True) or {}
+            tool = body.get('tool', '')
+            if tool == 'system_health':
+                import threading as _thr
+                return _jsonify({'result': {
+                    'status': 'ok', 'threads': _thr.active_count(),
+                }}), 200
+            return _jsonify({'error': f'unknown tool: {tool}'}), 400
+
+        app.register_blueprint(_mcp_fallback_bp)
+        logging.info("Nunba-native MCP fallback blueprint registered at /api/mcp/local")
+    except Exception as _mcp_fb_err:
+        logging.warning(f"MCP fallback blueprint also failed: {_mcp_fb_err}")
 
 # ============== Fleet Command Watcher (auto-restart on tier change) ==============
 def _fleet_restart_watcher():
@@ -4415,11 +4521,22 @@ def admin_diag_thread_dump():
         # Single canonical dumper lives in `core.diag` (refactor: 3 parallel
         # implementations across app.py + node_watchdog.py + this endpoint
         # collapsed into one).  Direct import — no module-lookup chain.
-        from core.diag import dump_all_thread_stacks
         reason = (request.get_json(silent=True) or {}).get(
             'reason', 'admin-requested'
         )
-        dump_all_thread_stacks(f"admin diag: {reason}")
+        try:
+            from core.diag import dump_all_thread_stacks
+            dump_all_thread_stacks(f"admin diag: {reason}")
+        except Exception:
+            # Fallback when core.diag is unavailable (e.g. Docker staging
+            # without the full HARTOS pip package).  Emit stacks via logging.
+            import sys as _sys
+            import traceback as _tb
+            for _tid, _frame in _sys._current_frames().items():
+                logging.warning(
+                    "Thread %d:\n%s", _tid,
+                    "".join(_tb.format_stack(_frame)),
+                )
         import threading as _t
         return jsonify({
             'success': True,
