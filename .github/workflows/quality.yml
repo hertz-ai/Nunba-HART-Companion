@@ -292,17 +292,27 @@ jobs:
           NUNBA_DISABLE_TTS: '1'  # No TTS models on CI
           NUNBA_CI: '1'
 
+      - name: Seed config.json from config.example.json
+        shell: bash
+        run: |
+          if [ ! -f config.json ] && [ -f config.example.json ]; then
+            cp config.example.json config.json
+            echo "::notice title=config::seeded config.json from config.example.json"
+          fi
+
       - name: Wait for Flask backend
         run: |
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+          for i in $(seq 1 45); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/status 2>/dev/null || echo "000")
+            if [ "$status" = "200" ]; then
               echo "Flask is ready (attempt $i)"
-              break
+              exit 0
             fi
-            echo "Waiting for Flask... (attempt $i)"
+            echo "Waiting for Flask... HTTP $status (attempt $i/45)"
             sleep 2
           done
-          curl -sf http://localhost:5000/health || echo "Flask health check returned non-200 (may still work)"
+          echo "::error::Flask /status never returned 200 after 90s"
+          exit 1
 
       # ── Frontend: Build React and let Flask serve it (bundled mode) ──
       - name: Install frontend dependencies
@@ -491,18 +501,28 @@ jobs:
           NUNBA_DISABLE_TTS: '1'
           NUNBA_CI: '1'
 
+      - name: Seed config.json from config.example.json
+        shell: bash
+        run: |
+          if [ ! -f config.json ] && [ -f config.example.json ]; then
+            cp config.example.json config.json
+            echo "::notice title=config::seeded config.json from config.example.json"
+          fi
+
       - name: Wait for Flask backend
         shell: bash
         run: |
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+          for i in $(seq 1 45); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/status 2>/dev/null || echo "000")
+            if [ "$status" = "200" ]; then
               echo "Flask is ready (attempt $i)"
-              break
+              exit 0
             fi
-            echo "Waiting for Flask... (attempt $i)"
+            echo "Waiting for Flask... HTTP $status (attempt $i/45)"
             sleep 2
           done
-          curl -sf http://localhost:5000/health || echo "Flask health check non-200 (may still work)"
+          echo "::error::Flask /status never returned 200 after 90s"
+          exit 1
 
       - name: Install frontend dependencies
         working-directory: landing-page

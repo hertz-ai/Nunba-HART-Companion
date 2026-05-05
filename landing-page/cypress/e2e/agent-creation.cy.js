@@ -175,12 +175,33 @@ describe('Agent Creation & Types E2E', () => {
     // The Demopage derives isAuthenticated from:
     //   (decryptedUserId && token) || isGuestMode
     // We set both token-based and guest-based auth for maximum compatibility.
+    // hart_sealed bypasses the HART onboarding gate in Agent.js so Demopage renders.
     cy.window().then((win) => {
+      win.localStorage.setItem('hart_sealed', 'true');
       win.localStorage.setItem('access_token', 'test-token-123');
       win.localStorage.setItem('user_id', 'test-user-id');
       win.localStorage.setItem('guest_mode', 'true');
       win.localStorage.setItem('guest_name', 'Test.Blue.User');
       win.localStorage.setItem('guest_user_id', 'test-guest-id');
+    });
+  }
+
+  // visitLocal — visits /local with auth pre-seeded via onBeforeLoad so
+  // localStorage is populated before React's first render (avoids the race
+  // where cy.window() before cy.visit() targets the wrong origin on the
+  // first test of a fresh runner).
+  function visitLocal() {
+    cy.visit('/local', {
+      timeout: 60000,
+      failOnStatusCode: false,
+      onBeforeLoad(win) {
+        win.localStorage.setItem('hart_sealed', 'true');
+        win.localStorage.setItem('access_token', 'test-token-123');
+        win.localStorage.setItem('user_id', 'test-user-id');
+        win.localStorage.setItem('guest_mode', 'true');
+        win.localStorage.setItem('guest_name', 'Test.Blue.User');
+        win.localStorage.setItem('guest_user_id', 'test-guest-id');
+      },
     });
   }
 
@@ -268,8 +289,7 @@ describe('Agent Creation & Types E2E', () => {
   describe('1. Create Agent Form UI Elements', () => {
     beforeEach(() => {
       setupIntercepts();
-      seedAuth();
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      visitLocal();
       cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       // Allow React to settle; also covers cloud API calls that may or may not fire
       cy.wait(3000);
@@ -284,14 +304,22 @@ describe('Agent Creation & Types E2E', () => {
       // handleCreateAgentClick shows CreateAgentForm only in cloud mode.
       // If guest_mode is set in localStorage, it enters local/conversational mode instead.
       // Override guest_mode to false so the form appears.
-      cy.window().then((win) => {
-        win.localStorage.removeItem('guest_mode');
-        win.localStorage.removeItem('guest_name');
-        win.localStorage.removeItem('guest_user_id');
+      // Re-visit with clean auth (non-guest) so the Demopage sees cloud mode.
+      // onBeforeLoad sets hart_sealed + token auth but omits guest_mode so
+      // handleCreateAgentClick takes the cloud path (setShowCreateAgentForm).
+      cy.visit('/local', {
+        timeout: 60000,
+        failOnStatusCode: false,
+        onBeforeLoad(win) {
+          win.localStorage.setItem('hart_sealed', 'true');
+          win.localStorage.setItem('access_token', 'test-token-123');
+          win.localStorage.setItem('user_id', 'test-user-id');
+          // Explicitly remove guest keys so isGuestMode=false
+          win.localStorage.removeItem('guest_mode');
+          win.localStorage.removeItem('guest_name');
+          win.localStorage.removeItem('guest_user_id');
+        },
       });
-
-      // Re-visit with clean auth (non-guest) so the Demopage sees cloud mode
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
       cy.wait(3000);
 
       cy.get('body').then(($body) => {
@@ -447,8 +475,7 @@ describe('Agent Creation & Types E2E', () => {
   describe('2. Private vs Public Agent (isPublic toggle)', () => {
     beforeEach(() => {
       setupIntercepts();
-      seedAuth();
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      visitLocal();
       cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       // Wait for cloud APIs and React to settle
       cy.wait(3000);
@@ -906,8 +933,7 @@ describe('Agent Creation & Types E2E', () => {
   describe('5. File Upload Flows', () => {
     beforeEach(() => {
       setupIntercepts();
-      seedAuth();
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      visitLocal();
       cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
@@ -1060,8 +1086,7 @@ describe('Agent Creation & Types E2E', () => {
   describe('6. Full Agent Creation End-to-End', () => {
     beforeEach(() => {
       setupIntercepts();
-      seedAuth();
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      visitLocal();
       cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
     });
@@ -1199,7 +1224,16 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should show "(Login required)" text next to Create button when unauthenticated', () => {
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      // hart_sealed bypasses HART gate so Demopage renders; no auth tokens so
+      // isAuthenticated=false and the "(Login required)" label appears.
+      cy.visit('/local', {
+        timeout: 60000,
+        failOnStatusCode: false,
+        onBeforeLoad(win) {
+          win.localStorage.clear();
+          win.localStorage.setItem('hart_sealed', 'true');
+        },
+      });
       cy.wait(3000);
 
       // The button shows "Login required" when isAuthenticated is false
@@ -1207,7 +1241,14 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should NOT open the CreateAgentForm when unauthenticated user clicks Create', () => {
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      cy.visit('/local', {
+        timeout: 60000,
+        failOnStatusCode: false,
+        onBeforeLoad(win) {
+          win.localStorage.clear();
+          win.localStorage.setItem('hart_sealed', 'true');
+        },
+      });
       cy.wait(3000);
 
       // Click the Create new Agent button (it should open the login modal instead)
@@ -1220,8 +1261,7 @@ describe('Agent Creation & Types E2E', () => {
     });
 
     it('should show Create button as active when authenticated', () => {
-      seedAuth();
-      cy.visit('/local', {timeout: 60000, failOnStatusCode: false});
+      visitLocal();
       cy.wait(2000); // Allow time for /prompts fetch (non-blocking)
       cy.wait(3000);
 
