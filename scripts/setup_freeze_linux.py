@@ -491,6 +491,19 @@ def find_hevolve_modules():
 hevolve_files = find_hevolve_modules()
 build_exe_options["include_files"].extend(hevolve_files)
 
+# Resolve HARTOS directory: _deps/HARTOS (CI: actions/checkout) or ../HARTOS (local dev)
+_project_dir_linux = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_hartos_dir = None
+for _hd_cand in [
+    os.path.join(_project_dir_linux, '_deps', 'HARTOS'),
+    os.path.join(os.path.dirname(_project_dir_linux), 'HARTOS'),
+]:
+    if os.path.isdir(_hd_cand):
+        _hartos_dir = _hd_cand
+        break
+if _hartos_dir is None:
+    _hartos_dir = os.path.join(os.path.dirname(_project_dir_linux), 'HARTOS')
+
 # Always include agent_ledger from sibling dir (namespace package issue)
 _agent_ledger_candidates = [
     os.path.join(_hartos_dir, 'agent-ledger-opensource', 'agent_ledger'),
@@ -505,18 +518,6 @@ else:
     print("WARNING: agent_ledger package not found -- distributed agent features unavailable")
 
 # Include HARTOS package directories (integrations, core, security)
-# Check _deps/HARTOS first (CI), then ../HARTOS (local dev)
-_project_dir_linux = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_hartos_dir = None
-for _hd_cand in [
-    os.path.join(_project_dir_linux, '_deps', 'HARTOS'),
-    os.path.join(os.path.dirname(_project_dir_linux), 'HARTOS'),
-]:
-    if os.path.isdir(_hd_cand):
-        _hartos_dir = _hd_cand
-        break
-if _hartos_dir is None:
-    _hartos_dir = os.path.join(os.path.dirname(_project_dir_linux), 'HARTOS')
 _hartos_packages = [
     ("integrations", "integrations"),
     ("core", "core"),

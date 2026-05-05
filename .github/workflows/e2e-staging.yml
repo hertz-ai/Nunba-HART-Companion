@@ -12,9 +12,9 @@ name: e2e-staging
 
 on:
   push:
-    branches: [main]
+    branches: [main, test-local-deployment-with-gpu]
   pull_request:
-    branches: [main]
+    branches: [main, test-local-deployment-with-gpu]
   schedule:
     - cron: "0 6 * * *"    # nightly 06:00 UTC
   workflow_dispatch: {}
@@ -75,7 +75,48 @@ jobs:
             sleep 10
           done
           echo "::error::nunba never reached healthy state"
+          docker compose -f docker-compose.staging.yml ps
+          docker compose -f docker-compose.staging.yml logs --no-color --timestamps nunba | tail -200
           exit 1
+
+      - name: Verify Nunba route surface
+        env:
+          NUNBA_BASE: http://localhost:5000
+          NUNBA_MCP_BEARER: staging-e2e-token-do-not-use-in-prod
+        run: |
+          set -euo pipefail
+          echo "=== /status ==="
+          curl -fsS "$NUNBA_BASE/status"
+          echo
+          echo "=== required route presence ==="
+          routes_json="$(curl -fsS \
+            -H "Authorization: Bearer $NUNBA_MCP_BEARER" \
+            "$NUNBA_BASE/debug/routes")"
+          printf '%s' "$routes_json" | jq -r '.[].rule' | sort > /tmp/nunba-routes.txt
+          required=(
+            /health
+            /api/mcp/local/health
+            /api/mcp/local/tools/execute
+            /api/admin/models/hub/install
+            /api/admin/diag/thread-dump
+            /backend/health
+          )
+          missing=0
+          for route in "${required[@]}"; do
+            if grep -Fxq "$route" /tmp/nunba-routes.txt; then
+              echo "OK $route"
+            else
+              echo "::error::missing route $route"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "=== registered routes around api/admin/backend/mcp/health ==="
+            grep -E '^(/health|/backend/|/api/(admin|mcp)/)' /tmp/nunba-routes.txt || true
+            echo "=== nunba logs ==="
+            docker compose -f docker-compose.staging.yml logs --no-color --timestamps nunba | tail -200
+            exit 1
+          fi
 
       - name: Run live HTTP probes
         env:

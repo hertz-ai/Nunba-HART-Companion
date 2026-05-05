@@ -2,9 +2,9 @@ name: Code Quality & Security
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, test-local-deployment-with-gpu]
   pull_request:
-    branches: [main]
+    branches: [main, test-local-deployment-with-gpu]
   workflow_dispatch:
 
 # Cancel in-progress runs for the same branch
