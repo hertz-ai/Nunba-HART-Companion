@@ -9,6 +9,19 @@
 target-version = "py312"
 line-length = 120
 
+exclude = [
+  "build",
+  "dist",
+  ".venv",
+  ".venv.bak",
+  "python-embed",
+  "hartos_backend_src",
+  "hevolve_backend_src",
+  "landing-page",
+  ".pycharm_plugin",
+  "agent_data",
+]
+
 [lint]
 select = [
   "E",      # pycodestyle errors
@@ -53,18 +66,6 @@ ignore = [
   "B023",   # function uses loop variable — will fix incrementally
   "UP022",  # prefer capture_output — will fix incrementally
   "UP028",  # yield from — will fix incrementally
-]
-
-exclude = [
-  "build",
-  "dist",
-  ".venv",
-  ".venv.bak",
-  "python-embed",
-  "hartos_backend_src",
-  "landing-page",
-  ".pycharm_plugin",
-  "agent_data",
 ]
 
 [lint.per-file-ignores]
