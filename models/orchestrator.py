@@ -12,6 +12,7 @@ The singleton is shared with HARTOS so that both
 """
 
 import logging
+import sys
 
 # Access the HARTOS module for shared singleton management
 import integrations.service_tools.model_orchestrator as _hartos_mod
@@ -140,6 +141,36 @@ class LlamaLoader(ModelLoader):
         except Exception:
             pass
         return False
+
+    def is_loaded(self, entry: ModelEntry) -> bool:
+        """Live HTTP probe of llama-server, not the catalog flag.
+
+        Same pattern as TTSLoader.is_loaded (line 283), STTLoader.is_loaded
+        (line 503), and VLMLoader.is_loaded (line 710) — every other
+        loader in this file overrides is_loaded with a live signal.
+        LlamaLoader was the lone exception, which is why an external
+        crash of llama-server (CUDA hang, OOM, segfault) left
+        entry.loaded=True permanently and ensure_loaded_async returned
+        "Model already loaded" without respawning.  See task #80 — the
+        14-minute "Draft boot decision" loop on 2026-05-04 was caused
+        by exactly this divergence.
+
+        check_llama_health() is the canonical liveness probe (defined
+        at llama_config.py:2114) — it sweeps configured port + 8082 +
+        8081 + 8080 with a 1s timeout and returns True iff at least
+        one /health endpoint replies 200.  Using it here means the
+        orchestrator's "is this loaded" query reflects the actual
+        process state, not a stale flag.
+        """
+        try:
+            from llama.llama_config import check_llama_health
+            return bool(check_llama_health())
+        except Exception:
+            # If the probe itself fails (e.g. import error, network
+            # stack down), fall back to the catalog flag rather than
+            # reporting a working server as dead.  Conservative — we'd
+            # rather over-report alive than spuriously evict + reload.
+            return bool(getattr(entry, 'loaded', False))
 
 
 class TTSLoader(ModelLoader):
@@ -707,13 +738,41 @@ class VLMLoader(ModelLoader):
             entry.error = str(e)
 
     def is_loaded(self, entry: ModelEntry) -> bool:
-        """Live probe: is the VisionService actually running?"""
-        try:
-            import hart_intelligence_entry as _hie
-            svc = _hie.get_vision_service()
-            return bool(svc is not None and getattr(svc, '_running', False))
-        except Exception:
-            return False
+        """Live probe: is the VisionService actually running?
+
+        Side-effect-free: reads any already-imported module's attribute
+        directly via ``sys.modules``.  We MUST NOT do
+        ``import hart_intelligence_entry`` here — that import has heavy
+        side effects (loads HARTOS ``security/__init__.py`` which
+        unconditionally pings Redis with no connect-timeout, hanging
+        the request thread for ~21s on Windows when Redis is absent —
+        the bug that left ``/admin/models`` spinning forever).
+
+        The intent of a probe is read-only.  We also avoid calling
+        ``integrations.vision.get_vision_service()`` because it
+        lazy-instantiates the service.  We only return True when a
+        VisionService has *already* been created and is marked running.
+        """
+        # Prefer hart_intelligence_entry's module-level _vision_service
+        # if the module is already imported (no fresh import).
+        hie = sys.modules.get('hart_intelligence_entry')
+        if hie is not None:
+            svc = getattr(hie, '_vision_service', None)
+            if svc is None:
+                # Bundled mode stashes it on __main__.
+                main_mod = sys.modules.get('__main__')
+                if main_mod is not None:
+                    svc = getattr(main_mod, '_vision_service', None)
+            if svc is not None:
+                return bool(getattr(svc, '_running', False))
+        # Fallback: direct singleton in integrations.vision (still no
+        # lazy-instantiate — only read existing module-level var).
+        vmod = sys.modules.get('integrations.vision')
+        if vmod is not None:
+            svc = getattr(vmod, '_vision_service_singleton', None)
+            if svc is not None:
+                return bool(getattr(svc, '_running', False))
+        return False
 
     def validate(self, entry: ModelEntry) -> tuple:
         """Canned VLM probe: describe a 32×32 red JPEG in ≤20 words.

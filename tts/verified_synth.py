@@ -35,6 +35,7 @@ import os
 import tempfile
 import threading
 import time
+import traceback
 from dataclasses import dataclass
 from typing import Optional
 
@@ -68,6 +69,93 @@ class Result:
 
     def __bool__(self) -> bool:
         return self.ok
+
+
+def _backend_err_log_path(backend: str) -> str:
+    """Path to the per-backend error sidecar.
+
+    Lives next to the rest of the Nunba runtime logs so support /
+    operators can grep one location for "what blew up in TTS today"
+    instead of hunting through journalctl + a python traceback that
+    was swallowed by an upstream `if result_path: ...` gate.
+    """
+    log_dir = os.path.join(
+        os.path.expanduser("~"), "Documents", "Nunba", "logs",
+    )
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError:
+        # Read-only home (CI sandbox / locked profile) — fall back to tmp.
+        log_dir = tempfile.gettempdir()
+    return os.path.join(log_dir, f"tts_{backend}.err")
+
+
+def _surface_backend_exception(backend: str, err: BaseException) -> None:
+    """Append the FULL traceback for a backend failure to a dedicated file.
+
+    The chatterbox / F5 / parler synth wrappers historically swallowed
+    their internal exception (FileNotFoundError on missing weights,
+    safetensors HeaderTooLarge, RuntimeError on CUDA OOM, ImportError
+    for resemble-perth) — all the caller saw was `result_path is None`
+    and the warning "synthesize returned no path", which is useless
+    for triage.
+
+    Appending the traceback here gives the test plan and the operator
+    a single grep-able artefact that names the actual blast radius.
+    Failure to write the sidecar must NEVER mask the underlying error
+    — this function is best-effort and silently no-ops on disk-full /
+    permission-denied so the synth gate keeps reporting on the bigger
+    problem.
+    """
+    try:
+        path = _backend_err_log_path(backend)
+        ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+        with open(path, "a", encoding="utf-8") as fp:
+            fp.write(f"\n=== {ts} backend={backend} ===\n")
+            fp.write(f"{type(err).__name__}: {err}\n")
+            fp.write(traceback.format_exc())
+    except OSError:
+        pass
+
+    # Also route the failure to the agent self-heal pipeline so an
+    # autonomous coding agent can investigate.  Previously every TTS
+    # probe failure (chatterbox CUDA crash, f5_tts argparse exit=2,
+    # indic_parler missing transitive, kokoro/melo missing primary)
+    # landed in the .err sidecar and stopped there — the agent never
+    # saw it (only 2 production sites called handle_exception per the
+    # 2026-05-04 audit: gpu_worker.py:501 and package_installer.py:1001).
+    # Wire it in here at the single chokepoint so all probe paths
+    # benefit at once.  Best-effort: never raises, matches the
+    # "probing must never raise" contract from the caller.  5-min
+    # throttle in error_advice keys on (category, fingerprint) so
+    # repeated failures of the SAME shape only file ONE goal per
+    # window — chatterbox failing 50× per session = 1 goal, not 50.
+    try:
+        from core.error_advice import handle_exception
+        handle_exception(
+            err,
+            category='tts.probe',
+            severity='high',
+            agent_remediation=True,
+            context={
+                'backend': backend,
+                'err_log_path': _backend_err_log_path(backend),
+                'remediation_hint': (
+                    f"Probe of TTS backend '{backend}' failed.  Read "
+                    f"the per-backend .err sidecar (path in "
+                    f"context.err_log_path) for the full traceback, "
+                    f"then check tts/package_installer.py for the "
+                    f"install plan and integrations/channels/media/"
+                    f"tts_router.py for the EngineSpec.  Common "
+                    f"patterns: missing primary package (re-run "
+                    f"install_backend_full), CUDA conflict (move to "
+                    f"venv quarantine like indic_parler), worker "
+                    f"argparse mismatch (check tts/<backend>_worker.py)."
+                ),
+            },
+        )
+    except Exception:
+        pass
 
 
 def _pick_test_phrase(backend: str, lang: str | None) -> str:
@@ -104,6 +192,53 @@ def _hf_offline_reason() -> str | None:
         return ("TRANSFORMERS_OFFLINE=1 and model weights not cached — "
                 "download failed")
     return None
+
+
+def _probe_backend_for_error(engine, backend: str, text: str,
+                             lang: str | None) -> None:
+    """Call the backend instance directly to capture the raw exception.
+
+    The engine's `synthesize` path catches every per-backend failure
+    and routes through `_synthesize_with_fallback`, which logs only at
+    DEBUG level. By the time we see `result_path is None` here, the
+    actual exception is gone. This helper reaches into
+    `engine._backends[backend]` (or instantiates one via
+    `_create_backend`) and re-runs synth so the exception is RAISED
+    out, then `_surface_backend_exception` writes the traceback to
+    the per-backend `.err` sidecar.
+
+    Safe to call always: any failure in this probe is itself swallowed
+    so a logging path can't mask the bigger picture.
+    """
+    try:
+        backends = getattr(engine, '_backends', None) or {}
+        inst = backends.get(backend)
+        if inst is None and hasattr(engine, '_create_backend'):
+            try:
+                inst = engine._create_backend(backend)
+                if inst is not None:
+                    backends[backend] = inst
+            except Exception as e:
+                _surface_backend_exception(backend, e)
+                return
+        if inst is None:
+            return
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as fp:
+            probe_path = fp.name
+        try:
+            inst.synthesize(text=text, output_path=probe_path,
+                            language=lang or 'en')
+        except Exception as e:
+            _surface_backend_exception(backend, e)
+        finally:
+            try:
+                if os.path.exists(probe_path):
+                    os.unlink(probe_path)
+            except OSError:
+                pass
+    except Exception:
+        # Probing must never raise — it's a diagnostic side-channel.
+        pass
 
 
 def verify_backend_synth(engine, backend: str,
@@ -173,9 +308,16 @@ def verify_backend_synth(engine, backend: str,
                 if not box['ok']:
                     box['err'] = f"audio too small ({box['n_bytes']}B < {min_bytes}B)"
             else:
+                # synthesize() returned None — the engine's internal
+                # fallback chain swallowed the actual exception.  Probe
+                # the backend instance directly so the underlying error
+                # (FileNotFoundError / RuntimeError / WorkerCrash etc.)
+                # is captured in the per-backend sidecar log.
                 box['err'] = "synthesize returned no path"
+                _probe_backend_for_error(engine, backend, text, lang)
         except Exception as e:
             box['err'] = f"{type(e).__name__}: {e}"[:200]
+            _surface_backend_exception(backend, e)
         finally:
             box['done'] = True
 

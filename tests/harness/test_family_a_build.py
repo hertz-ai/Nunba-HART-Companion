@@ -71,6 +71,33 @@ def test_a3_build_writes_head_sha(source_build_py, source_text):
     )
 
 
+def test_a3b_build_writes_hartos_head_sha(source_build_py, source_text):
+    """A3b — build must ALSO fingerprint the HARTOS source HEAD,
+    not only the Nunba HEAD.
+
+    Bundle-drift incident (2026-04-25, master-orchestrator review
+    a73b4a29): HARTOS commits 52fe902 + 76f99dee landed but the
+    python-embed/ snapshot shipped pre-rebase HARTOS files —
+    register_consent_routes was still defined and ConsentService.
+    grant_consent still rewrote granted_at, breaking the
+    append-only audit invariant in the installed .exe.  BUILD_SHA
+    alone (the Nunba HEAD) couldn't surface this drift because
+    Nunba's source was correct; only the bundled HARTOS was stale.
+
+    The fix records HARTOS_SHA in BUILD_INFO.txt alongside BUILD_SHA
+    so a runtime check (or a release-time auditor) can detect
+    bundle drift by comparing stored HARTOS_SHA vs the live
+    `git -C ../HARTOS rev-parse HEAD`.
+    """
+    src = source_text(source_build_py)
+    assert "HARTOS_SHA" in src, (
+        "scripts/build.py must stamp HARTOS_SHA into BUILD_INFO.txt "
+        "so HARTOS bundle drift between live source and "
+        "python-embed/Lib/site-packages is auditable.  See "
+        "2026-04-25 consent-surface drift incident."
+    )
+
+
 def test_a4_landing_build_staleness_check(source_build_py, source_text):
     """A4 — frontend bundle staleness check.
 

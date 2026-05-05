@@ -110,6 +110,7 @@ Business gates:
 - **business-analyst** — revenue, cost, competitive positioning
 - **sales** — deal impact, enterprise readiness, demo-ability
 - **marketer** — messaging, launch readiness, competitive positioning
+- **video-story-director** — cinematic director's treatment + AI-video-model generation prompts (Sora/Veo/Runway/Pika), appended to `marketing/video_stories/<slug>.md` as a permanent marketing backlog. Artifact-producer, NOT a gate — never returns REJECT.
 - **seo** — search visibility (web frontend only)
 - **data-scientist** — metric impact, A/B evaluation, model benchmark delta
 - **ceo** — mission fit, moat impact, strategic alignment — FINAL gate
@@ -151,7 +152,7 @@ Change touches backend code only (no UI)
 
 Change touches frontend code only
   → architect + reviewer + testing + ux-designer + accessibility-reviewer
-  → if user-facing: + product-owner + technical-writer
+  → if user-facing: + product-owner + technical-writer + marketer + video-story-director
   → if touches analytics / metrics: + data-scientist
   → if multi-repo (web + mobile): + tpo
 
@@ -215,6 +216,8 @@ Three waves, each wave runs in parallel, waves run in sequence. Agents within a 
 │  business-analyst       ← revenue / cost                          │
 │  sales                  ← (if enterprise-affecting) deal impact   │
 │  marketer               ← (if user-visible) launch readiness      │
+│  video-story-director   ← (if user-visible) marketing video       │
+│                            backlog entry (artifact, never gates)  │
 │  seo                    ← (if web-frontend) search visibility     │
 │  release-manager        ← version / changelog / signing           │
 │                                                                    │

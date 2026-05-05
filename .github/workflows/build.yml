@@ -190,10 +190,33 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
+      # Configure git so anything the build script clones from
+      # github.com (private siblings, pip git+https URLs, cx_Freeze
+      # extras) authenticates with HEVOLVE_REPO_TOKEN instead of
+      # prompting for credentials and dying with
+      #   fatal: could not read Username for 'https://github.com'
+      # GIT_TERMINAL_PROMPT=0 is the belt-and-suspenders: even if
+      # the rewrite misses a URL shape, git fails fast with a clear
+      # error instead of hanging on /dev/tty.
+      - name: Configure git credentials for github.com clones
+        shell: bash
+        env:
+          HEVOLVE_REPO_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+        run: |
+          if [ -n "$HEVOLVE_REPO_TOKEN" ]; then
+            git config --global \
+              "url.https://x-access-token:${HEVOLVE_REPO_TOKEN}@github.com/.insteadOf" \
+              "https://github.com/"
+            echo "[git] github.com clones will use HEVOLVE_REPO_TOKEN"
+          else
+            echo "::warning::HEVOLVE_REPO_TOKEN not set; private-repo clones from github.com will fail"
+          fi
+          echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
+
       - name: Install Python dependencies + sibling repos
         shell: bash
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt 2>&1 | tail -5
 
           # Sibling repos are checked out to _deps/<name> by the
@@ -219,8 +242,11 @@ jobs:
           # Always create .pth as belt-and-suspenders (editable installs can silently break)
           if [ -d "_deps/Hevolve_Database/sql" ]; then
             SITE_PKG=$(python -c "import site; print(site.getsitepackages()[0])")
-            # Use Python to resolve the path — pwd returns /d/... on Windows Git Bash
-            # which Python can't resolve. os.path.abspath always returns a native OS path.
+            # MUST be a Windows-style absolute path on win runners — bash's
+            # `pwd` returns MSYS2-style /d/a/... which Python on Windows
+            # treats as a literal-but-nonexistent path, silently dropping
+            # the .pth entry.  Use python's os.path.abspath so the .pth
+            # carries D:\a\... and `import sql` actually resolves.
             HEVOLVE_DB_PATH=$(python -c "import os; print(os.path.abspath('_deps/Hevolve_Database'))")
             echo "$HEVOLVE_DB_PATH" > "$SITE_PKG/hevolve_database.pth"
             echo "Added Hevolve_Database to Python path via .pth: $HEVOLVE_DB_PATH"
@@ -376,9 +402,24 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      # See build-windows for the rationale on this step.
+      - name: Configure git credentials for github.com clones
+        env:
+          HEVOLVE_REPO_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+        run: |
+          if [ -n "$HEVOLVE_REPO_TOKEN" ]; then
+            git config --global \
+              "url.https://x-access-token:${HEVOLVE_REPO_TOKEN}@github.com/.insteadOf" \
+              "https://github.com/"
+            echo "[git] github.com clones will use HEVOLVE_REPO_TOKEN"
+          else
+            echo "::warning::HEVOLVE_REPO_TOKEN not set; private-repo clones from github.com will fail"
+          fi
+          echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
+
       - name: Install Python dependencies + sibling repos
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt 2>&1 | tail -5
           for dep_dir in ../hevolveai ../HARTOS; do
             if [ -f "$dep_dir/pyproject.toml" ] || [ -f "$dep_dir/setup.py" ]; then
@@ -532,9 +573,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfuse2 desktop-file-utils
 
+      # See build-windows for the rationale on this step.
+      - name: Configure git credentials for github.com clones
+        env:
+          HEVOLVE_REPO_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN }}
+        run: |
+          if [ -n "$HEVOLVE_REPO_TOKEN" ]; then
+            git config --global \
+              "url.https://x-access-token:${HEVOLVE_REPO_TOKEN}@github.com/.insteadOf" \
+              "https://github.com/"
+            echo "[git] github.com clones will use HEVOLVE_REPO_TOKEN"
+          else
+            echo "::warning::HEVOLVE_REPO_TOKEN not set; private-repo clones from github.com will fail"
+          fi
+          echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
+
       - name: Install Python dependencies + sibling repos
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt 2>&1 | tail -5
 
           echo "=== Checking sibling repos ==="
@@ -609,7 +665,7 @@ jobs:
           Exec=Nunba
           Icon=nunba
           Type=Application
-          Categories=Utility;Education;ArtificialIntelligence;
+          Categories=Utility;ArtificialIntelligence;
           EOF
 
           if [ -f assets/icon.png ]; then

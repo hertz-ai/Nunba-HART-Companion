@@ -6,6 +6,7 @@ flask==3.1.2
 flask-cors==6.0.2
 werkzeug==3.1.5
 waitress==3.0.2
+hypercorn==0.17.3
 pywebview==6.1
 pyautogui==0.9.54
 pyperclip==1.11.0
@@ -63,7 +64,7 @@ sentence-transformers==5.2.2
 tokenizers==0.22.2
 safetensors==0.7.0
 huggingface_hub==1.4.1
-regex==2024.11.6
+regex==2025.11.3
 numpy==1.26.4
 tqdm==4.67.1
 pyyaml==6.0.2

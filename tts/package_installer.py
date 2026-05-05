@@ -28,112 +28,299 @@ from pathlib import Path
 logger = logging.getLogger('NunbaTTSInstaller')
 
 # huggingface_hub 0.29+ removes is_offline_mode needed by transformers <5.x
+# Re-exported from here for any caller that depends on the constant; the
+# canonical pin lives in HARTOS's tts_router._HF_HUB_PIN now.
 _HF_HUB_PIN = 'huggingface_hub>=0.27.0,<0.29.0'
 
-# Backend → pip packages needed (in install order)
-BACKEND_PACKAGES = {
-    'chatterbox_turbo': [
-        _HF_HUB_PIN,
-        'torchaudio',
-        'chatterbox-tts',
-    ],
-    'chatterbox_multilingual': [
-        _HF_HUB_PIN,
-        'torchaudio',
-        'chatterbox-tts',
-    ],
-    # Indic Parler lives in its OWN venv (see BACKEND_VENV_PACKAGES
-    # below) because parler-tts==0.2.2 needs transformers<4.47, while
-    # the main interpreter is pinned to transformers 5.1.0 for
-    # chatterbox_ml / f5 / cosyvoice. Track B, Phase 6 refactor.
-    'indic_parler': [],
-    'cosyvoice3': [
-        'torchaudio',
-        # cosyvoice is NOT pip-installable — needs cloned repo
-        # Model weights downloaded separately via huggingface_hub
-    ],
-    'f5': [
-        'torchaudio',
-        'f5-tts',
-    ],
-    'piper': [],  # Bundled, no pip install needed
-    'kokoro': [
-        _HF_HUB_PIN,
-        'kokoro',       # Main package (includes misaki phonemizer)
-        'espeakng',     # espeak-ng Python bindings (ships binary on Windows)
-    ],
-    'luxtts': [],       # CPU in-process, bundled via HARTOS
-    'pocket_tts': [
-        'pocket-tts',
-    ],
+# ─── Backend → pip packages needed (in install order) ──────────────────
+#
+# The actual install plan for each engine is OWNED BY HARTOS via
+# TTSEngineSpec.pip_install_plan in
+# integrations/channels/media/tts_router.py.  HARTOS already declares
+# required_package + tool_module per engine; the install plan belongs
+# alongside that knowledge so adding a new engine doesn't require
+# parallel edits in two repos that drift.
+#
+# This module re-exports the same dict shape Nunba's existing callers
+# expect ({backend_id: [pip_specs...]}), populated from HARTOS at
+# import time, plus a thin name-alias layer for the two engines that
+# Nunba historically called by different names (chatterbox_multilingual
+# vs chatterbox_ml; f5 vs f5_tts) and the bundled-only engines that
+# don't appear in HARTOS's registry (piper, luxtts).
+#
+# If the HARTOS import fails (cx_Freeze tracer edge case where the
+# sibling repo isn't yet mounted), we fall back to the legacy hardcoded
+# dict — the user-visible behaviour stays the same instead of erroring
+# at module-load.
+
+# Nunba-side aliases for legacy backend names (Nunba_id -> HARTOS_id).
+# Drop entry if HARTOS gets renamed; add entry if Nunba's UI keeps
+# calling an engine by an old name for back-compat.
+_NUNBA_TO_HARTOS_BACKEND = {
+    'chatterbox_multilingual': 'chatterbox_ml',
+    'f5':                      'f5_tts',
 }
 
-# Backends that live in their OWN venv under ~/Documents/Nunba/data/venvs/
-# (see tts/backend_venv.py). Each venv's dep set is independent and may
+# Backends Nunba ships bundled (piper voices in python-embed, luxtts
+# in HARTOS image) — no pip install needed; keys must still appear in
+# BACKEND_PACKAGES so callers iterating it see the full surface.
+_BUNDLED_ONLY_BACKENDS = ('piper', 'luxtts')
+
+# Legacy hardcoded plan — used as fallback ONLY when HARTOS import
+# fails at module load.  The HARTOS-owned plan is the source of truth
+# whenever the import succeeds (almost always).
+_LEGACY_BACKEND_PACKAGES_FALLBACK = {
+    # Mirrors HARTOS _CHATTERBOX_PIP_PLAN — chatterbox-tts upstream
+    # omits multiple runtime imports from install_requires.  See
+    # HARTOS tts_router.py for the full list of transitives the
+    # self-heal loop covers single-package-at-a-time at runtime
+    # (omegaconf / conformer / diffusers / s3tokenizer / einops
+    # surface in that order on a fresh install; not pre-installed
+    # together because of the --no-build-isolation parallel-build
+    # race observed 2026-04-28).
+    'chatterbox_turbo':        [_HF_HUB_PIN, 'torchaudio', 'chatterbox-tts', 'librosa', 'soundfile', 'resemble-perth'],
+    'chatterbox_multilingual': [_HF_HUB_PIN, 'torchaudio', 'chatterbox-tts', 'librosa', 'soundfile', 'resemble-perth'],
+    'indic_parler':            [],
+    'cosyvoice3':              [],
+    'f5':                      ['torchaudio', 'f5-tts'],
+    'piper':                   [],
+    'kokoro':                  [_HF_HUB_PIN, 'kokoro', 'espeakng'],
+    'luxtts':                  [],
+    'pocket_tts':              ['pocket-tts'],
+}
+
+
+def _hartos_engine_registry() -> dict:
+    """Single-call import of HARTOS's ENGINE_REGISTRY with a
+    well-defined empty-dict fallback on import error.
+
+    cx_Freeze can occasionally land Nunba into a state where
+    integrations/* isn't yet on sys.path (build phase, partial install).
+    The HARTOS-derived dicts below all degrade gracefully when this
+    function returns {} — install paths use the legacy fallback dict,
+    which keeps onboarding functional but drifts."""
+    try:
+        from integrations.channels.media.tts_router import ENGINE_REGISTRY
+        return dict(ENGINE_REGISTRY)
+    except Exception as exc:  # noqa: BLE001 — broad on purpose
+        logger.warning(
+            "HARTOS tts_router import failed; falling back to legacy "
+            "engine dicts (engine drift risk). reason=%s", exc,
+        )
+        return {}
+
+
+def _build_backend_packages_from_hartos() -> dict:
+    """{backend_id: [pip_specs...]} for engines that install into the
+    MAIN interpreter (install_target == 'main').
+
+    Skips engines routed elsewhere (venv / bundled / cloud / git_clone)
+    so a caller that does `pip install BACKEND_PACKAGES[backend]`
+    against a venv'd engine doesn't accidentally contaminate the main
+    interpreter with parler/chatterbox deps.
+
+    Includes Nunba-side aliases (chatterbox_multilingual, f5) for
+    legacy callers + the bundled-only entries (piper, luxtts) so the
+    keyspace covers what every existing Nunba caller expects.
+
+    Empty `[]` for venv / bundled / cloud / git_clone engines —
+    callers iterating BACKEND_PACKAGES see them but get a no-op
+    install plan, matching the prior Nunba behavior for indic_parler."""
+    registry = _hartos_engine_registry()
+    if not registry:
+        return dict(_LEGACY_BACKEND_PACKAGES_FALLBACK)
+
+    out: dict[str, list[str]] = {}
+    for engine_id, spec in registry.items():
+        target = getattr(spec, 'install_target', 'main')
+        # Engines that DON'T install into the main interpreter still
+        # appear here (with an empty plan) for keyspace compatibility
+        # with existing Nunba callers iterating the dict.  The
+        # install_backend_packages() router below uses install_target
+        # to decide what install path to actually take.
+        if target == 'main':
+            out[engine_id] = list(spec.pip_install_plan)
+        else:
+            out[engine_id] = []
+
+    for nunba_name, hartos_name in _NUNBA_TO_HARTOS_BACKEND.items():
+        if hartos_name in out:
+            out[nunba_name] = list(out[hartos_name])
+
+    for engine_id in _BUNDLED_ONLY_BACKENDS:
+        out.setdefault(engine_id, [])
+
+    return out
+
+
+def _build_backend_venv_packages_from_hartos() -> dict:
+    """{backend_id: [pip_specs...]} for engines that install into their
+    OWN private venv (install_target == 'venv').
+
+    Mirrors HARTOS's TTSEngineSpec.pip_install_plan for venv engines,
+    so the Nunba-side BACKEND_VENV_PACKAGES literal goes away and the
+    install plan + venv-routing decision both live in HARTOS.
+
+    Falls back to a hand-maintained dict (currently parler-only) when
+    HARTOS isn't importable, same as BACKEND_PACKAGES does."""
+    registry = _hartos_engine_registry()
+    if not registry:
+        # Hand-maintained venv plan as fallback.  Kept minimal — only
+        # parler today, matching the prior Nunba state.
+        return {
+            'indic_parler': [
+                'colorama>=0.4.6', 'tqdm>=4.65',
+                'transformers==4.46.1',
+                'torch', 'torchaudio',
+                'sentencepiece', 'descript-audio-codec',
+                'parler-tts==0.2.2', 'soundfile',
+                _HF_HUB_PIN,
+            ],
+        }
+
+    out: dict[str, list[str]] = {}
+    for engine_id, spec in registry.items():
+        target = getattr(spec, 'install_target', 'main')
+        if target == 'venv':
+            out[engine_id] = list(spec.pip_install_plan)
+    return out
+
+
+BACKEND_PACKAGES = _build_backend_packages_from_hartos()
+
+# Backends routed into their OWN venv under ~/Documents/Nunba/data/venvs/
+# (see tts/backend_venv.py).  Each venv's dep set is independent and may
 # pin conflicting transformers / torch versions without contaminating
 # the main interpreter or each other.
 #
-# Track B, Phase 6: parler-tts 0.2.2 + transformers 4.46.1 can't coexist
-# with the main interpreter's transformers 5.1.0, so Indic Parler is
-# quarantined here. Other backends can be migrated as their pins drift.
-BACKEND_VENV_PACKAGES = {
-    'indic_parler': [
-        # Pre-pin tqdm + colorama FIRST.  Without this, pip's resolver
-        # backtracks through every historical colorama version
-        # (0.4.x → 0.3.x → 0.2.x → 0.1.15) when it later installs
-        # parler-tts's transitive chain:
-        #     parler-tts 0.2.2 → transformers 4.46.1 → tqdm >=4.27
-        #     → colorama (unconstrained)
-        # colorama 0.1.15 has neither setup.py nor pyproject.toml and
-        # explodes the install with:
-        #     "does not appear to be a Python project"
-        # Pinning modern versions up front keeps the resolver out of
-        # the backtrack tarpit. Witnessed user-facing failure:
-        #     "Indic Parler TTS unavailable — using fallback voice engine"
-        # Root-caused from ~/Documents/Nunba/logs/venv_indic_parler.log.
-        'colorama>=0.4.6',
-        'tqdm>=4.65',
-        'transformers==4.46.1',   # parler-tts 0.2.2 requires <4.47
-        'torch',                   # CPU-ish fallback; replaced by CUDA if GPU
-        'torchaudio',
-        'sentencepiece',
-        'descript-audio-codec',
-        'parler-tts==0.2.2',       # 0.2.3 has DacModel.decode() API mismatch
-        'soundfile',
-        'huggingface_hub>=0.27.0,<0.29.0',
-    ],
-}
+# Source of truth lives in HARTOS — TTSEngineSpec.install_target='venv'
+# selects an engine for venv routing, and TTSEngineSpec.pip_install_plan
+# is the plan that lands in the venv.  This dict is now derived state.
+#
+# Today only `indic_parler` qualifies (parler-tts 0.2.2 hard-pins
+# transformers<4.47, conflicts with main's 5.1.0).  Migrating
+# chatterbox / cosyvoice / f5 / kokoro / omnivoice into their own
+# venvs is a follow-up task per engine — flip install_target='venv'
+# in HARTOS and set `tool.python_exe = backend_venv.ensure_venv(<engine>)`
+# on the engine's HARTOS ToolWorker (see #53).  No per-engine
+# Nunba-side worker file is needed: gpu_worker._dispatch_and_run
+# spawns the HARTOS tool directly under the venv's python.
+BACKEND_VENV_PACKAGES = _build_backend_venv_packages_from_hartos()
+
+
+# Boot-time wire: for every venv-eligible engine whose venv already
+# exists on disk (created by a prior install), point the HARTOS
+# ToolWorker's python_exe at the venv's python.  Without this the
+# install-time wire (line ~1313) only persists for the install
+# Python's lifetime — next boot, worker resets to python-embed
+# default and synth subprocess hits the same version conflicts.
+# `is_venv_healthy(backend)` is non-creating: skips engines whose
+# venv hasn't been built yet (those wire later, at install time).
+def _wire_existing_venv_workers() -> None:
+    registry = _hartos_engine_registry()
+    if not registry or not BACKEND_VENV_PACKAGES:
+        return
+    try:
+        from tts.backend_venv import _python_exe_in, is_venv_healthy, venv_path
+    except Exception:
+        return
+    for backend in BACKEND_VENV_PACKAGES:
+        spec = registry.get(backend)
+        if spec is None or not getattr(spec, 'tool_module', None) \
+                or not getattr(spec, 'tool_worker_attr', None):
+            continue
+        if not is_venv_healthy(backend):
+            continue  # venv not yet created — install-time wire handles it
+        try:
+            import importlib
+            worker = getattr(
+                importlib.import_module(spec.tool_module),
+                spec.tool_worker_attr, None)
+            if worker is not None:
+                worker.python_exe = str(_python_exe_in(venv_path(backend)))
+        except Exception as _e:
+            logger.debug("boot wire skipped for %s: %s", backend, _e)
+
+
+_wire_existing_venv_workers()
+
+
+def get_install_target(backend: str) -> str:
+    """Return the install_target string ('main' | 'venv' | 'bundled' |
+    'cloud' | 'git_clone') HARTOS declares for this backend.
+
+    Defaults to 'main' if the engine isn't in HARTOS's ENGINE_REGISTRY
+    (matches the dataclass default; preserves Nunba's prior behavior
+    for any legacy backend ID a caller might still address)."""
+    registry = _hartos_engine_registry()
+    spec = registry.get(backend)
+    if spec is None:
+        # Resolve through Nunba alias map before giving up (e.g.
+        # 'chatterbox_multilingual' -> 'chatterbox_ml').
+        canonical = _NUNBA_TO_HARTOS_BACKEND.get(backend)
+        if canonical:
+            spec = registry.get(canonical)
+    return getattr(spec, 'install_target', 'main') if spec is not None else 'main'
 
 # pip package name → import name (for verification)
+#
+# Required when the PyPI distribution name doesn't map cleanly to the
+# Python import name via the default `dash→underscore` rule
+# _canonical_import_name applies.  Without an entry here the verify
+# step asks `find_spec('<wrong_name>')`, returns False on a perfectly
+# successful install, and reports "Some packages installed for
+# <backend>" → user sees "<engine> setup failed".
+#
+# How to add a new entry:
+#   1. The pip name is whatever appears in the HARTOS pip_install_plan
+#      (e.g. 'resemble-perth')
+#   2. The import name is what `import X` would actually use (e.g.
+#      `perth`).  Find this by running `python -c "import perth;
+#      print(perth.__file__)"` after the package installs, OR by
+#      checking the package's source layout on PyPI / GitHub
+#      (top-level dir under src/ or the project root).
 _PIP_TO_IMPORT = {
-    'chatterbox-tts': 'chatterbox',
-    'parler-tts': 'parler_tts',
-    'f5-tts': 'f5_tts',
-    'torchaudio': 'torchaudio',
-    'descript-audio-codec': 'dac',
-    'descript-audiotools': 'audiotools',
-    'tensorboard': 'tensorboard',
-    'kokoro': 'kokoro',
-    'espeakng': 'espeakng',
-    'pocket-tts': 'pocket_tts',
+    'chatterbox-tts':        'chatterbox',
+    'parler-tts':            'parler_tts',
+    'f5-tts':                'f5_tts',
+    'torchaudio':            'torchaudio',
+    'descript-audio-codec':  'dac',
+    'descript-audiotools':   'audiotools',
+    'tensorboard':           'tensorboard',
+    'kokoro':                'kokoro',
+    'espeakng':              'espeakng',
+    'pocket-tts':            'pocket_tts',
+    'resemble-perth':        'perth',     # ResembleAI watermark lib —
+                                          # PyPI dist=resemble-perth
+                                          # but `import perth` (no
+                                          # `resemble_` prefix in the
+                                          # source layout)
 }
 
-# Human-readable names for progress messages
+# Human-readable names for progress messages.  Must cover the full
+# keyspace of BACKEND_PACKAGES (which now includes HARTOS-canonical
+# names like chatterbox_ml + f5_tts + omnivoice + espeak + makeittalk
+# in addition to Nunba's legacy keys), enforced by
+# TestConstants.test_display_names_match_backends.
 BACKEND_DISPLAY_NAMES = {
-    'chatterbox_turbo': 'Chatterbox Turbo (English, expressive)',
+    # Legacy Nunba names (kept for the UI surface)
+    'chatterbox_turbo':        'Chatterbox Turbo (English, expressive)',
     'chatterbox_multilingual': 'Chatterbox Multilingual (23 languages)',
-    'indic_parler': 'Indic Parler TTS (21 Indian languages + English)',
-    'cosyvoice3': 'CosyVoice3 (9 international languages)',
-    'f5': 'F5-TTS (voice cloning)',
-    'piper': 'Piper TTS (CPU fallback)',
-    # Added after Kokoro landed + pocket_tts was promoted from Piper
-    # alias to its own backend + luxtts was kept for frozen-HARTOS
-    # compat. Keeping the keyspace aligned with BACKEND_PACKAGES is
-    # enforced by TestConstants.test_display_names_match_backends —
-    # a missing entry here previously crashed that test every CI run.
-    'kokoro': 'Kokoro 82M (CPU/GPU, multilingual)',
-    'luxtts': 'LuxTTS (CPU, English voice-clone)',
-    'pocket_tts': 'Pocket TTS (CPU, English voice-clone)',
+    'indic_parler':            'Indic Parler TTS (21 Indian languages + English)',
+    'cosyvoice3':              'CosyVoice3 (9 international languages)',
+    'f5':                      'F5-TTS (voice cloning)',
+    'piper':                   'Piper TTS (CPU fallback)',
+    'kokoro':                  'Kokoro 82M (CPU/GPU, multilingual)',
+    'luxtts':                  'LuxTTS (CPU, English voice-clone)',
+    'pocket_tts':              'Pocket TTS (CPU, English voice-clone)',
+    # HARTOS-canonical names exposed via BACKEND_PACKAGES — same
+    # display strings as their Nunba aliases so users see one name
+    # whichever entry-point the request hits.
+    'chatterbox_ml':           'Chatterbox Multilingual (23 languages)',
+    'f5_tts':                  'F5-TTS (voice cloning)',
+    'omnivoice':               'OmniVoice (646 languages, voice clone)',
+    'espeak':                  'eSpeak NG (CPU last-resort fallback)',
+    'makeittalk':              'MakeItTalk (cloud, English)',
 }
 
 # Lock to prevent concurrent installs (in-process)
@@ -393,7 +580,21 @@ def _run_pip(args: list[str], progress_cb: Callable | None = None,
     cmd = [python_exe, '-m', 'pip'] + args
     env = os.environ.copy()
     env['PYTHONNOUSERSITE'] = '1'  # Don't leak to user site-packages
-    env['SETUPTOOLS_USE_DISTUTILS'] = 'stdlib'  # Skip _distutils_hack shim (missing in frozen build)
+    # NOTE: do NOT set SETUPTOOLS_USE_DISTUTILS='stdlib'.  Python 3.12
+    # removed `distutils` from the stdlib entirely; setuptools relies on
+    # `_distutils_hack` to alias `distutils` -> `setuptools._distutils`.
+    # Forcing 'stdlib' suppresses that hack -> `import distutils.core` in
+    # setuptools.__init__.py raises ModuleNotFoundError -> pip's PEP 517
+    # build subprocess crashes with `BackendUnavailable: Cannot import
+    # 'setuptools.build_meta'` on every sdist (e.g. omegaconf 2.3.0 ->
+    # antlr4-python3-runtime==4.9.3, which has no wheel on PyPI).  Was
+    # added 2026-03-31 (zinc installer commit) on the assumption that
+    # _distutils_hack was missing from python-embed; in practice
+    # `_distutils_hack` is in ~/.nunba/site-packages from prior installs
+    # AND/OR setuptools 82 bundles its own equivalent at
+    # `setuptools/_distutils`.  Letting setuptools pick its own distutils
+    # source works on Python 3.10/3.11/3.12 alike.  Regression guarded by
+    # tests/test_package_installer.py::TestRunPipEnv.
     env['PYTHONUNBUFFERED'] = '1'  # Stream stdout immediately — no buffering
 
     logger.info(f"Running: {' '.join(cmd)}")
@@ -468,18 +669,139 @@ def _run_pip(args: list[str], progress_cb: Callable | None = None,
                 msg = f"pip timed out after {timeout}s"
                 if progress_cb:
                     progress_cb(msg)
+                # Surface the timeout to the agent self-heal pipeline.
+                # Pre-fix this returned False silently — no exception
+                # raised → handle_exception never called → agent never
+                # saw it.  Synthesize a TimeoutError (deterministic
+                # fingerprint for the throttle dedup) and route via
+                # error_advice so an autonomous fix path exists.
+                try:
+                    from core.error_advice import handle_exception
+                    handle_exception(
+                        TimeoutError(msg),
+                        category='tts.install.pip_timeout',
+                        severity='high',
+                        agent_remediation=True,
+                        context={
+                            'timeout_s': timeout,
+                            'last_pkg': state.get('current_pkg') or '',
+                            'last_lines_tail': '\n'.join(
+                                state.get('lines', [])[-10:]
+                            ),
+                            'remediation_hint': (
+                                "pip install hit absolute wall-clock "
+                                "ceiling.  Either the network is slow, "
+                                "the index is unreachable, or a single "
+                                "package (e.g. parler-tts pulling "
+                                "transformers + torch) needs more time. "
+                                "Bump timeout_s in the EngineSpec or "
+                                "split the install plan into smaller "
+                                "single-package passes (the "
+                                "_self_heal_missing_transitives loop "
+                                "already does this for transitives)."
+                            ),
+                        },
+                    )
+                except Exception:
+                    pass
                 return False, msg
             _time.sleep(0.5)
 
         drain.join(timeout=2)
         out = "\n".join(state['lines'])
+
+        # Persist FULL pip output to a per-package log file so a
+        # post-mortem (carets, full Python tracebacks, transitive
+        # dep error chains) survives the logger's line-width truncation.
+        # Without this, an rc!=0 pip run shows only the last ~800 chars
+        # in gui_app.log — which often clips the actual error and shows
+        # only the SyntaxError-indicator carets (`^^^^^^^...`), leaving
+        # nothing actionable to debug from.  See Apr 2026 chatterbox
+        # omegaconf rc=2 incident.
+        try:
+            _log_dir = os.path.join(
+                os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
+            )
+            os.makedirs(_log_dir, exist_ok=True)
+            # File name keys on the FIRST positional pip arg after
+            # the install/uninstall verb that isn't a flag — usually
+            # the package name.  Falls back to 'pip' if we can't tell.
+            _arg_name = 'pip'
+            for _a in args:
+                if not _a.startswith('-') and _a not in (
+                    'install', 'uninstall', '--target', '--index-url',
+                    '--no-build-isolation', '--progress-bar', 'off',
+                    '-U', '--upgrade', '--no-deps', user_sp,
+                ):
+                    # Strip version specifier so the file name stays
+                    # filesystem-safe (no '<', '>', '=' on Windows).
+                    _arg_name = re.split(r'[<>=!~]', _a, maxsplit=1)[0]
+                    _arg_name = _arg_name.replace('/', '_').replace('\\', '_')
+                    break
+            _pip_log = os.path.join(
+                _log_dir, f'pip_{_arg_name}.log',
+            )
+            with open(_pip_log, 'w', encoding='utf-8') as _pf:
+                _pf.write(f"# pip rc={rc}\n# cmd: {' '.join(cmd)}\n\n")
+                _pf.write(out)
+        except Exception:
+            _pip_log = None
+
+        # ENOSPC detection — disk full anywhere along the install
+        # mid-flight.  Pip's exit code is rc=2 in this case but the
+        # message is buried in the middle of the dep-resolver output;
+        # surface a dedicated string the caller can branch on.
+        out_low = out.lower()
+        is_enospc = ('no space left' in out_low
+                     or 'enospc' in out_low
+                     or 'errno 28' in out_low
+                     or '0x80070070' in out_low)  # Windows: not enough space
+
+        # "Successfully installed <pkgs>" is pip's positive-result
+        # line — when present it means the packages DID land on disk
+        # even if pip exited rc!=0 due to a post-install dep-resolver
+        # warning or build-system noise.  Without this rescue, a
+        # successful install + a non-fatal rc=2 looks identical to the
+        # caller, who then aborts the entire heal loop.  Captured
+        # 2026-04-28 (chatterbox omegaconf: rc=2 from dep-conflict
+        # warnings even though omegaconf landed on disk just fine).
+        success_line = None
+        for _line in state['lines']:
+            if _line.startswith('Successfully installed '):
+                success_line = _line
+                break
+
         if rc == 0:
             # Ensure the target dir is on sys.path NOW (not just next restart)
             ensure_user_site_on_path()
             return True, out
+
+        # rc != 0 below — but check if pip nonetheless reported
+        # successful install of the target packages.
+        if success_line and not is_enospc:
+            ensure_user_site_on_path()
+            logger.warning(
+                "pip exited rc=%d but reported success line: %s "
+                "(treating as installed; full log: %s)",
+                rc, success_line, _pip_log or '(disabled)',
+            )
+            return True, out
+
+        # Honest failure — log the FULL output (not just last 800 chars)
+        # via the per-package file path, plus the tail in the in-memory
+        # log for the operator's first glance.
+        _log_hint = f' (full output: {_pip_log})' if _pip_log else ''
+        if is_enospc:
+            logger.error(
+                "pip failed (rc=%d, ENOSPC — disk full)%s. Tail:\n%s",
+                rc, _log_hint, out[-1500:],
+            )
         else:
-            logger.error(f"pip failed (rc={rc}): {out[-800:]}")
-            return False, out
+            logger.error(
+                "pip failed (rc=%d)%s. Tail:\n%s",
+                rc, _log_hint, out[-1500:],
+            )
+        return False, out
     except Exception as e:
         return False, str(e)
 
@@ -551,8 +873,29 @@ def install_gpu_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
             logger.info("CUDA torch installed to D: drive successfully")
 
     if ok:
-        # Remove the stub torch (0.0.0) from python-embed so the CUDA version
-        # from ~/.nunba/site-packages is the only one Python finds
+        # Remove ANY torch from python-embed so the CUDA version from
+        # ~/.nunba/site-packages is the one and only torch on sys.path.
+        #
+        # Was previously gated on `version == '0.0.0'` (stub-only) — but
+        # cx_Freeze bundles the dev .venv's REAL torch (e.g. v2.10.0+cpu)
+        # into python-embed at build time, NOT a 0.0.0 stub.  The check
+        # never fired, both real torches stayed on sys.path, and Python
+        # tripped the partial-init / circular-import detector when one
+        # torch's __init__.py finished while a transitive resolved a
+        # submodule from the other version.  Validate.log symptom:
+        #   AttributeError: partially initialized module 'torch'
+        #   has no attribute 'autograd' (most likely due to a circular
+        #   import)
+        # cascading across helper, autogen, create_recipe, reuse_recipe,
+        # gather_agentdetails, lifecycle_hooks → SKIPped the deep
+        # health check → masked Tier-1 failure for weeks.
+        #
+        # When we reach this branch, install_gpu_torch() returned True,
+        # meaning the CUDA torch is verifiably installed in ~/.nunba.
+        # That makes ~/.nunba canonical — python-embed's torch is stale
+        # by definition and MUST go.  For users without GPU,
+        # install_gpu_torch never runs, so this branch is skipped and
+        # python-embed/torch stays as the only torch.
         _embed_sp = get_embed_site_packages()
         if _embed_sp:
             import shutil
@@ -560,16 +903,12 @@ def install_gpu_torch(progress_cb: Callable | None = None) -> tuple[bool, str]:
                 _stub_path = os.path.join(_embed_sp, _stub_dir)
                 if os.path.isdir(_stub_path):
                     try:
-                        _ver_file = os.path.join(_stub_path, 'version.py')
-                        _is_stub = False
-                        if os.path.isfile(_ver_file):
-                            with open(_ver_file) as _vf:
-                                _is_stub = '0.0.0' in _vf.read()
-                        if _is_stub:
-                            shutil.rmtree(_stub_path, ignore_errors=True)
-                            logger.info(f"Removed stub {_stub_dir} from python-embed")
+                        shutil.rmtree(_stub_path, ignore_errors=True)
+                        logger.info(
+                            f"Removed bundled {_stub_dir} from python-embed "
+                            f"(CUDA torch in ~/.nunba is canonical)")
                     except Exception as _e:
-                        logger.debug(f"Could not remove stub {_stub_dir}: {_e}")
+                        logger.debug(f"Could not remove {_stub_dir}: {_e}")
 
         # Fix torch/_C directory conflict in CUDA install target too
         # pip creates both _C.cpXYZ.pyd (the real extension) AND _C/ (stubs).
@@ -667,7 +1006,57 @@ def install_backend_packages(backend: str,
             # Continue — caller decides how to handle a still-CPU torch.
 
     if not to_install and not cuda_torch_was_installed:
-        return True, f"All packages for {backend} already installed"
+        # Pip-level "all installed" is an unreliable success signal —
+        # is_package_installed only checks top-level find_spec, missing
+        # transitives the upstream package omits from install_requires
+        # (chatterbox-tts pulled this stunt twice: librosa, then perth).
+        # Run the deep self-heal probe BEFORE returning so we either
+        # confirm the engine is truly runnable or auto-install the
+        # actual missing transitive.  Skipping this check is what
+        # caused the perth failure on a chatterbox re-install where
+        # librosa was already on disk from the prior heal attempt.
+        deep_ok, healed = _self_heal_missing_transitives(
+            backend, progress_cb=progress_cb,
+        )
+        if healed:
+            logger.info(
+                f"Self-heal (early-return path) installed transitives for "
+                f"{backend}: {healed} — add to HARTOS pip_install_plan"
+            )
+        if deep_ok:
+            return True, f"All packages for {backend} already installed"
+        # Deep probe failed even after self-heal — fall through to the
+        # error_advice handoff at the bottom of the function so an
+        # autogen agent can investigate.
+        all_ok = False
+        # Skip the redundant top-level verify since to_install is empty
+        # — go straight to the agent-remediation path below.
+        try:
+            from core.error_advice import handle_exception
+            handle_exception(
+                RuntimeError(
+                    f"deterministic self-heal exhausted for {backend} "
+                    f"(early-return path) after installing {healed}"
+                ),
+                category='tts.install.self_heal_exhausted',
+                severity='high',
+                agent_remediation=True,
+                context={
+                    'backend': backend,
+                    'display_name': display_name,
+                    'attempted_packages': packages,
+                    'healed_during_loop': healed,
+                    'path': 'early-return (all-pip-installed)',
+                    'probe_err_file': os.path.join(
+                        os.path.expanduser('~'),
+                        'Documents', 'Nunba', 'logs',
+                        f'probe_{backend}.err',
+                    ),
+                },
+            )
+        except Exception:
+            pass
+        return False, f"Deep probe failed for {backend} after self-heal"
 
     if to_install and progress_cb:
         progress_cb(f"Installing packages for {display_name}: {', '.join(to_install)}")
@@ -707,10 +1096,262 @@ def install_backend_packages(backend: str,
             all_ok = False
             logger.warning(f"Package {pkg} ({import_name}) not importable after install")
 
+    # Deep self-heal probe — runs the SAME subprocess import that
+    # _torch_probe uses at runtime, so a chatterbox-style failure
+    # (top-level `import chatterbox` succeeds → `from .tts import
+    # ChatterboxTTS` blows up on missing `import librosa` because the
+    # upstream package omits it from install_requires) gets caught
+    # HERE, on the install screen, instead of 5 minutes later when the
+    # user actually tries to talk and verified_synth reports
+    # "synthesize returned no path" with no recovery path.
+    #
+    # If the deep probe surfaces a ModuleNotFoundError for an
+    # un-declared transitive, install it + retry.  Bounded so a
+    # genuinely broken upstream doesn't loop forever — when the loop
+    # gives up (3 iterations or non-ModuleNotFound failure mode), the
+    # central error_advice handler files an AgentGoal so an autogen
+    # agent can take over investigation (alternate package versions,
+    # upstream-issue search, alternate engines).
+    if all_ok:
+        deep_ok, healed = _self_heal_missing_transitives(
+            backend, progress_cb=progress_cb,
+        )
+        if healed:
+            logger.info(
+                f"Self-heal installed transitive deps for {backend}: {healed} "
+                f"— add these to HARTOS pip_install_plan to skip this loop next time"
+            )
+        if not deep_ok:
+            all_ok = False
+            # Hand off to the central error advice fan-out so an
+            # autogen agent can investigate beyond the deterministic
+            # loop.  Uses the existing crash_reporter (Sentry capture)
+            # + GoalManager.create_goal pipeline; no parallel paths.
+            try:
+                from core.error_advice import handle_exception
+                handle_exception(
+                    RuntimeError(
+                        f"deterministic self-heal exhausted for {backend} "
+                        f"after installing {healed}; deep probe still fails"
+                    ),
+                    category='tts.install.self_heal_exhausted',
+                    severity='high',
+                    agent_remediation=True,
+                    context={
+                        'backend': backend,
+                        'display_name': display_name,
+                        'attempted_packages': packages,
+                        'healed_during_loop': healed,
+                        'probe_err_file': os.path.join(
+                            os.path.expanduser('~'),
+                            'Documents', 'Nunba', 'logs',
+                            f'probe_{backend}.err',
+                        ),
+                    },
+                )
+            except Exception:
+                # Never let observability break the install path
+                pass
+
     if all_ok and progress_cb:
         progress_cb(f"{display_name} packages installed successfully")
 
     return all_ok, f"{'All' if all_ok else 'Some'} packages installed for {backend}"
+
+
+# ── Generic transitive-dep self-heal ──────────────────────────────────
+#
+# Catches the chatterbox-librosa class of failure: upstream package
+# imports a runtime dep that isn't in its install_requires.  Pip
+# completes "successfully", top-level `find_spec` returns True, but
+# the deep import chain blows up.  This loop runs the same deep probe
+# the runtime uses (subprocess `import <required_pkg>`), parses the
+# probe's already-written ~/Documents/Nunba/logs/probe_<backend>.err
+# for ModuleNotFoundError, pip-installs the missing module, retries.
+#
+# Pure SRP: this function does ONE thing — find + install the
+# transitive deps that the engine's runtime import chain reveals.  No
+# duplicated install logic (uses _run_pip), no duplicated probe logic
+# (uses _torch_probe.check_backend_runnable), no parallel cache (uses
+# _invalidate_import_cache).
+_MISSING_MODULE_RE = re.compile(
+    r"ModuleNotFoundError:\s+No module named ['\"]([^'\"]+)['\"]"
+)
+# transformers' `dependency_versions_check` raises this format when a
+# transitive dep is installed but pinned too low.  Example seen 2026-04-27
+# in probe_chatterbox_turbo.err:
+#   ImportError: regex>=2025.10.22 is required for a normal functioning
+#   of this module, but found regex==2024.11.6.
+# Without this pattern, self-heal exits with `installing []` and the
+# user sees "Chatterbox Turbo Failed".  Captured group is the package
+# name; install path uses `pip install -U <pkg>` to upgrade past the
+# floor.
+_VERSION_MISMATCH_RE = re.compile(
+    r"ImportError:\s+([A-Za-z_][\w.\-]*)\s*[<>=!~]",
+)
+
+
+def _self_heal_missing_transitives(
+    backend: str,
+    max_iter: int = 3,
+    progress_cb: Callable | None = None,
+) -> tuple[bool, list[str]]:
+    """Run the runtime deep-import probe; if it fails on a
+    ModuleNotFoundError, install the missing module and retry.
+
+    Returns (deep_probe_ok, [packages_installed_during_heal]).
+    deep_probe_ok=False means the engine STILL won't work — caller
+    should mark backend as failed.
+    """
+    # Resolve the required_package from HARTOS's spec.  No-op for
+    # engines that don't declare one (espeak / piper / makeittalk —
+    # the bundled / cloud paths).
+    registry = _hartos_engine_registry()
+    spec = registry.get(backend) or registry.get(
+        _NUNBA_TO_HARTOS_BACKEND.get(backend, ''),
+    )
+    required_pkg = getattr(spec, 'required_package', None) if spec else None
+    if not required_pkg:
+        return True, []  # nothing to probe; treat as healthy
+
+    # Venv-eligible engines (install_target='venv') CANNOT be healed in
+    # the main interpreter — chatterbox-tts hard-pins torch==2.6 vs
+    # main's 2.11, parler-tts pins transformers<4.47 vs main's 5.x, etc.
+    # Installing missing transitives into main env one-by-one only ever
+    # exhausts the iter cap and surfaces "Chatterbox Turbo Failed" to
+    # the user (witnessed 2026-04-29: legacy main-env chatterbox install
+    # left over from pre-venv-routing builds keeps tripping this probe).
+    # Bail out: callers fall back to the next engine in the ladder, and
+    # the venv install path (line ~1313) creates the venv when the user
+    # explicitly triggers install.  Treats unhealable-in-main as "not
+    # installed yet" rather than "failed".
+    if getattr(spec, 'install_target', 'main') == 'venv':
+        return True, []
+
+    try:
+        from tts._torch_probe import _resolve_paths, check_backend_runnable
+    except Exception:
+        return True, []  # probe unavailable in dev mode — treat as healthy
+
+    # Probe requires a frozen python-embed bundle to run the deep
+    # subprocess import.  In dev mode (running from source, not a
+    # frozen .exe), `_resolve_paths()` returns False, and a direct
+    # call to check_backend_runnable would return False without ever
+    # actually running the probe — indistinguishable from "probe ran
+    # and the engine is broken".  Treat unavailable-probe as healthy
+    # so dev-mode + unit-test runs trust the pip-level signal that
+    # called us; only frozen-build users get the deep-probe gate.
+    if not _resolve_paths():
+        return True, []
+
+    err_file = os.path.join(
+        os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
+        f'probe_{backend}.err',
+    )
+
+    healed: list[str] = []
+    for iteration in range(max_iter):
+        _invalidate_import_cache()
+        if check_backend_runnable(backend, required_pkg):
+            return True, healed
+
+        # Deep probe failed — read the error file the probe just wrote
+        if not os.path.isfile(err_file):
+            return False, healed
+        try:
+            with open(err_file) as _ef:
+                err_text = _ef.read()
+        except Exception:
+            return False, healed
+
+        # Two recognised failure shapes — try in order:
+        #  1. ModuleNotFoundError → install missing top-level package.
+        #  2. ImportError: pkg>=X is required (transformers' version-
+        #     check format) → upgrade to satisfy the floor.
+        m = _MISSING_MODULE_RE.search(err_text)
+        if m:
+            missing = m.group(1).split('.')[0]  # heal at top-level only
+            # ``-U`` is required even for "missing" — when ~/.nunba/site-
+            # packages/<pkg>/ already exists from a prior partial install,
+            # pip --target SKIPS writing with the warning
+            #   "Target directory ... already exists. Specify --upgrade
+            #    to force replacement."
+            # The previous code ran without -U, so the stale dir survived
+            # untouched and the very next deep probe failed with the
+            # same ModuleNotFoundError — auto-heal looked successful in
+            # the log ("Successfully installed omegaconf-2.3.0") but the
+            # probe stayed broken.  This was the root cause of the
+            # chatterbox_turbo "missing for 'omegaconf'" loop on
+            # Windows installs that had ever started a previous install.
+            # The version-mismatch branch below already used -U for
+            # exactly this reason; the two branches now match.
+            pip_args = ['install', '-U', missing]
+            heal_key = missing
+            kind = 'missing'
+        else:
+            vm = _VERSION_MISMATCH_RE.search(err_text)
+            if not vm:
+                # Different kind of failure (e.g., DLL not found, runtime
+                # error in __init__) — can't auto-heal; bail.
+                return False, healed
+            missing = vm.group(1).split('.')[0]
+            # Upgrade-in-place: pip will pick the latest version that
+            # satisfies the floor in the error message.  Use a distinct
+            # heal_key so a prior plain-install of the same pkg this
+            # run does not falsely abort the upgrade attempt.
+            pip_args = ['install', '-U', missing]
+            heal_key = f'{missing}@upgrade'
+            kind = 'version-mismatch'
+
+        if heal_key in healed:
+            # Already attempted this exact remediation this run, probe
+            # still fails — circular or the install lied; stop looping.
+            return False, healed
+
+        if progress_cb:
+            progress_cb(
+                f"Auto-healing {backend}: deep probe shows {kind} for "
+                f"'{missing}' — installing..."
+            )
+        ok, msg = _run_pip(pip_args, progress_cb)
+        if not ok:
+            # Pip exited non-zero — but the package may STILL have
+            # landed on disk before the failure (post-install dep
+            # check, target-dir warning, harmless rc=2 from upstream
+            # `Successfully installed` is now rescued in _run_pip
+            # itself, but a hard rc=2 mid-write can still leave the
+            # missing module importable).  Re-run the deep probe one
+            # extra time before giving up; if the missing module is
+            # now resolvable, the next iteration of the outer loop
+            # will pick up whatever NEW transitive surfaces.
+            _invalidate_import_cache()
+            if check_backend_runnable(backend, required_pkg):
+                logger.info(
+                    "Self-heal: pip rc!=0 for '%s' but deep probe now "
+                    "passes — treating as healed.", missing,
+                )
+                healed.append(heal_key)
+                return True, healed
+            # Probe still fails AND pip failed — log the FULL message
+            # so future runs aren't blind to the carets-only line that
+            # used to leak through the logger's width truncation.
+            _msg_tail = msg[-1500:] if len(msg) > 1500 else msg
+            logger.warning(
+                "Self-heal pip install of '%s' for %s failed (full "
+                "output trimmed to last 1500 chars; see "
+                "~/Documents/Nunba/logs/pip_%s.log for full):\n%s",
+                missing, backend, missing, _msg_tail,
+            )
+            return False, healed
+        healed.append(heal_key)
+        # Loop re-runs deep probe
+
+    # Exhausted max_iter — treat as failed
+    logger.warning(
+        f"Self-heal for {backend} hit max_iter={max_iter} after installing "
+        f"{healed}; deep probe still fails"
+    )
+    return False, healed
 
 
 def install_backend_full(backend: str,
@@ -749,11 +1390,29 @@ def install_backend_full(backend: str,
                     f"({len(venv_pkgs)} packages)..."
                 )
             from tts.backend_venv import ensure_venv, install_into_venv
-            ensure_venv(backend)
+            venv_python = ensure_venv(backend)
             venv_ok, venv_msg = install_into_venv(backend, venv_pkgs)
             if not venv_ok:
                 return False, f"venv install failed: {venv_msg}"
             pkg_ok, pkg_msg = True, venv_msg
+            # Wire the HARTOS ToolWorker to spawn its dispatch subprocess
+            # under THIS venv's python (#53 contract).  Without this,
+            # install_target='venv' only routes the install — synth still
+            # spawns under python-embed and re-hits the same version
+            # conflicts.  Use the spec already in BACKEND_VENV_PACKAGES
+            # path: HARTOS owns tool_module + tool_worker_attr.
+            try:
+                spec = _hartos_engine_registry().get(backend)
+                if spec and spec.tool_module and spec.tool_worker_attr:
+                    import importlib
+                    worker = getattr(
+                        importlib.import_module(spec.tool_module),
+                        spec.tool_worker_attr, None)
+                    if worker is not None:
+                        worker.python_exe = str(venv_python)
+                        getattr(worker, 'stop', lambda: None)()
+            except Exception as _e:
+                logger.debug("python_exe wire skipped for %s: %s", backend, _e)
         else:
             # Step 1b: normal main-interpreter install path.
             if progress_cb:
@@ -902,19 +1561,44 @@ def _download_model_weights(backend: str,
 
 
 def _invalidate_import_cache():
-    """Clear TTSEngine import cache so newly installed packages are detected.
+    """Clear ALL import-related caches so newly installed packages are
+    detected on the very next probe.  Three independent caches sit
+    between the install path and the runnable check:
 
-    Also refreshes importlib's finder cache.
+      1. TTSEngine._import_check_cache       (per-package, in-process)
+      2. importlib's internal finder cache   (in-process)
+      3. _torch_probe._backend_cache         (per-backend, in-process,
+                                              keys the subprocess
+                                              import probe — was the
+                                              missed one that caused
+                                              chatterbox-librosa
+                                              self-heal to spin: pip
+                                              installed librosa, this
+                                              fn cleared (1) and (2)
+                                              but NOT (3), so the next
+                                              probe call returned the
+                                              stale pre-install False
+                                              instead of re-running
+                                              the subprocess.)
+
+    Cheap to clear all three, expensive to forget any one of them.
     """
-    # Clear TTSEngine's static cache
+    # 1. TTSEngine's static cache
     try:
         from tts.tts_engine import TTSEngine
         TTSEngine._import_check_cache.clear()
     except Exception:
         pass
 
-    # Refresh importlib finders
+    # 2. importlib finders
     importlib.invalidate_caches()
+
+    # 3. _torch_probe per-backend subprocess result cache
+    try:
+        from tts import _torch_probe as _tp
+        _tp._backend_cache.clear()
+    except Exception:
+        pass
 
     # Re-add python-embed to sys.path if not present (edge case after pip install)
     sp = get_embed_site_packages()

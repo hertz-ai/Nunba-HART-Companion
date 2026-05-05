@@ -107,7 +107,20 @@ def test_j219_ensure_venv_does_not_contaminate_main_interp(tmp_path, monkeypatch
            "(above) run always.",
 )
 def test_j219_indic_synth_via_venv_real(tmp_path, monkeypatch):
-    """Real install + synth path. Only runs when the operator opts in."""
+    """Real install + synth path. Only runs when the operator opts in.
+
+    Goes through the SAME path production uses now (#53 cleanup):
+    HARTOS `indic_parler_synthesize()` -> module-level `_tool` (ToolWorker)
+    -> `gpu_worker._dispatch_and_run` subprocess -> tool's `_load` /
+    `_synthesize` callbacks. The ONLY thing this test sets is
+    `_tool.python_exe` to the venv python so the dispatcher subprocess
+    runs under transformers==4.46.x instead of main's 5.x.
+
+    The previous version of this test invoked
+    `backend_venv.invoke_in_venv("indic_parler", "tts.indic_parler_worker", ...)`
+    which was a parallel path duplicating HARTOS's tool — retired in
+    #53 along with `tts/indic_parler_worker.py`.
+    """
     monkeypatch.setenv("NUNBA_VENV_ROOT_OVERRIDE", str(tmp_path))
     backend_venv._reset_cache_for_tests()
 
@@ -119,22 +132,26 @@ def test_j219_indic_synth_via_venv_real(tmp_path, monkeypatch):
     # Venv healthy for parler_tts?
     assert backend_venv.is_venv_healthy("indic_parler", "parler_tts")
 
-    # Actually synthesize something short in Hindi.
-    payload = {"text": "नमस्ते", "language": "hi"}
-    rc, out, err = backend_venv.invoke_in_venv(
-        "indic_parler", "tts.indic_parler_worker",
-        ["--payload", __import__("json").dumps(payload)],
-        timeout=300,
-    )
-    assert rc == 0, f"indic_parler_worker rc={rc} err={err[-400:]!r}"
+    # Wire HARTOS's module-level ToolWorker to spawn under the venv's
+    # python.  Read at `_get_or_start` time (#53 contract), so setting
+    # the attribute before the first synth call takes effect.
+    venv_py = str(backend_venv.ensure_venv("indic_parler"))
+    from integrations.service_tools import indic_parler_tool
+    indic_parler_tool._tool.python_exe = venv_py
+    # Ensure no stale worker is running from a prior test.
+    try:
+        indic_parler_tool._tool.stop()
+    except Exception:
+        pass
 
-    import json
-    result = json.loads(out.splitlines()[-1])
-    assert result.get("ok"), f"worker reported failure: {result}"
-    audio = result.get("audio_base64", "")
-    assert len(audio) > 10_000, (
-        f"audio_base64 too short ({len(audio)} chars) — synth did not "
-        f"produce meaningful output"
+    # Synthesize through the production API.
+    out_wav = tmp_path / "j219_real.wav"
+    indic_parler_tool.indic_parler_synthesize(
+        text="नमस्ते", language="hi", output_path=str(out_wav),
+    )
+    assert out_wav.is_file() and out_wav.stat().st_size > 10_000, (
+        f"output {out_wav} missing or too small "
+        f"({out_wav.stat().st_size if out_wav.exists() else 0} bytes)"
     )
 
     # Final gate: main interp transformers stayed on its pinned version.

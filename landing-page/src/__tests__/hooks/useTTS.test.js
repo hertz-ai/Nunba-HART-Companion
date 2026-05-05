@@ -158,7 +158,7 @@ describe('speak', () => {
     expect(mockPocketTTSInstance.speak).not.toHaveBeenCalled();
   });
 
-  // eslint-disable-next-line jest/no-disabled-tests
+  // eslint-disable-next-line -- it.skip is intentional; see comment below
   it.skip('sets error when no TTS engine is available', async () => {
     // SKIPPED 2026-04-19: hermetic mocking requires simultaneous
     // control of (a) /tts/status fetch, (b) ttsCapabilityProbe engine

@@ -377,10 +377,12 @@ end).  Build queue:
      This is expected — the BLE feature is new; Android side
      awaits the BLE native module shipped in #407.
 
-3. **api_tracker.py:1012 also registers `/encounters` GET.**  Whether
-   this duplicates the gamification_bp registration depends on
-   tracker_bp's mount prefix.  If both end up at `/api/social/
-   encounters`, that's a real conflict.  Logged as follow-up.
+3. **api_tracker.py vs api_gamification.py `/encounters` —
+   verified NOT a conflict.**  tracker_bp mounts at
+   `/api/social/tracker` (api_tracker.py:24), gamification_bp at
+   `/api/social` (api_gamification.py:25).  Fully-qualified paths
+   are `/api/social/tracker/encounters` vs `/api/social/encounters`
+   — different routes.  Retracting the "possible conflict" flag.
 
 4. **Component-level deep trace not yet performed** for:
    `useLocationPing`, `MissedConnectionDetail`, `MissedConnectionForm`,

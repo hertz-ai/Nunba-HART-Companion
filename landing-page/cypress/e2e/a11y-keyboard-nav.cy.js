@@ -149,7 +149,7 @@ describe('a11y: reduced-motion preference respected', () => {
   });
 });
 
-describe('a11y: static metadata + skip-link presence', () => {
+describe('a11y: static metadata (title, headings, labels)', () => {
   beforeEach(() => {
     installBaselineStubs();
   });

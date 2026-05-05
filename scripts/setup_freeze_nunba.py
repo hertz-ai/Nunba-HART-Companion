@@ -28,6 +28,50 @@ try:
             print("Patched transformers/__init__.py: frozenset fix applied")
 except Exception as _e:
     print(f"WARNING: Could not patch transformers: {_e}")
+
+# ── Defang transformers' packages_distributions() module-load scan ──
+# transformers/utils/import_utils.py:45 does
+#     PACKAGE_DISTRIBUTION_MAPPING = importlib.metadata.packages_distributions()
+# at module-import time, with NO guard.  packages_distributions() walks
+# every *.dist-info/METADATA in site-packages and accesses
+# `dist.metadata['Name']`.  If ANY one dist-info is corrupt (METADATA
+# missing or being concurrently rewritten by pip), this raises
+# KeyError('Name') → transformers fails to import → langchain →
+# hart_intelligence → Tier-1 HARTOS dies → agent daemon never starts →
+# Admin Agent Dashboard shows empty.
+#
+# Regression 2026-04-26: a transient corrupt dist-info killed Tier-1 init
+# at boot; the dashboard stayed empty for the rest of the process
+# lifetime because Tier-1 init is one-shot and transformers' module-level
+# globals are populated only once.
+#
+# The patch wraps that single line in a try/except that falls back to an
+# empty mapping.  Auto-docstring lookups against the empty mapping return
+# best-effort generic distribution-name guesses — strictly worse than the
+# canonical map but vastly better than a hard crash that takes down the
+# entire HARTOS Tier-1.
+try:
+    import importlib.util as _ilu_iu
+    _iu_spec = _ilu_iu.find_spec('transformers.utils.import_utils')
+    if _iu_spec and _iu_spec.origin:
+        with open(_iu_spec.origin, encoding='utf-8') as _f:
+            _iu_src = _f.read()
+        _iu_bad = 'PACKAGE_DISTRIBUTION_MAPPING = importlib.metadata.packages_distributions()'
+        _iu_good = (
+            'try:\n'
+            '    PACKAGE_DISTRIBUTION_MAPPING = importlib.metadata.packages_distributions()\n'
+            'except Exception:\n'
+            '    # Corrupt dist-info / pip race — degrade gracefully so the\n'
+            '    # whole HARTOS Tier-1 import does not crash on a single bad METADATA.\n'
+            '    PACKAGE_DISTRIBUTION_MAPPING = {}'
+        )
+        if _iu_bad in _iu_src and _iu_good not in _iu_src:
+            _iu_src = _iu_src.replace(_iu_bad, _iu_good)
+            with open(_iu_spec.origin, 'w', encoding='utf-8') as _f:
+                _f.write(_iu_src)
+            print("Patched transformers/utils/import_utils.py: packages_distributions() guarded")
+except Exception as _e2:
+    print(f"WARNING: Could not patch transformers import_utils: {_e2}")
 import py_compile
 
 # hevolveai/embodied_ai pull in torch/transformers which cause cx_Freeze
@@ -294,19 +338,28 @@ build_exe_options = {
         "routes.chatbot_routes",  # Chatbot routes module
         "routes.kids_media_routes",  # Kids media generation routes
 
-        # core.* — architect-refactor modules (diag, optional_import,
-        # gpu_tier, hub_allowlist) now live in HARTOS core/ alongside
-        # the canonical infrastructure (http_pool, port_registry,
-        # realtime, agent_tools, platform_paths, constants).  Nunba
-        # NO LONGER has its own core/ directory — the previous split
-        # caused a namespace-package collision (Nunba core/ lacked
-        # __init__.py, HARTOS core/ has one → whichever loaded first
-        # won, hiding the other's modules at runtime).  HARTOS core/
-        # is picked up via the "Including core package" trace above,
-        # so no explicit packages list is needed here — cx_Freeze
-        # bundles everything in the package tree automatically.
+        # core / integrations / security are HARTOS packages.  They are
+        # NOT listed here on purpose — see the matching excludes[] entry
+        # below for the SRP rationale.  TL;DR: they're bundled at the
+        # install ROOT via include_files (lines ~709-730) for the main
+        # exe, AND in python-embed/Lib/site-packages/ for subprocesses.
+        # cx_Freeze must NOT also produce a partial copy in lib/ — that
+        # third location is the shadow that has caused four production
+        # outages (2026-04-21, -24, -25, -26).  See excludes[] below.
 
         "uvicorn",
+        # Hypercorn + its h11/h2/wsproto/priority dep chain.  Listed
+        # explicitly because cx_Freeze's tracer often misses
+        # dynamically-imported worker classes (asyncio worker etc.).
+        # All five packages are pure-Python wheels (no native compile),
+        # safe to bundle on every platform.
+        "hypercorn",
+        "wsproto",
+        "h11",
+        "h2",
+        "hpack",
+        "hyperframe",
+        "priority",
         "fastapi",
         "pydantic",
         "sqlalchemy",
@@ -332,7 +385,11 @@ build_exe_options = {
         "tts.piper_tts",  # Piper TTS for CPU text-to-speech
         "tts.package_installer",  # Runtime TTS package installer
         "tts.backend_venv",  # Per-backend venv infra (Track A)
-        "tts.indic_parler_worker",  # Subprocess entrypoint (runs inside venv) (Track B)
+        # tts.indic_parler_worker DELETED — was a duplicate __main__ path
+        # paralleling HARTOS integrations/service_tools/indic_parler_tool.
+        # The central dispatcher (gpu_worker._dispatch_and_run) now spawns
+        # the HARTOS tool directly under the engine's venv via
+        # ToolWorker(python_exe=...).  See task #53.
         "tts.tts_engine",  # Unified TTS engine (auto-selects GPU/CPU backend)
         "tts.tts_handshake",  # First-run voice-check handshake (gates Ready banner)
         "tts.verified_synth",  # Verified-signal gate (consumed by tts_handshake + _bg_install)
@@ -405,6 +462,36 @@ build_exe_options = {
     "zip_includes": [],
     "build_exe": "build/Nunba",
     "excludes": [
+        # ── HARTOS packages: SRP single-source-of-truth ─────────────
+        # core / integrations / security live at the install ROOT (via
+        # include_files at ~line 709-730) for the main exe runtime, AND
+        # in python-embed/Lib/site-packages/ for subprocess runtime.
+        # Those are TWO legitimate locations — different runtime
+        # contexts (cx_Freeze exe vs python-embed subprocess).
+        #
+        # cx_Freeze's static import tracer wants to ALSO bundle these
+        # into lib/<pkg>/.  That third copy is a parallel path: lib/
+        # sits earlier on sys.path than the install-root for the main
+        # exe, so a partial lib/<pkg>/ shadows the canonical full copy
+        # and the .exe crashes with ModuleNotFoundError on any
+        # function-local `from core.X import Y` the tracer missed.
+        #
+        # Every prior shadow incident (2026-04-21 dev .venv, -24
+        # bundle's own lib stripped, -25 stale user site-packages, -26
+        # partial lib/core/) was a different VARIANT of this same
+        # parallel-path failure.  Each was patched by adding sys.path-
+        # scrubbing logic in app.py — symptomatic, not root-cause.
+        # Excluding here is the SRP fix: cx_Freeze stops trying to be
+        # the bundler for HARTOS code, leaving include_files (top-
+        # level) and pip install (python-embed) as the only two paths.
+        "core", "core.*",
+        "integrations", "integrations.*",
+        "security", "security.*",
+        # agent_ledger / hevolveai / hevolve_database are also HARTOS-
+        # adjacent packages bundled via include_files / python-embed,
+        # not lib/.  Same SRP principle.
+        "agent_ledger", "agent_ledger.*",
+        "hevolve_database", "hevolve_database.*",
         "unittest", "test", "tests",
         "shapely.plotting", "shapely.tests",
         # Exclude large unnecessary packages
@@ -453,6 +540,13 @@ build_exe_options = {
         "webview.platforms.qt",
         # pycparser is included as source files in lib_src to avoid circular import
         "pycparser",
+        # `agents` is the openai-agents SDK, an OPTIONAL transitive of
+        # sentry_sdk.integrations.openai_agents.patches.error_tracing.
+        # Sentry guards the imports with try/except, but cx_Freeze's
+        # static tracer reports the missing modules as validation errors
+        # ("Fix import errors above before distributing"), failing the
+        # macOS Build Nunba step. We don't ship openai-agents, so exclude.
+        "agents", "agents.*",
         # Linux-only agent_engine modules (WebKit2/GTK, Conky, PipeWire)
         "integrations.agent_engine.liquid_ui_service",
         "integrations.agent_engine.shell_manifest",
@@ -682,19 +776,35 @@ def find_hevolve_modules():
 hevolve_files = find_hevolve_modules()
 build_exe_options["include_files"].extend(hevolve_files)
 
-# Always include agent_ledger from sibling dir (namespace package issue)
-if True:
-    _agent_ledger_candidates = [
-        os.path.join(_hartos_dir, 'agent-ledger-opensource', 'agent_ledger'),
-        os.path.join('hartos_backend_src', 'agent_ledger'),
-    ]
-    for _al_path in _agent_ledger_candidates:
-        if os.path.isdir(_al_path) and os.path.isfile(os.path.join(_al_path, '__init__.py')):
-            build_exe_options["include_files"].append((os.path.normpath(_al_path), "agent_ledger"))
-            print(f"Including agent_ledger package <- {os.path.normpath(_al_path)}")
-            break
-    else:
-        print("WARNING: agent_ledger package not found — distributed agent features will be unavailable")
+
+# Always include agent_ledger from sibling dir (namespace package issue).
+# agent_ledger is core to distributed coordination (TaskLedger UI,
+# DistributedTaskCoordinator, LedgerPubSub delegation broadcasts) and
+# is consumed by HARTOS itself (create_recipe, lifecycle_hooks,
+# integrations/agent_engine/api.py) plus Nunba tts_engine.  Shipping a
+# build without it produces a runtime ImportError that the admin UI
+# surfaces as 501 from /api/agent-engine/ledger/tasks → "No tasks
+# found" with no diagnostic trail.  Treat missing source as a hard
+# build-abort, not a warning.
+_agent_ledger_candidates = [
+    os.path.join(_hartos_dir, 'agent-ledger-opensource', 'agent_ledger'),
+    os.path.join('hartos_backend_src', 'agent_ledger'),
+]
+_agent_ledger_resolved = None
+for _al_path in _agent_ledger_candidates:
+    if os.path.isdir(_al_path) and os.path.isfile(os.path.join(_al_path, '__init__.py')):
+        build_exe_options["include_files"].append((os.path.normpath(_al_path), "agent_ledger"))
+        _agent_ledger_resolved = os.path.normpath(_al_path)
+        print(f"Including agent_ledger package <- {_agent_ledger_resolved}")
+        break
+if _agent_ledger_resolved is None:
+    raise RuntimeError(
+        "agent_ledger package source not found.  Searched:\n  - "
+        + "\n  - ".join(_agent_ledger_candidates)
+        + "\nClone HARTOS as a sibling directory or vendor the package "
+        "into hartos_backend_src/agent_ledger before building."
+    )
+
 
 # Include HARTOS package directories if not pip-installed (integrations, core, security)
 # Check _deps/HARTOS first (CI: actions/checkout), then ../HARTOS (local dev)
@@ -807,12 +917,283 @@ def get_directory_hash(directory):
                 pass
     return hash_obj.hexdigest()
 
-# python-embed is copied via shutil.copytree in the post-build step (not
-# cx_Freeze include_files) because cx_Freeze doesn't reliably copy
-# dot-prefixed directories like .libs/ which contain critical DLLs.
+# ── Source python-embed integrity scan ─────────────────────────────
+# Witnessed regression (2026-04-27): a prior pip install --target into
+# python-embed/Lib/site-packages got interrupted (Ctrl-C / OOM /
+# antivirus quarantine), leaving transformers/.../t3.py written with
+# NULL bytes in the middle.  The .py was a stable hash from then on,
+# so SHA-based skip-copy below kept saying "source unchanged, skipping
+# copy" forever — the corruption persisted across every rebuild and
+# every Nunba installer shipped the same broken file.  Users hit
+# `SyntaxError: source code string cannot contain null bytes` on
+# `from transformers import ...` for weeks.
+#
+# Fix: validate the SOURCE python-embed BEFORE the hash check.  Same
+# checks as the post-build validator (METADATA Name: header, .py null
+# bytes), applied to the SOURCE so corruption is caught before it gets
+# hashed-as-canonical.  Failing here also short-circuits the
+# skip-copy logic — operator must fix the source before any further
+# build can succeed.
+def _validate_python_embed_source() -> list[tuple[str, str]]:
+    """Scan source python-embed/Lib/site-packages for known
+    corruption patterns the cx_Freeze copy would propagate.
+    Returns [(path, reason), ...] for every bad file found."""
+    bad: list[tuple[str, str]] = []
+    sp = os.path.join("python-embed", "Lib", "site-packages")
+    if not os.path.isdir(sp):
+        return bad
+    # Pass 1: dist-info METADATA must have a `Name:` header before
+    # the body delimiter (matches what packages_distributions reads).
+    for entry in os.listdir(sp):
+        full = os.path.join(sp, entry)
+        if not (os.path.isdir(full) and entry.endswith('.dist-info')):
+            continue
+        meta = os.path.join(full, 'METADATA')
+        if not os.path.isfile(meta):
+            bad.append((full, 'METADATA file missing'))
+            continue
+        try:
+            with open(meta, encoding='utf-8', errors='replace') as fh:
+                has_name = False
+                for line in fh:
+                    if line.startswith('Name:'):
+                        has_name = True
+                        break
+                    if line.strip() == '':
+                        break
+            if not has_name:
+                bad.append((meta, 'no Name: header in METADATA'))
+        except OSError as exc:
+            bad.append((meta, f'read error: {exc}'))
+    # Pass 2: .py files with NULL bytes (reproduces the cycle-7
+    # transformers/.../t3.py SyntaxError).  Only the first 64 KB of
+    # each file is scanned — a NULL anywhere in the parsed prefix is
+    # enough to break Python's compiler.  Capping the read keeps the
+    # scan O(N_files × 64KB) instead of O(total_python_embed_bytes)
+    # which would be minutes on a hot site-packages.
+    for root, _dirs, files in os.walk(sp):
+        for fn in files:
+            if not fn.endswith('.py'):
+                continue
+            fp = os.path.join(root, fn)
+            try:
+                with open(fp, 'rb') as fh:
+                    chunk = fh.read(64 * 1024)
+                if b'\x00' in chunk:
+                    bad.append((fp, 'NULL bytes found in .py source'))
+            except OSError as exc:
+                bad.append((fp, f'read error: {exc}'))
+    return bad
+
+
+def _build_import_to_pip_map(sp: str) -> dict[str, str]:
+    """Walk every *.dist-info in `sp`, read METADATA Name: + top_level.txt,
+    return {import_name: pip_dist_name}.
+
+    Why this exists: PyPI dist names rarely match Python import names.
+    `chatterbox-tts` installs the `chatterbox` package; `resemble-perth`
+    installs `perth`; `descript-audio-codec` installs `dac`.  When a
+    .py file at `<sp>/<import_name>/...` is corrupt, the autorepair
+    needs the PyPI dist name to pip-install — guessing from the dir
+    name lands on the wrong (unrelated) package and silently doesn't
+    fix the corruption (witnessed: cycle 8 — pip install `chatterbox`
+    grabbed an old chatbot framework instead of ResembleAI's
+    chatterbox-tts; the corrupt models/t3/t3.py survived and shipped).
+
+    The dist-info itself records the mapping authoritatively:
+      * METADATA's `Name:` header is the PyPI dist name
+      * top_level.txt lists the import names the package provides
+    Inverting top_level.txt → Name: gives us the right pip name for
+    every corrupt import path the validator finds.
+
+    Robust against missing top_level.txt (older pip versions / wheel
+    packages) by also indexing the dist-info's own derived name.
+    Robust against multiple top-levels per dist (e.g. `setuptools`
+    provides `setuptools`, `pkg_resources`, `_distutils_hack`)."""
+    out: dict[str, str] = {}
+    if not os.path.isdir(sp):
+        return out
+    for entry in os.listdir(sp):
+        full = os.path.join(sp, entry)
+        if not (os.path.isdir(full) and entry.endswith('.dist-info')):
+            continue
+        # 1) PyPI dist name from METADATA Name:
+        pip_name = ''
+        meta = os.path.join(full, 'METADATA')
+        if os.path.isfile(meta):
+            try:
+                with open(meta, encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        if line.startswith('Name:'):
+                            pip_name = line.split(':', 1)[1].strip()
+                            break
+                        if line.strip() == '':
+                            break
+            except OSError:
+                pass
+        # Fallback: derive from `<name>-<version>.dist-info` dir name
+        if not pip_name:
+            pip_name = entry[:-len('.dist-info')].rsplit('-', 1)[0]
+        # 2) Import names from top_level.txt
+        top = os.path.join(full, 'top_level.txt')
+        import_names: list[str] = []
+        if os.path.isfile(top):
+            try:
+                with open(top, encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        n = line.strip()
+                        if n:
+                            import_names.append(n)
+            except OSError:
+                pass
+        # If no top_level.txt, fall back to the dist's own derived name
+        # normalized (dashes -> underscores) which usually matches
+        if not import_names:
+            import_names.append(pip_name.replace('-', '_'))
+        for n in import_names:
+            # First mapping wins (deterministic if multiple dist-infos
+            # claim the same top-level).
+            out.setdefault(n, pip_name)
+    return out
+
+
+def _autorepair_corrupt_packages(corruption: list[tuple[str, str]]) -> int:
+    """Auto-repair corrupt python-embed packages by deleting the package
+    dir + pip-installing it again with --force-reinstall.  Mirrors the
+    repair recipe a human would run, but inline so `python scripts/
+    build.py` self-corrects without operator intervention.
+
+    Returns the number of packages successfully repaired.  Skips
+    packages we can't safely auto-repair (sibling repos with no PyPI
+    name — those are handled by the dedicated sibling-deps loop
+    further down) and packages whose pip name we can't infer."""
+    import subprocess as _sp
+    import shutil as _shutil
+
+    sp = os.path.join("python-embed", "Lib", "site-packages")
+    by_pkg: dict[str, int] = {}
+    for fp, _reason in corruption:
+        try:
+            rel = os.path.relpath(fp, sp)
+            pkg_dir = rel.split(os.sep)[0]
+            by_pkg[pkg_dir] = by_pkg.get(pkg_dir, 0) + 1
+        except Exception:
+            pass
+
+    # Build the import-name → pip-dist-name map BEFORE we start
+    # deleting dist-info dirs (deletion races would empty it mid-loop).
+    _import_to_pip = _build_import_to_pip_map(sp)
+
+    # Sibling repos are handled by the explicit re-install loop below
+    # — don't double-repair them here (would race the loop's own
+    # delete + pip install).
+    _SIBLING_NAMES = {
+        'hart-backend', 'hart_backend', 'hartos',
+        'hevolveai',
+        'hevolve-database', 'hevolve_database',
+        'agent-ledger', 'agent_ledger',
+    }
+
+    repaired = 0
+    for pkg_dir in sorted(by_pkg.keys()):
+        # Derive the pip distribution name.  Three rules in order:
+        #   1) Exact match in import → pip map (handles
+        #      `chatterbox -> chatterbox-tts`, `perth -> resemble-perth`,
+        #      `dac -> descript-audio-codec`)
+        #   2) Strip .dist-info / .egg-info suffixes for direct dist
+        #      dirs (handles `transformers-5.1.0.dist-info -> transformers`)
+        #   3) Fallback: dir name unchanged
+        if pkg_dir in _import_to_pip:
+            _pip_name = _import_to_pip[pkg_dir]
+        else:
+            _pip_name = pkg_dir
+            for _suf in ('.dist-info', '.egg-info'):
+                if _pip_name.endswith(_suf):
+                    _pip_name = _pip_name[: -len(_suf)].rsplit('-', 1)[0]
+                    # After stripping, also try the import-name lookup
+                    # against the bare name in case it disambiguates.
+                    if _pip_name in _import_to_pip:
+                        _pip_name = _import_to_pip[_pip_name]
+                    break
+        if _pip_name.lower() in _SIBLING_NAMES:
+            print(
+                f"  python-embed: {pkg_dir} corrupt -- skipping autorepair "
+                f"(handled by sibling-deps loop below)"
+            )
+            continue
+        # Step 1: rm -rf the corrupt dir (pip --force-reinstall alone
+        # can leave stray files from the broken install behind)
+        _full = os.path.join(sp, pkg_dir)
+        try:
+            _shutil.rmtree(_full)
+        except Exception as _exc:
+            print(
+                f"  python-embed: failed to remove {pkg_dir}: {_exc} -- "
+                f"skipping autorepair"
+            )
+            continue
+        # Step 2: pip install --target <python-embed sp> --force-reinstall
+        # --no-deps <pip_name>.  --no-deps because the bundle already
+        # carries every required transitive; we only want to repair
+        # this one corrupt package without unbounded re-resolution.
+        print(f"  python-embed: autorepair pip-install {_pip_name} "
+              f"(import={pkg_dir})...")
+        _r = _sp.run(
+            [sys.executable, "-m", "pip", "install",
+             "--target", sp, "--force-reinstall", "--no-deps",
+             "--no-build-isolation", "--quiet", _pip_name],
+            capture_output=True, text=True, timeout=600,
+        )
+        if _r.returncode == 0:
+            print(f"  python-embed: {_pip_name} repaired OK")
+            repaired += 1
+        else:
+            print(
+                f"  python-embed: {_pip_name} repair FAILED: "
+                f"{(_r.stderr or _r.stdout or '')[:200]}"
+            )
+    return repaired
+
+
 _skip_python_embed_copy = False
 current_python_embed_hash = None
 if os.path.exists("python-embed"):
+    _src_corruption = _validate_python_embed_source()
+    if _src_corruption:
+        print(
+            f"[python-embed] {len(_src_corruption)} corrupt file(s) detected "
+            f"in source — auto-repairing.  The skip-copy logic below would "
+            f"otherwise lock the corruption into every future build "
+            f"(witnessed: cycle-7 transformers NULL-byte t3.py persisted "
+            f"across reinstalls for weeks)."
+        )
+        for fp, reason in _src_corruption[:10]:
+            print(f"  {fp}  ->  {reason}")
+        if len(_src_corruption) > 10:
+            print(f"  ... and {len(_src_corruption) - 10} more")
+        _repaired = _autorepair_corrupt_packages(_src_corruption)
+        print(f"[python-embed] autorepair pass: {_repaired} package(s) "
+              f"reinstalled")
+        # Re-validate after repair — if anything still corrupt, FAIL
+        # so the operator sees what couldn't be fixed (e.g. a sibling
+        # repo whose .py was nulled, or a package pip can't reach
+        # because the index is offline).
+        _src_corruption = _validate_python_embed_source()
+        if _src_corruption:
+            print(
+                f"[BUILD FAILURE] {len(_src_corruption)} file(s) STILL "
+                f"corrupt after autorepair — refusing to ship."
+            )
+            for fp, reason in _src_corruption[:30]:
+                print(f"  {fp}  ->  {reason}")
+            print()
+            print("  Manual repair recipe (run from the Nunba repo root):")
+            print("    rm -rf python-embed/Lib/site-packages/<bad-pkg>")
+            print("    pip install --target python-embed/Lib/site-packages \\")
+            print("        --force-reinstall --no-deps <pip-name>")
+            sys.exit(1)
+        print("[python-embed] post-repair: source clean, proceeding")
+
     current_python_embed_hash = get_directory_hash("python-embed")
     build_dir = build_exe_options["build_exe"]
     hash_file = os.path.join(build_dir, "python-embed.hash")
@@ -824,7 +1205,8 @@ if os.path.exists("python-embed"):
         _old_src_hash = _hash_lines[0] if _hash_lines else ''
         _old_dest_hash = _hash_lines[1] if len(_hash_lines) > 1 else _old_src_hash
         if _old_src_hash == current_python_embed_hash:
-            # Source unchanged — check if dest matches what we built last time
+            # Source unchanged AND validated clean — check if dest
+            # matches what we built last time.
             dest_hash = get_directory_hash(dest_embed)
             if dest_hash == _old_dest_hash:
                 _skip_python_embed_copy = True
@@ -973,6 +1355,7 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     _build_lib = os.path.join(os.path.abspath(build_exe_options["build_exe"]), "lib")
     if os.path.isdir(_build_lib):
         _compiled = 0
+        _post_build_failures = []
         for _py_file in glob.glob(os.path.join(_build_lib, "*.py")):
             _base = os.path.splitext(_py_file)[0]
             _pyc_file = _base + ".pyc"
@@ -981,9 +1364,18 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
                 os.remove(_py_file)
                 _compiled += 1
             except py_compile.PyCompileError as _pce:
-                print(f"  WARNING: Failed to compile {os.path.basename(_py_file)}: {_pce}")
+                # Was: print WARNING + continue.  That let broken bytecode
+                # ship to users (the bundled app crashed at first import,
+                # not at build time).  Now: collect + abort hard at end.
+                _post_build_failures.append((_py_file, str(_pce)))
         if _compiled:
             print(f"Post-build: compiled {_compiled} HARTOS .py files to .pyc in lib/")
+        if _post_build_failures:
+            print(f"\nPost-build: {len(_post_build_failures)} compile failures - "
+                  f"refusing to ship broken bytecode:")
+            for _f, _msg in _post_build_failures:
+                print(f"  {os.path.basename(_f)}: {_msg}")
+            sys.exit(1)
     # Also remove any raw .py files in root (leftover from previous builds)
     _build_root = os.path.abspath(build_exe_options["build_exe"])
     _root_cleaned = 0
@@ -1049,6 +1441,101 @@ if 'build' in sys.argv or 'build_exe' in sys.argv:
     else:
         print(f"Post-build: all .pyc files verified (magic={_expected_magic.hex()})")
 
+
+# ── Post-build: verify dist-info METADATA integrity ──
+# (2026-04-27 regression — chatterbox debug session)
+# Witnessed: a freeze that shipped python-embed/Lib/site-packages/
+# transformers-5.1.0.dist-info/METADATA as 31 KB of pure whitespace
+# (no `Name:` header).  Likely cause: an interrupted pip install
+# during a prior freeze step left the file half-written, and the
+# next build's `shutil.copytree` faithfully copied the corruption
+# into the installer.  Every subsequent Nunba install carried the
+# same broken file.
+#
+# Runtime impact: Python's importlib.metadata.packages_distributions()
+# walks every dist-info/METADATA and reads `dist.metadata['Name']`.
+# Any METADATA without a `Name:` header raises KeyError('Name').
+# transformers calls this at module-load time → langchain transitive →
+# whole agent stack falls over.  In the Nunba bundle the daemon's
+# tick path triggered transformers re-evaluation every 30 s, logging
+# "Agent daemon tick error (state reset): 'Name'" repeatedly while
+# the Admin Agent Dashboard sat empty.
+#
+# Two-layer protection:
+#   - Runtime: app.py (top) installs a packages_distributions
+#     monkey-patch that swallows the KeyError.
+#   - Build-time (this hook): scan EVERY dist-info METADATA the
+#     bundle is about to ship.  Fail the build if any are corrupt
+#     so a broken file never reaches a user installer in the first
+#     place.  The runtime patch is belt-and-suspenders; this is
+#     the suspenders.
+#
+# Failure mode:
+#   - METADATA file missing entirely  → fail build
+#   - METADATA file present but `Name:` header missing → fail build
+#   (Both cases reproduce the runtime KeyError.)
+if 'build' in sys.argv or 'build_exe' in sys.argv:
+    _build_dir_meta = os.path.abspath(build_exe_options["build_exe"])
+    _embed_sp_check = os.path.join(
+        _build_dir_meta, "python-embed", "Lib", "site-packages",
+    )
+    if os.path.isdir(_embed_sp_check):
+        _bad_meta: list[tuple[str, str]] = []  # (dist_info_dir, reason)
+        for _entry in os.listdir(_embed_sp_check):
+            _full = os.path.join(_embed_sp_check, _entry)
+            if not (os.path.isdir(_full) and _entry.endswith('.dist-info')):
+                continue
+            _meta_file = os.path.join(_full, 'METADATA')
+            if not os.path.isfile(_meta_file):
+                _bad_meta.append((_entry, 'METADATA file missing'))
+                continue
+            try:
+                with open(_meta_file, encoding='utf-8', errors='replace') as _fh:
+                    _has_name_header = False
+                    for _line in _fh:
+                        # Multi-line continuation lines start with whitespace;
+                        # the header's first occurrence is what matters.
+                        if _line.startswith('Name:'):
+                            _has_name_header = True
+                            break
+                        # Bail at first blank line — headers end before body
+                        if _line.strip() == '':
+                            break
+                if not _has_name_header:
+                    _bad_meta.append(
+                        (_entry, 'no Name: header in METADATA'),
+                    )
+            except OSError as _exc:
+                _bad_meta.append((_entry, f'read error: {_exc}'))
+        if _bad_meta:
+            print(
+                f"[BUILD FAILURE] {len(_bad_meta)} dist-info METADATA file(s) "
+                f"are corrupt — Nunba runtime will hit "
+                f"KeyError('Name') in importlib.metadata."
+                f"packages_distributions().  Reproduces the 2026-04-26 "
+                f"agent-daemon tick-error cascade.  Refusing to ship a "
+                f"broken installer."
+            )
+            for _di, _reason in _bad_meta:
+                print(f"  {_di}  ->  {_reason}")
+            print(
+                "  Fix: rebuild python-embed (delete + recreate) or "
+                "reinstall the affected packages with "
+                "`pip install --target python-embed/Lib/site-packages "
+                "--force-reinstall --no-deps <pkg>`."
+            )
+            sys.exit(1)
+        else:
+            _total_meta = sum(
+                1 for _e in os.listdir(_embed_sp_check)
+                if _e.endswith('.dist-info')
+            )
+            print(
+                f"Post-build: all {_total_meta} dist-info/METADATA files "
+                f"verified (Name: header present, packages_distributions "
+                f"won't blow up at runtime)"
+            )
+
 # ── Pre-copy: install TTS packages into python-embed ──
 # GPU TTS backends need pip packages in python-embed's site-packages.
 # python-embed's own pip is broken (distutils-precedence.pth), so we use
@@ -1075,9 +1562,17 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
                 os.path.isfile(os.path.join(_sib_path, 'setup.py'))
             ):
                 print(f"python-embed: re-installing {_pkg_name} from {_sib_dir}...")
+                # --force-reinstall: pip's default skips files that
+                # appear satisfied — but a partial-write from a prior
+                # interrupted install can leave a corrupt .py that
+                # still appears "installed".  Forcing reinstall
+                # overwrites byte-for-byte, so the cycle-7 NULL-byte
+                # transformers/.../t3.py class of bug self-heals on
+                # every freeze build instead of being silently
+                # propagated by hash-equal source.
                 _r = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "--no-deps",
-                     "--no-build-isolation",
+                     "--no-build-isolation", "--force-reinstall",
                      "--target", _embed_sp, "--upgrade", _sib_path],
                     capture_output=True, text=True, timeout=900)
                 if _r.returncode == 0:
@@ -1114,7 +1609,7 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
                 if not os.path.isfile(_meta_path):
                     continue
                 _name, _version, _summary = 'hevolveai', '0.1.0', 'HevolveAI compiled binary'
-                with open(_meta_path, 'r', encoding='utf-8', errors='replace') as _mf:
+                with open(_meta_path, encoding='utf-8', errors='replace') as _mf:
                     for _ln in _mf:
                         _lns = _ln.rstrip()
                         if _lns.startswith('Name:'):
@@ -1231,6 +1726,14 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
             # Installing full torch here causes stack overflow: torch.__init__
             # loads _C.pyd → needs torch_cpu.dll → DLL loader recurses → crash.
             ("chatterbox-tts", "chatterbox-tts", "chatterbox", []),
+            # Piper — canonical CPU-only TTS baseline.  ~30MB, no
+            # transformers / torch / CUDA needed.  Bundled so the ladder
+            # ALWAYS has a working last-resort engine when every GPU
+            # backend fails (chatterbox VRAM-rejected, F5 missing, etc).
+            # Without this, `tts.piper_tts._init_piper` logs
+            # "piper-tts not installed" inside the bundled exe and the
+            # whole TTS pipeline ends up at "No TTS engine available".
+            ("piper-tts", "piper-tts", "piper", []),
             ("parler-tts", "parler-tts", "parler_tts", []),
             # descript-audio-codec ships the top-level `dac` package that
             # parler_tts.dac_wrapper imports via `from dac.model import DAC`.
@@ -1246,6 +1749,34 @@ if ('build' in sys.argv or 'build_exe' in sys.argv):
             # STT — CTranslate2 bundles platform-specific CUDA runtime
             ("faster-whisper", "faster-whisper", "faster_whisper", []),
             ("ctranslate2", "ctranslate2", "ctranslate2", []),
+            # ── Mid-VRAM coverage tier (added 2026-04-29) ───────────
+            # Three new engines that fill the 1–3 GB bucket so every
+            # SUPPORTED_LANG_DICT code has at least one ≤3 GB engine
+            # in its preference ladder.
+            #
+            # MeloTTS (myshell-ai) — 6 langs (en/es/fr/zh/ja/ko), neural,
+            # CPU-friendly real-time inference, ~1.5 GB VRAM.  Ships
+            # `melotts` PyPI package with `melo` import root.
+            # `gpu_worker._maybe_self_heal_from_line` catches transitive
+            # imports MyShell forgot to declare in install_requires
+            # (witnessed for chatterbox-tts; same self-heal applies here).
+            ("melotts", "melotts", "melo", []),
+            # XTTS-v2 (Coqui idiap fork) — 17 langs incl. hi, voice
+            # cloning, ~2.5 GB VRAM.  PyPI: `coqui-tts` (the maintained
+            # 2026 fork; the older `TTS` package is unmaintained).
+            # Both ship `from TTS.api import TTS` so the import name
+            # is stable.
+            ("coqui-tts", "coqui-tts", "TTS", []),
+            # MMS-TTS (Meta's 1100+ language VITS) — uses `transformers`
+            # (already bundled) + `soundfile` (already a transitive of
+            # the bigger TTS engines).  No NEW pip install line is
+            # strictly necessary; the entry is here so the bundle
+            # accountant explicitly knows MMS-TTS is in scope and can
+            # optionally pre-pull a tiny smoke checkpoint at first run.
+            # We list `transformers` to make the dependency explicit
+            # without re-downloading (--no-deps + `_check_path` skip
+            # short-circuits when the package is already present).
+            ("mms-tts (transformers)", "transformers", "transformers", []),
         ]
         for _pkg_label, _pip_name, _import_name, _extra_args in _tts_deps:
             _check_path = os.path.join(_embed_sp, _import_name)

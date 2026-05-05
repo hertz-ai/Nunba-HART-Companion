@@ -249,6 +249,11 @@
 
     <!-- Inline critical splash styles — renders BEFORE any external CSS loads -->
     <style>
+      /* Loader matches the hero's base look: black bg + drifting brand
+         particles.  When React mounts and the hero renders, the only
+         visible change is the hero content fading in — the background
+         field is already there, so there's no jarring cut from
+         "logo+spinner on flat bg" to "particle hero". */
       #pre-react-loader {
         position: fixed;
         top: 0;
@@ -261,12 +266,35 @@
         align-items: center;
         justify-content: center;
         gap: 24px;
-        background: #0f0e17;
+        background: black;
+        overflow: hidden;
       }
       #pre-react-loader.hidden {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.3s ease;
+      }
+      .pre-loader-particles {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .pre-loader-particles span {
+        position: absolute;
+        border-radius: 50%;
+        animation: particleFloat 18s ease-in-out infinite;
+      }
+      @keyframes particleFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        33% { transform: translateY(-8px) scale(1.15); }
+        66% { transform: translateY(4px) scale(0.9); }
+      }
+      #pre-react-loader > img,
+      #pre-react-loader > .loader-spinner,
+      #pre-react-loader > .loader-timeout {
+        position: relative;
+        z-index: 1;
       }
       @keyframes nunba-spin {
         to {
@@ -335,7 +363,7 @@
 
   <body
     class="font-figtree text-base text-slate-900 dark:text-white"
-    style="background: #0f0e17"
+    style="background: black"
   >
     <!-- Early error capture — catches module/chunk failures BEFORE React loads -->
     <script>
@@ -356,8 +384,43 @@
         });
       });
     </script>
-    <!-- Pre-React splash — OUTSIDE #root so it renders instantly (not blocked by React/CSS) -->
+    <!-- Pre-React splash — OUTSIDE #root so it renders instantly (not blocked by React/CSS).
+         Visual base mirrors Agent.js hero: black bg + brand particle drift.  -->
     <div id="pre-react-loader">
+      <!-- 30 hand-distributed particles — same color/animation as Agent.js
+           hero, just statically positioned so they paint with zero JS. -->
+      <div class="pre-loader-particles" aria-hidden="true">
+        <span style="left:8%;top:12%;width:3px;height:3px;background:#FF6B6B;opacity:.18;animation-duration:18s;animation-delay:-5s"></span>
+        <span style="left:22%;top:7%;width:2px;height:2px;background:#6C63FF;opacity:.14;animation-duration:22s;animation-delay:-12s"></span>
+        <span style="left:38%;top:18%;width:3.5px;height:3.5px;background:#6C63FF;opacity:.20;animation-duration:16s;animation-delay:-3s"></span>
+        <span style="left:55%;top:9%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.12;animation-duration:24s;animation-delay:-8s"></span>
+        <span style="left:73%;top:14%;width:4px;height:4px;background:#6C63FF;opacity:.22;animation-duration:14s;animation-delay:-1s"></span>
+        <span style="left:89%;top:6%;width:2px;height:2px;background:#FF6B6B;opacity:.10;animation-duration:26s;animation-delay:-15s"></span>
+        <span style="left:14%;top:28%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.16;animation-duration:20s;animation-delay:-7s"></span>
+        <span style="left:32%;top:36%;width:3px;height:3px;background:#6C63FF;opacity:.13;animation-duration:18s;animation-delay:-11s"></span>
+        <span style="left:48%;top:30%;width:3.5px;height:3.5px;background:#FF6B6B;opacity:.19;animation-duration:15s;animation-delay:-4s"></span>
+        <span style="left:62%;top:38%;width:2px;height:2px;background:#6C63FF;opacity:.11;animation-duration:23s;animation-delay:-9s"></span>
+        <span style="left:78%;top:32%;width:3px;height:3px;background:#6C63FF;opacity:.17;animation-duration:17s;animation-delay:-13s"></span>
+        <span style="left:93%;top:42%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.14;animation-duration:21s;animation-delay:-2s"></span>
+        <span style="left:5%;top:48%;width:4px;height:4px;background:#6C63FF;opacity:.21;animation-duration:14s;animation-delay:-6s"></span>
+        <span style="left:24%;top:55%;width:2px;height:2px;background:#FF6B6B;opacity:.12;animation-duration:25s;animation-delay:-10s"></span>
+        <span style="left:42%;top:52%;width:3px;height:3px;background:#6C63FF;opacity:.18;animation-duration:19s;animation-delay:-14s"></span>
+        <span style="left:58%;top:60%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.13;animation-duration:16s;animation-delay:-3s"></span>
+        <span style="left:75%;top:54%;width:3.5px;height:3.5px;background:#6C63FF;opacity:.20;animation-duration:13s;animation-delay:-8s"></span>
+        <span style="left:88%;top:62%;width:2px;height:2px;background:#FF6B6B;opacity:.10;animation-duration:24s;animation-delay:-12s"></span>
+        <span style="left:11%;top:70%;width:3px;height:3px;background:#6C63FF;opacity:.15;animation-duration:18s;animation-delay:-1s"></span>
+        <span style="left:28%;top:76%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.17;animation-duration:20s;animation-delay:-5s"></span>
+        <span style="left:46%;top:72%;width:4px;height:4px;background:#FF6B6B;opacity:.22;animation-duration:15s;animation-delay:-9s"></span>
+        <span style="left:65%;top:78%;width:2px;height:2px;background:#6C63FF;opacity:.11;animation-duration:22s;animation-delay:-13s"></span>
+        <span style="left:82%;top:74%;width:3.5px;height:3.5px;background:#6C63FF;opacity:.19;animation-duration:14s;animation-delay:-4s"></span>
+        <span style="left:96%;top:82%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.13;animation-duration:17s;animation-delay:-7s"></span>
+        <span style="left:7%;top:88%;width:3px;height:3px;background:#6C63FF;opacity:.16;animation-duration:21s;animation-delay:-11s"></span>
+        <span style="left:25%;top:92%;width:2px;height:2px;background:#6C63FF;opacity:.10;animation-duration:25s;animation-delay:-2s"></span>
+        <span style="left:43%;top:86%;width:3.5px;height:3.5px;background:#FF6B6B;opacity:.20;animation-duration:13s;animation-delay:-6s"></span>
+        <span style="left:60%;top:94%;width:2.5px;height:2.5px;background:#6C63FF;opacity:.14;animation-duration:19s;animation-delay:-10s"></span>
+        <span style="left:79%;top:90%;width:3px;height:3px;background:#6C63FF;opacity:.18;animation-duration:16s;animation-delay:-14s"></span>
+        <span style="left:91%;top:96%;width:2px;height:2px;background:#FF6B6B;opacity:.12;animation-duration:23s;animation-delay:-3s"></span>
+      </div>
       <img
         src="./HevolveLogo.png"
         alt="Nunba"
@@ -394,7 +457,7 @@
       </div>
     </div>
 
-    <div style="background: #0f0e17; min-height: 100vh" id="root"></div>
+    <div style="background: black; min-height: 100vh" id="root"></div>
 
     <script>
       // Hide splash once React ACTUALLY mounts (not just a <style> tag)

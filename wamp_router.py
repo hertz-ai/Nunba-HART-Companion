@@ -974,7 +974,7 @@ def stop_wamp_router(drain_timeout_s: float = 3.0):
             )
             try:
                 drain_future.result(timeout=drain_timeout_s)
-            except (TimeoutError, asyncio.TimeoutError):
+            except TimeoutError:
                 logger.warning(
                     "WAMP drain exceeded %.1fs; stopping loop with pending "
                     "tasks (futures-after-shutdown may still fire)",

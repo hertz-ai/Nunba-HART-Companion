@@ -43,6 +43,7 @@ def _isolate(tmp_path, monkeypatch):
     """Point file_sync at an isolated tmp dir per test."""
     monkeypatch.setenv('NUNBA_DATA_DIR', str(tmp_path))
     import importlib
+
     from desktop import file_sync
     importlib.reload(file_sync)
     monkeypatch.setattr(file_sync, '_data_dir', lambda: str(tmp_path))
@@ -127,8 +128,9 @@ def test_j232_list_since_cursor_progression():
 @pytest.mark.timeout(15)
 def test_j232_delete_cleans_up_blob_and_meta(tmp_path):
     """After delete, neither blob nor sidecar may remain on disk."""
-    from desktop import file_sync
     import os
+
+    from desktop import file_sync
     meta = file_sync.store('user_abc', b'ephemeral', name='e.txt')
     assert file_sync.delete('user_abc', meta['file_id']) is True
 

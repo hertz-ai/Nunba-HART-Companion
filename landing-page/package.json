@@ -2,7 +2,7 @@
   "name": "hevolve-ai",
   "version": "1.0.0",
   "description": "Hevolve AI — Self-evolving multimodal AI agents through natural conversation",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/hertz-ai/nunba.git",
@@ -49,6 +49,7 @@
     "libphonenumber-js": "^1.11.17",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.456.0",
+    "markdown-to-jsx": "^9.7.16",
     "pdfjs-dist": "^3.11.174",
     "phaser": "^3.90.0",
     "postcss": "^8.4.47",

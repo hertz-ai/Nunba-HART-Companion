@@ -95,6 +95,7 @@ class TestWampRouterHelpers:
 class TestWampSession:
     def test_wamp_session_is_class(self):
         import inspect
+
         from wamp_router import WampSession
         assert inspect.isclass(WampSession)
 
@@ -102,6 +103,7 @@ class TestWampSession:
 class TestWampRealm:
     def test_wamp_realm_is_class(self):
         import inspect
+
         from wamp_router import WampRealm
         assert inspect.isclass(WampRealm)
 

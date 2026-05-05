@@ -62,6 +62,16 @@ def _run_in_embed(code: str, extra_argv: list = None, timeout: int = 15) -> subp
         code: Python code string (paths come via sys.argv, not interpolated)
         extra_argv: Additional args passed as sys.argv[3:]
         timeout: Subprocess timeout in seconds
+
+    PYTHONNOUSERSITE=1 mirrors the install path in package_installer._run_pip:
+    without it, the user's SYSTEM Python (e.g. Python 3.12 at
+    %APPDATA%/Roaming/Python/Python312/site-packages) leaks into
+    python-embed's sys.path.  That leak loads the WRONG transformers /
+    chatterbox / numpy and surfaces as a fake "ModuleNotFoundError"
+    for s3tokenizer / einops — pip dutifully heals the named symbol,
+    but the next probe still picks up the leaked package and fails
+    again.  Endless heal cycle.  Set it once here; same env shape as
+    every other subprocess in this codebase.
     """
     if not _resolve_paths() or not _embed_py:
         raise RuntimeError("python-embed not available")
@@ -70,11 +80,14 @@ def _run_in_embed(code: str, extra_argv: list = None, timeout: int = 15) -> subp
     if extra_argv:
         cmd.extend(extra_argv)
 
+    env = os.environ.copy()
+    env['PYTHONNOUSERSITE'] = '1'
+
     from tts._subprocess import hidden_startupinfo
     si, cf = hidden_startupinfo()
     return subprocess.run(
         cmd, capture_output=True, text=True, timeout=timeout,
-        startupinfo=si, creationflags=cf,
+        env=env, startupinfo=si, creationflags=cf,
     )
 
 
@@ -159,6 +172,39 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
     if not os.path.isdir(_tlib):
         _backend_cache[backend] = False
         return False
+
+    # Guard: engines with install_target='git_clone' (e.g. cosyvoice3 →
+    # FunAudioLLM/CosyVoice) have no pip path.  Running `import X` on
+    # them is guaranteed to fail until the user manually clones the
+    # repo and pip-installs from the clone dir.  Without this guard,
+    # every probe rewrites probe_<backend>.err with the same
+    # ModuleNotFoundError; the dispatch path's log fills with
+    # `Backend probe: <git_clone_engine> NOT importable` noise that
+    # has nothing to do with a real install failure.
+    #
+    # If the user HAS cloned + installed (find_spec returns a real
+    # location), fall through to the normal subprocess probe so a
+    # post-clone install gets verified properly.  This way the guard
+    # is a no-op for engines the user has already set up.
+    try:
+        from integrations.channels.media.tts_router import ENGINE_REGISTRY
+        _spec = ENGINE_REGISTRY.get(backend)
+        if (_spec is not None
+                and getattr(_spec, 'install_target', 'main') == 'git_clone'):
+            import importlib.util as _ilu
+            if _ilu.find_spec(import_name) is None:
+                _backend_cache[backend] = False
+                logger.debug(
+                    "Backend probe: %s (%s) skipped — install_target='git_clone' "
+                    "and package not yet cloned (this is expected; no install "
+                    "path can fix it without a manual git clone of the upstream "
+                    "repo)", backend, import_name,
+                )
+                return False
+    except Exception:
+        # HARTOS spec unreachable in dev mode → fall through to the
+        # normal probe; same behavior as before this guard existed.
+        pass
 
     try:
         r = _run_in_embed(

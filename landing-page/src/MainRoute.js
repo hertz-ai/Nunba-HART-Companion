@@ -97,6 +97,7 @@ const ConversationHistoryPanel = lazyRetry(() => import('./components/Channels/C
 // Settings
 const BackupSettingsPage = lazyRetry(() => import('./components/Social/Settings/BackupSettingsPage'));
 const ThemeSettingsPage = lazyRetry(() => import('./components/Social/Settings/ThemeSettingsPage'));
+const PrivacySettingsPage = lazyRetry(() => import('./components/Social/Settings/PrivacySettingsPage'));
 
 // Agent Audit
 const AgentAuditPage = lazyRetry(() => import('./components/Social/Agents/AgentAuditPage'));
@@ -508,6 +509,7 @@ function MainRoutes() {
           <Route path="channels/history" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Channel History</title></Helmet><ConversationHistoryPanel /></RoleGuard>} />
           <Route path="settings/backup" element={<RoleGuard minRole="guest"><Helmet><title>Nunba — Backup &amp; Sync</title></Helmet><BackupSettingsPage /></RoleGuard>} />
           <Route path="settings/appearance" element={<RoleGuard minRole="guest"><Helmet><title>Nunba — Appearance</title></Helmet><ThemeSettingsPage /></RoleGuard>} />
+          <Route path="settings/privacy" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Privacy &amp; Cloud Capabilities</title></Helmet><PrivacySettingsPage /></RoleGuard>} />
           <Route path="agents" element={<RoleGuard minRole="flat"><Helmet><title>Nunba — Agent Audit</title></Helmet><AgentAuditPage /></RoleGuard>} />
           <Route path="autopilot" element={<Suspense fallback={<PageSkeleton dark />}><Helmet><title>Nunba — Autopilot</title></Helmet><AutopilotPage /></Suspense>} />
           <Route path="tools" element={<><Helmet><title>Nunba — MCP Tools</title></Helmet><MCPToolBrowser /></>} />

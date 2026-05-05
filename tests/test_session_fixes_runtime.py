@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -371,7 +370,7 @@ class TestJ_ProbeCorrectness:
                "model_type != 'llm'" in body
 
     def test_probe_dispatcher_routes_venv_to_is_venv_healthy(self):
-        from tts.tts_engine import _probe_backend_runnable, _is_venv_backend
+        from tts.tts_engine import _is_venv_backend, _probe_backend_runnable
         # indic_parler is the one known venv backend
         assert _is_venv_backend('indic_parler') is True
         # Main-interp backends are NOT flagged as venv

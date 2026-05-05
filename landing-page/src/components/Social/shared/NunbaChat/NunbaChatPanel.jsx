@@ -41,6 +41,8 @@ function formatTimestamp(ts) {
 }
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
+import MicIcon from '@mui/icons-material/Mic';
+import MicOffIcon from '@mui/icons-material/MicOff';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -49,6 +51,8 @@ import RateReviewIcon from '@mui/icons-material/RateReview';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 
 import {useNunbaChat, getAgentPalette} from './NunbaChatProvider';
+import useSpeechRecognition from '../../../../hooks/useSpeechRecognition';
+import {useReducedMotion} from '../../../../hooks/useAnimations';
 
 import {
   GRADIENTS,
@@ -82,6 +86,13 @@ const shimmerSlide = keyframes`
 
 const spinnerRotate = keyframes`
   to { transform: rotate(360deg); }
+`;
+
+/* Mic recording pulse — disabled when prefers-reduced-motion: reduce */
+const micPulse = keyframes`
+  0%   { box-shadow: 0 0 0 0 rgba(255,107,107,0.55); }
+  70%  { box-shadow: 0 0 0 10px rgba(255,107,107,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,107,107,0); }
 `;
 
 /* ── Typewriter for assistant responses ── */
@@ -439,6 +450,77 @@ function PanelContent() {
   const [mentionQuery, setMentionQuery] = useState(null); // null = no @mention active
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+
+  // ── Speech-to-text wiring ──
+  // Uses the local HARTOS Whisper WS (ws://127.0.0.1:8005) when reachable,
+  // otherwise falls back to browser SpeechRecognition.  The badge next to
+  // the mic surfaces which path the user's audio is taking, so privacy is
+  // legible at a glance (orchestrator ciso/ethical-hacker gates).
+  const reducedMotion = useReducedMotion();
+  const {
+    transcript,
+    isListening,
+    startListening,
+    stopListening,
+    resetTranscript,
+    error: micError,
+    activeMethod: micMethod,
+  } = useSpeechRecognition();
+
+  // Track the last transcript chunk we appended so a stable string from the
+  // hook (during a continuous session) doesn't get appended repeatedly.
+  const lastAppendedTranscriptRef = useRef('');
+
+  // Append (don't replace) new transcript chunks into the input.  Users keep
+  // any text they typed before tapping mic, and they can still edit before
+  // sending — auto-send is intentionally OFF (product-owner gate).
+  useEffect(() => {
+    if (!transcript) return;
+    if (transcript === lastAppendedTranscriptRef.current) return;
+    lastAppendedTranscriptRef.current = transcript;
+    setInput((prev) => {
+      if (!prev) return transcript;
+      const needsSpace = !/\s$/.test(prev);
+      return needsSpace ? `${prev} ${transcript}` : `${prev}${transcript}`;
+    });
+  }, [transcript]);
+
+  // Reset the transcript memo whenever the mic stops, so the next session
+  // starts clean and doesn't immediately re-fire the append effect with a
+  // stale value.
+  useEffect(() => {
+    if (!isListening) {
+      lastAppendedTranscriptRef.current = '';
+    }
+  }, [isListening]);
+
+  // Stop the mic on unmount.  The hook also self-cleans (lines 274-286 of
+  // useSpeechRecognition.js), but calling stopListening here makes the
+  // intent explicit and keeps the AudioContext / WebSocket / MediaStream
+  // lifecycles deterministic when the panel unmounts mid-session.
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
+  }, [stopListening]);
+
+  const handleMicClick = useCallback(() => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    resetTranscript();
+    lastAppendedTranscriptRef.current = '';
+    const lang = localStorage.getItem('hart_language') || 'en';
+    startListening({language: lang});
+  }, [isListening, startListening, stopListening, resetTranscript]);
+
+  // Friendly inline message for permission errors (browser denial / blocked
+  // mic).  We only surface the message — the underlying error string from
+  // the hook is checked for "permission" or "denied".
+  const micPermissionDenied =
+    typeof micError === 'string' &&
+    /permission|denied|not-allowed/i.test(micError);
 
   // Auto-scroll
   useEffect(() => {
@@ -1052,6 +1134,100 @@ function PanelContent() {
         </Box>
       )}
 
+      {/* ── Mic permission + path indicator ── */}
+      {(micPermissionDenied || isListening) && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 2.5,
+            py: 0.5,
+            flexShrink: 0,
+            borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+          }}
+        >
+          {micPermissionDenied ? (
+            <Typography
+              variant="caption"
+              role="alert"
+              data-testid="mic-permission-error"
+              sx={{
+                fontSize: '0.66rem',
+                color: theme.palette.error.light,
+                lineHeight: 1.4,
+              }}
+            >
+              Microphone access blocked. Click the lock icon in the address
+              bar to enable.
+            </Typography>
+          ) : (
+            <>
+              {/* STT path badge — privacy is a feature, the user must see at a
+                  glance whether their audio is local-Whisper or browser-cloud. */}
+              <Box
+                role="status"
+                data-testid={
+                  micMethod === 'ws' ? 'mic-path-local' : 'mic-path-cloud'
+                }
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  px: 0.75,
+                  py: 0.25,
+                  borderRadius: RADIUS.pill,
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.02em',
+                  background:
+                    micMethod === 'ws'
+                      ? alpha('#2ECC71', 0.15)
+                      : alpha(theme.palette.warning.main, 0.15),
+                  color:
+                    micMethod === 'ws'
+                      ? '#2ECC71'
+                      : theme.palette.warning.main,
+                  border: `1px solid ${
+                    micMethod === 'ws'
+                      ? alpha('#2ECC71', 0.35)
+                      : alpha(theme.palette.warning.main, 0.35)
+                  }`,
+                }}
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background:
+                      micMethod === 'ws'
+                        ? '#2ECC71'
+                        : theme.palette.warning.main,
+                  }}
+                />
+                {micMethod === 'ws'
+                  ? 'Local (private)'
+                  : 'Cloud (browser)'}
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.6rem',
+                  color: alpha(theme.palette.text.secondary, 0.85),
+                  lineHeight: 1.3,
+                }}
+              >
+                {micMethod === 'ws'
+                  ? 'Audio stays on this device.'
+                  : 'Browser sends audio to its speech provider.'}
+              </Typography>
+            </>
+          )}
+        </Box>
+      )}
+
       {/* ── Input bar ── */}
       <Box
         sx={{
@@ -1098,6 +1274,69 @@ function PanelContent() {
             },
           }}
         />
+        {/* Mic toggle — voice-to-text via local Whisper (preferred) or browser
+            SpeechRecognition fallback.  Pulse animation highlights the
+            recording state; honors prefers-reduced-motion by switching to a
+            solid red mic with no pulse so users with motion sensitivity
+            still get an unmistakable visual signal. */}
+        <Tooltip
+          arrow
+          title={
+            isListening
+              ? 'Tap to stop recording'
+              : micPermissionDenied
+                ? 'Microphone blocked — enable in browser settings'
+                : 'Tap to dictate'
+          }
+        >
+          <IconButton
+            onClick={handleMicClick}
+            disabled={isLoading}
+            data-testid="mic-toggle-button"
+            aria-pressed={isListening}
+            aria-label={
+              isListening ? 'Stop recording' : 'Start voice input'
+            }
+            sx={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              color: isListening
+                ? '#FF6B6B'
+                : theme.palette.text.secondary,
+              background: isListening
+                ? alpha('#FF6B6B', 0.12)
+                : alpha(theme.palette.common.white, 0.04),
+              border: `1px solid ${
+                isListening
+                  ? alpha('#FF6B6B', 0.4)
+                  : alpha(theme.palette.common.white, 0.08)
+              }`,
+              transition: `all 200ms ${EASINGS.smooth}`,
+              '&:hover': {
+                background: isListening
+                  ? alpha('#FF6B6B', 0.22)
+                  : alpha(theme.palette.common.white, 0.08),
+                color: isListening ? '#FF6B6B' : theme.palette.primary.main,
+              },
+              '&.Mui-disabled': {
+                color: alpha(theme.palette.common.white, 0.2),
+              },
+              // Pulse only when recording AND user hasn't asked for reduced
+              // motion.  Reduced-motion users see the same red color +
+              // border but without the radial expansion.
+              ...(isListening && !reducedMotion
+                ? {animation: `${micPulse} 1.4s ease-out infinite`}
+                : {}),
+            }}
+          >
+            {micPermissionDenied ? (
+              <MicOffIcon sx={{fontSize: 18}} />
+            ) : (
+              <MicIcon sx={{fontSize: 18}} />
+            )}
+          </IconButton>
+        </Tooltip>
         <IconButton
           onClick={handleSend}
           disabled={isLoading || !input.trim()}

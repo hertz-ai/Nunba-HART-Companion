@@ -14,6 +14,36 @@ import {Link as RouterLink, useNavigate} from 'react-router-dom';
  * Extracted from Demopage.js to reduce file size.
  * All behaviour and styling is identical to the original inline JSX.
  */
+
+/**
+ * Read the per-agent chat blob that Demopage's `saveMessagesToStorage`
+ * already writes on every send / agent-switch / unmount.  Returns the
+ * last user message text (truncated) so the row can show "what we were
+ * working on with this specialist" — task continuity without a parallel
+ * store.  Storage shape is owned by Demopage.js:1080-1088 — do NOT
+ * invent a sibling key here.
+ */
+const _getAgentLastTask = (promptId) => {
+  if (!promptId) return '';
+  try {
+    const raw = localStorage.getItem(`chat_messages_${promptId}`);
+    if (!raw) return '';
+    const data = JSON.parse(raw);
+    const msgs = Array.isArray(data) ? data : data?.messages || [];
+    for (let i = msgs.length - 1; i >= 0; i -= 1) {
+      const m = msgs[i] || {};
+      if (m.type === 'user' || m.role === 'user') {
+        return String(m.content || m.text || '').trim().slice(0, 60);
+      }
+    }
+    // Fall back to the last assistant turn if no user msg exists yet
+    const tail = msgs[msgs.length - 1];
+    return String(tail?.content || tail?.text || '').trim().slice(0, 60);
+  } catch {
+    return '';
+  }
+};
+
 const AgentSidebar = ({
   screenWidth,
   showContent,
@@ -98,25 +128,36 @@ const AgentSidebar = ({
           <div className="flex-1">
             <h2 className="text-sm mb-2 ml-4">Recents</h2>
             <div className="space-y-1">
-              {items.map((chat, index) => (
-                <div
-                  onClick={() => handleButtonClick(chat)}
-                  key={index}
-                  className="flex items-center ml-1 justify-start gap-1 hover:bg-gray-800 p-2 rounded cursor-pointer"
-                >
-                  <img
-                    src={
-                      chat.teacher_image_url || chat.image_url || AgentPoster
-                    }
-                    alt={chat?.name}
-                    className="md:w-6 md:h-6 lg:w-8 lg:h-8 rounded-full xl:w-8 xl:h-8"
-                    onError={handleImgError}
-                  />
-                  <span className="truncate sm:text-base md:text-[1.2rem]">
-                    {chat?.name}
-                  </span>
-                </div>
-              ))}
+              {items.map((chat, index) => {
+                const _lastTask = _getAgentLastTask(chat?.prompt_id);
+                return (
+                  <div
+                    onClick={() => handleButtonClick(chat)}
+                    key={index}
+                    className="flex items-center ml-1 justify-start gap-1 hover:bg-gray-800 p-2 rounded cursor-pointer"
+                    title={_lastTask || undefined}
+                  >
+                    <img
+                      src={
+                        chat.teacher_image_url || chat.image_url || AgentPoster
+                      }
+                      alt={chat?.name}
+                      className="md:w-6 md:h-6 lg:w-8 lg:h-8 rounded-full xl:w-8 xl:h-8"
+                      onError={handleImgError}
+                    />
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="truncate sm:text-base md:text-[1.2rem]">
+                        {chat?.name}
+                      </span>
+                      {_lastTask && (
+                        <span className="truncate text-xs text-gray-400">
+                          {_lastTask}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <button
@@ -385,25 +426,36 @@ const AgentSidebar = ({
           <div>
             <h2 className="text-sm mb-2 text-white">Recents</h2>
             <div className="space-y-0.5">
-              {items.map((chat, index) => (
-                <div
-                  key={index}
-                  onClick={() => handleButtonClick(chat)}
-                  className="flex items-center gap-2 text-white hover:bg-gray-800 p-1 rounded cursor-pointer"
-                >
-                  <img
-                    src={
-                      chat.teacher_image_url || chat.image_url || AgentPoster
-                    }
-                    alt={chat?.name}
-                    className="!w-6 !h-6 sm:!w-8 sm:!h-8 md:!w-10 md:!h-10 lg:!w-12 lg:!h-12 xl:!w-14 xl:!h-14 rounded-full"
-                    onError={handleImgError}
-                  />
-                  <span className="truncate text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl">
-                    {chat?.name}
-                  </span>
-                </div>
-              ))}
+              {items.map((chat, index) => {
+                const _lastTask = _getAgentLastTask(chat?.prompt_id);
+                return (
+                  <div
+                    key={index}
+                    onClick={() => handleButtonClick(chat)}
+                    className="flex items-center gap-2 text-white hover:bg-gray-800 p-1 rounded cursor-pointer"
+                    title={_lastTask || undefined}
+                  >
+                    <img
+                      src={
+                        chat.teacher_image_url || chat.image_url || AgentPoster
+                      }
+                      alt={chat?.name}
+                      className="!w-6 !h-6 sm:!w-8 sm:!h-8 md:!w-10 md:!h-10 lg:!w-12 lg:!h-12 xl:!w-14 xl:!h-14 rounded-full"
+                      onError={handleImgError}
+                    />
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="truncate text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl">
+                        {chat?.name}
+                      </span>
+                      {_lastTask && (
+                        <span className="truncate text-xs text-gray-400">
+                          {_lastTask}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <button
               onClick={() => setShowAgentsOverlay(true)}
@@ -414,32 +466,12 @@ const AgentSidebar = ({
             </button>
           </div>
 
-          <div className="justify-self-center">
-            <a
-              href="https://azurekong.hertzai.com/mkt-aws/examples/daf7beee-7HevolveAI_Agent_Companion_Setup_2.exe"
-              download
-              className="
-        bg-gradient-to-r from-blue-500 to-green-500
-        text-white
-        border border-gray-600
-        rounded-lg
-        px-3 py-2
-        text-sm
-        focus:outline-none
-        focus:ring-2
-        focus:ring-blue-500
-        focus:border-transparent
-        hover:bg-gray-700
-        transition-colors
-        cursor-pointer
-        min-w-[120px]
-        inline-block
-        text-center
-      "
-            >
-              Install Windows Agent Companion
-            </a>
-          </div>
+          {/* "Install Windows Agent Companion" button removed 2026-04-28:
+              Nunba IS the companion app — surfacing a download link to a
+              separate "HevolveAI Agent Companion Setup" .exe from inside
+              Nunba (or from any sidebar that ships in Nunba's React
+              bundle) is confusing.  Cloud-side desktop discovery now
+              flows through the Nunba downloads page. */}
 
           {/* Google Play & Companion (hidden on /local) */}
           {!isLocalRoute && (

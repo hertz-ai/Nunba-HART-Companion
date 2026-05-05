@@ -482,34 +482,19 @@ def _stamp_version_in_file(filepath, pattern, replacement):
     return False
 
 
-def generate_build_hashes():
-    """Generate build_hashes.json with git commit hashes of all repos.
-
-    Queried at runtime via GET /api/harthash (@HARTHASH magic word).
-    """
-    import datetime
-    import json
-    scripts_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(scripts_dir)
-    repos = {
-        'nunba': project_dir,
-        'hartos': os.path.join(project_dir, '..', 'HARTOS'),
-        'hevolve_database': os.path.join(project_dir, '..', 'Hevolve_Database'),
-        'hevolveai': os.path.join(project_dir, '..', 'hevolveai'),
-    }
-    hashes = {}
-    for name, path in repos.items():
-        try:
-            r = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'],
-                               capture_output=True, text=True, cwd=path, timeout=5)
-            hashes[name] = r.stdout.strip() if r.returncode == 0 else 'unknown'
-        except Exception:
-            hashes[name] = 'unknown'
-    hashes['build_time'] = datetime.datetime.now().isoformat()
-    out_path = os.path.join(project_dir, 'build_hashes.json')
-    with open(out_path, 'w') as f:
-        json.dump(hashes, f, indent=2)
-    print_info(f"Build hashes: {hashes}")
+# NOTE: A `generate_build_hashes()` function used to live here that
+# wrote a `build_hashes.json` next to the project root.  It was DEAD
+# CODE — never called from any build phase, and the file never got
+# included in the cx_Freeze bundle.  Meanwhile the build's actual
+# version stamp is `BUILD_INFO.txt` (written further down in this
+# file: search `_bi_path = os.path.join('build', 'Nunba',
+# 'BUILD_INFO.txt')`).  Keeping the dead function around led
+# main.py::harthash to read the never-shipped JSON and surface
+# `unknown` for the version even on a successfully-built install.
+#
+# Removed 2026-04-27.  /api/harthash now reads BUILD_INFO.txt as the
+# source of truth (with build_hashes.json as a legacy fallback for
+# pre-removal installs); see main.py:harthash for the read order.
 
 
 def stamp_version():
@@ -1038,6 +1023,21 @@ def build_windows(python_exe, app_only=False, installer_only=False):
         except OSError:
             stored_hash = None
 
+    # Forward-only atomic rebuild contract (2026-05-02):
+    #   - rebuild_python_embed.py works in python-embed.building/ and
+    #     atomic-swaps into python-embed/ ONLY after end-to-end
+    #     verification passes (torch + torch._C + transformers +
+    #     hevolveai canaries all loadable).
+    #   - On any failure the live python-embed/ is unchanged and the
+    #     scratch dir is preserved for forensics.  The script exits
+    #     non-zero and we abort the build rather than ship a broken
+    #     bundle.  Recovery is forward-only: re-run after fixing the
+    #     root cause; the next run wipes the scratch dir at step 1.
+    #   - The venv + ensurepip + launcher overlay is part of every
+    #     full rebuild (no presence-gate forcing rebuilds for it).
+    #     If you have an older python-embed snapshot without the
+    #     overlay and don't want to bump deps, run:
+    #       python scripts/rebuild_python_embed.py --overlay-only
     _needs_full_rebuild = (
         not os.path.isdir(embed_src)
         or not os.listdir(embed_src)
@@ -1046,24 +1046,32 @@ def build_windows(python_exe, app_only=False, installer_only=False):
     rebuild_script = os.path.join('scripts', 'rebuild_python_embed.py')
 
     if _needs_full_rebuild:
-        _reason = ('missing' if not os.path.isdir(embed_src) or not os.listdir(embed_src)
-                    else f'EMBED_DEPS hash changed ({stored_hash} -> {current_hash})')
-        print_header(f"Rebuilding python-embed ({_reason})")
-        if os.path.isfile(rebuild_script):
-            if run_command([python_exe, rebuild_script],
-                            "Building python-embed from scratch..."):
-                # Stamp the new hash so subsequent builds skip the rebuild
-                try:
-                    with open(hash_file, 'w', encoding='utf-8') as _hf:
-                        _hf.write(current_hash)
-                    print_info(f"Wrote python-embed.hash = {current_hash}")
-                except OSError as _e:
-                    print_warn(f"Failed to write {hash_file}: {_e}")
-            else:
-                print_warn("python-embed creation failed — TTS/STT/VLM features will be unavailable")
-                print_warn("You can run 'python scripts/rebuild_python_embed.py' manually later")
+        if not os.path.isdir(embed_src) or not os.listdir(embed_src):
+            _reason = 'missing'
         else:
-            print_warn("rebuild_python_embed.py not found — skipping python-embed")
+            _reason = f'EMBED_DEPS hash changed ({stored_hash} -> {current_hash})'
+        print_header(f"Rebuilding python-embed ({_reason})")
+        if not os.path.isfile(rebuild_script):
+            print_error(f"rebuild_python_embed.py not found at {rebuild_script}")
+            print_error("Aborting build — refusing to ship without a current python-embed.")
+            sys.exit(1)
+        if run_command([python_exe, rebuild_script],
+                       "Building python-embed (atomic, scratch -> swap)..."):
+            # Stamp the new hash so subsequent builds skip the rebuild.
+            try:
+                with open(hash_file, 'w', encoding='utf-8') as _hf:
+                    _hf.write(current_hash)
+                print_info(f"Wrote python-embed.hash = {current_hash}")
+            except OSError as _e:
+                print_warn(f"Failed to write {hash_file}: {_e}")
+        else:
+            print_error("python-embed rebuild FAILED — atomic swap was not performed.")
+            print_error("Live python-embed/ is unchanged; scratch dir python-embed.building/")
+            print_error("preserved for forensics.  Refusing to ship a broken/stale bundle.")
+            print_error("Inspect the rebuild output above, fix the root cause, and re-run")
+            print_error("'python scripts/build.py'.  The next run wipes the scratch dir")
+            print_error("at step 1 and starts fresh.")
+            sys.exit(1)
     else:
         print_info(f"python-embed exists and hash matches ({embed_src}, {current_hash})")
 
@@ -1122,6 +1130,56 @@ def build_windows(python_exe, app_only=False, installer_only=False):
                 _dirs.remove('__pycache__')
     print_info(f"Purged {_purged} __pycache__ directories")
 
+    # Pre-build syntax gate: ast.parse every Python source file so a
+    # stray typo (e.g. accidental keystrokes landing in main.py) never
+    # ships.  cx_Freeze itself does NOT abort on syntax errors during
+    # the bytecode-trace phase - it just emits a warning and the
+    # broken file lands in the .exe.  setup_freeze_nunba.py:1340-1354
+    # has a post-build py_compile step but it (a) runs AFTER cx_Freeze
+    # has already shipped the broken bytecode, (b) only checks
+    # build_exe/lib/*.py not the source tree, and (c) just logs a
+    # WARNING on failure without aborting.  Real users hit
+    # "main.py:5493 expected 'except' or 'finally' block" at app
+    # startup with no signal during build.  This gate fails loud.
+    print_info("Pre-build syntax gate: ast.parse all .py sources...")
+    import ast as _ast
+    _src_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    _bad: list = []
+    _checked = 0
+    for _walk_root, _walk_dirs, _walk_files in os.walk(_src_root):
+        # Skip vendored / generated dirs that aren't shipped Python.
+        _walk_dirs[:] = [
+            _d for _d in _walk_dirs
+            if _d not in {
+                '.git', '.venv', 'venv', 'venv310', 'venv-build',
+                'node_modules', 'build', 'dist', '__pycache__',
+                'python-embed', 'python-embed-broken-20260502',
+                'landing-page',  # JS tree, no .py to gate
+                '.eggs', '.pytest_cache',
+            }
+        ]
+        for _fname in _walk_files:
+            if not _fname.endswith('.py'):
+                continue
+            _path = os.path.join(_walk_root, _fname)
+            try:
+                with open(_path, encoding='utf-8') as _f:
+                    _ast.parse(_f.read(), filename=_path)
+                _checked += 1
+            except SyntaxError as _se:
+                _bad.append((_path, _se))
+            except (OSError, UnicodeDecodeError) as _e:
+                # Read failure is its own class of broken; surface it.
+                _bad.append((_path, _e))
+    if _bad:
+        print_error(
+            f"Pre-build syntax gate: {len(_bad)}/{_checked + len(_bad)} files "
+            f"failed to parse - aborting build to prevent shipping broken code:")
+        for _path, _err in _bad:
+            print_error(f"  {os.path.relpath(_path, _src_root)}: {_err}")
+        return False
+    print_info(f"Syntax gate: {_checked} .py files parse clean")
+
     # Run cx_Freeze
     if not run_command([python_exe, os.path.join('scripts', 'setup_freeze_nunba.py'), 'build'],
                        "Running cx_Freeze..."):
@@ -1149,12 +1207,31 @@ def build_windows(python_exe, app_only=False, installer_only=False):
             ['git', 'rev-parse', 'HEAD'],
             capture_output=True, text=True, check=False,
         ).stdout.strip() or 'unknown'
+        # Also stamp the HARTOS-side HEAD so bundle-drift between
+        # Nunba and HARTOS source can be detected at runtime (see
+        # 2026-04-25 incident: HARTOS commits 52fe902 + 76f99dee
+        # landed but python-embed shipped pre-rebase HARTOS files,
+        # silently violating the consent append-only invariant in
+        # the installed .exe).  The local-sibling HARTOS path is the
+        # canonical dev source per build.py:34, 432, 622.
+        _hartos_dir = _local_hartos_path() if '_local_hartos_path' in dir() else \
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'HARTOS')
+        _hartos_head = 'unknown'
+        try:
+            if os.path.isdir(_hartos_dir):
+                _hartos_head = subprocess.run(
+                    ['git', '-C', _hartos_dir, 'rev-parse', 'HEAD'],
+                    capture_output=True, text=True, check=False,
+                ).stdout.strip() or 'unknown'
+        except Exception:
+            pass
         _bi_path = os.path.join('build', 'Nunba', 'BUILD_INFO.txt')
         with open(_bi_path, 'w', encoding='utf-8') as _bi:
             _bi.write(f"BUILD_SHA={_head}\n")
+            _bi.write(f"HARTOS_SHA={_hartos_head}\n")
             _bi.write(f"BUILD_TIME={_bi_dt.datetime.utcnow().isoformat(timespec='seconds')}Z\n")
             _bi.write(f"BUILD_PLATFORM={sys.platform}\n")
-        print_info(f"Wrote {_bi_path} (sha={_head[:12]})")
+        print_info(f"Wrote {_bi_path} (nunba={_head[:12]} hartos={_hartos_head[:12]})")
     except Exception as _bi_err:
         print_warn(f"Could not write BUILD_INFO.txt: {_bi_err}")
 

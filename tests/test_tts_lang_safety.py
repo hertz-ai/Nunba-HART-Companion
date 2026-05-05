@@ -100,11 +100,25 @@ def test_normalize_lang():
 def _make_stub_engine(active_backend=BACKEND_COSYVOICE3):
     """Construct a TTSEngine instance without running __init__ (which
     imports torch / loads GPU backends).  We only need the attributes
-    `_synthesize_with_fallback` touches."""
+    `_synthesize_with_fallback` touches.
+
+    Adds the demotion-tracker attributes that landed alongside the
+    ``_is_demoted`` / consecutive-failure logic — without them the
+    stub engine raises AttributeError before the routing decision
+    we're trying to test.  We do NOT modify the demotion logic
+    itself; we just initialise the attributes the real ``__init__``
+    would have set, so the stub matches a fresh engine instance.
+    """
     engine = TTSEngine.__new__(TTSEngine)
     engine._active_backend = active_backend
     engine._backends = {}
     engine._language = 'en'
+    # Demotion tracker — empty set + zeroed counters mean "no backend
+    # is currently demoted".  The routing path under test reads but
+    # never writes these in the failure scenarios we exercise.
+    engine._demoted_backends = set()
+    engine._consecutive_failures = {}
+    engine._failure_threshold = 3
     return engine
 
 

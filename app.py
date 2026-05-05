@@ -5,8 +5,50 @@ Creates a WebApp with reliable startup and system tray functionality + Sidebar C
 Connect to Hivemind with your friends' agents.
 """
 # app.py (VERY TOP — before any other imports)
+# ── Defang importlib.metadata.packages_distributions() before transformers ──
+# (Mirror of HARTOS hart_intelligence_entry.py:21-52 — installed here too
+# because Nunba's frozen entry point is app.py, NOT hart_intelligence_entry.py,
+# so the HARTOS-side patch never fires in the desktop bundle.)
+#
+# transformers/utils/import_utils.py:45 calls
+#     PACKAGE_DISTRIBUTION_MAPPING = importlib.metadata.packages_distributions()
+# at module-import time, with NO guard.  The function walks every
+# *.dist-info/METADATA visible on sys.path and accesses
+# `dist.metadata['Name']`.  ANY corrupt dist-info (METADATA missing,
+# Name: header malformed, pip rewriting it concurrently, OR a bundle
+# shipping a corrupt file from a freeze-time interrupted install)
+# raises KeyError('Name') → transformers crashes its module-load →
+# langchain crashes → every code path that touches them dies.
+#
+# Witnessed cascade on the 2026-04-26 user log: Nunba's bundle ships
+# python-embed/Lib/site-packages/transformers-5.1.0.dist-info/METADATA
+# as 31KB of whitespace (no Name: header) — likely an interrupted pip
+# install during the freeze step that got baked into every installer.
+# The agent_daemon's tick path lazily triggers transformers
+# evaluation; the unguarded `packages_distributions()` blew up every
+# 30-second tick: "Agent daemon tick error (state reset): 'Name'".
+# Result: Admin Agent Dashboard sat empty for the entire process
+# lifetime because the daemon never completed a tick cleanly.
+#
+# Monkey-patch applies BEFORE any langchain/transformers reach this
+# interpreter so the swap takes effect for the import-time call.
+import importlib.metadata as _md_safe
 import os
 import sys
+
+_orig_pd = getattr(_md_safe, 'packages_distributions', None)
+if _orig_pd is not None and not getattr(_orig_pd, '_hartos_guarded', False):
+    def _safe_packages_distributions():
+        try:
+            return _orig_pd()
+        except Exception:
+            # Best-effort fallback: empty mapping.  Auto-docstring
+            # lookups against {} return generic guesses (worse than the
+            # real lookup but nonfatal — the daemon tick stays alive).
+            return {}
+    _safe_packages_distributions._hartos_guarded = True
+    _md_safe.packages_distributions = _safe_packages_distributions
+del _md_safe
 
 # Block user site-packages for every subprocess, unconditionally.
 # Rationale (2026-04-25 incident): a stale hevolve_backend-0.0.1.dev339
@@ -74,7 +116,7 @@ if getattr(sys, 'frozen', False):
         except OSError:
             _exe_mtime = 0
         _ch = _h_cc.sha256()
-        _ch.update(f"{_exe}|{_exe_mtime}".encode('utf-8'))
+        _ch.update(f"{_exe}|{_exe_mtime}".encode())
         os.environ.setdefault('HEVOLVE_CODE_HASH_PRECOMPUTED', _ch.hexdigest())
         del _h_cc, _exe, _exe_mtime, _ch
     except Exception:
@@ -138,6 +180,7 @@ if getattr(sys, 'frozen', False):
             pass  # Non-Windows or no WinAPI — fall through; log file is still the source of truth.
     try:
         import importlib.util
+
         import torch  # noqa: F401  — full torch.__init__ under stock importer
         import torch.autograd  # noqa: F401  — belt-and-braces: ensure attr bound
         import torch.nested  # noqa: F401  — warm before wrapper sees it
@@ -155,6 +198,22 @@ if getattr(sys, 'frozen', False):
         # If torch isn't bundled or fails to import, don't crash app boot.
         # The hartos-init thread will re-attempt and surface a clearer error.
         pass
+
+    # ── No HARTOS heavy-chain pre-warm here ──
+    # The deferred init lives in `routes.hartos_backend_adapter`.
+    # `start_hartos_init_background()` (called from `main.py`
+    # `_deferred_social_init`) spawns the `hartos-init` thread AFTER
+    # Flask is ready; chat falls through to Tier-3 (llama.cpp) until
+    # Tier-1 is up.  Importing the heavy chain (transformers / langchain
+    # / autogen / hart_intelligence / helper / create_recipe /
+    # reuse_recipe) at module-load time races with that thread on
+    # `transformers`'s per-module import lock and triggers the
+    # `_LazyModule.__getattr__` ~1500-frame recursion documented at
+    # `routes/hartos_backend_adapter.py:41-49`.  The 2026-04-28 prewarm
+    # regression and its three follow-up "fixes" all trace back to
+    # ignoring that comment.  Regression guard:
+    # `tests/test_no_eager_hartos_imports.py` AST-fails on any
+    # module-level import of those packages from `app.py`.
 
 # Trace recursion in frozen builds — write to file since Win32GUI has no console
 if getattr(sys, 'frozen', False):
@@ -960,7 +1019,12 @@ if getattr(sys, 'frozen', False):
     _lc_wd.start()
     try:
         _trace("  [1/4] importing langchain_classic.chains (expected <1s, but can be slow on cold cache)")
-        import langchain_classic.chains as _lc_chains
+        # Eager: pre-installs a `ReduceDocumentsChain` stub into
+        # `langchain_classic.chains.__dict__` BEFORE the hartos-init thread
+        # starts, so HARTOS's later access goes to our stub and never pulls
+        # the real class (which transitively loads torch).  Direct
+        # `__dict__` write — no `_LazyModule.__getattr__` trigger.
+        import langchain_classic.chains as _lc_chains  # allow:eager-hartos-import
         _trace(f"  [2/4] import completed at {_lc_time.time()-_lc_start:.3f}s")
         # Write stub directly via __dict__ — skips __getattr__ probe.
         if 'ReduceDocumentsChain' not in _lc_chains.__dict__:
@@ -1546,8 +1610,19 @@ def _clipboard_monitor_thread():
 
 _pump_early_splash('Preparing interface...')
 
-# Default configuration for stop API URL
-DEFAULT_STOP_API_URL = "http://gcp_training2.hertzai.com:5001/stop"
+# Default configuration for stop API URL — resolved from HARTOS so
+# cloud-trainer deployments can override via HEVOLVE_STOP_API_URL.
+# Default is empty string for local installs (no cloud trainer to
+# stop).  Same resolver used by main.py — single source of truth in
+# core.config_cache.get_stop_api_url.  Used to live as a hardcoded
+# `http://gcp_training2.hertzai.com:5001/stop` literal that timed
+# out silently on every shutdown of every local install.
+try:
+    from core.config_cache import get_stop_api_url as _get_stop_api_url
+    DEFAULT_STOP_API_URL = _get_stop_api_url()
+except ImportError:
+    import os as _os
+    DEFAULT_STOP_API_URL = _os.environ.get('HEVOLVE_STOP_API_URL', '')
 
 # Initialize argument parser
 # Enhanced argument parser with sidebar options
@@ -1777,6 +1852,22 @@ if getattr(args, 'validate', False):
             _mod_obj = sys.modules.get(_mod_name)
             if not _mod_obj:
                 _mod_obj = importlib.import_module(_mod_name)
+            # Trigger the adapter's lazy Tier-1 import.  Runtime spawns this
+            # from `main.py._deferred_social_init` (background thread) — but
+            # in --validate mode main.py never runs, so the attributes below
+            # would otherwise stay at their module-import defaults
+            # (False / 'unknown') and falsely report "Tier-1 failed to load".
+            # Calling _attempt_hartos_init synchronously exercises the SAME
+            # import path Tier-1 takes at runtime, so this check is honest:
+            # if the synchronous call sets _hartos_backend_available=True,
+            # the bundle will work; if it doesn't, the bundle is genuinely
+            # broken and we want validate to flag it.
+            _trigger = getattr(_mod_obj, '_attempt_hartos_init', None)
+            if callable(_trigger):
+                try:
+                    _trigger()
+                except Exception:
+                    pass  # the failure is already recorded in adapter state
             for _attr, _expected, _msg in _checks:
                 _val = getattr(_mod_obj, _attr, '__MISSING__')
                 if _val == '__MISSING__':
@@ -2043,7 +2134,10 @@ if getattr(args, 'acceptance_test', False):
         else:
             # Post-freeze: verify behavioral equivalents.
             try:
-                import hart_intelligence_entry as _hie  # noqa: F401
+                # Eager only inside `--validate` / `--acceptance-test` /
+                # `--diag` CLI branches — normal boot path doesn't enter
+                # this block (see top-level CLI flag check in app.py).
+                import hart_intelligence_entry as _hie  # noqa: F401  # allow:eager-hartos-import
                 from core.user_lang import get_preferred_lang as _gpl
                 _has_fallback = callable(_gpl)
                 _check('symptom_5_preferred_lang_fallback_active',
@@ -2235,6 +2329,7 @@ _root_logger = logging.getLogger()
 _root_logger.setLevel(logging.INFO)
 
 from logging.handlers import RotatingFileHandler as _RFH
+
 # 25MB × 5 = 125MB cap (was unbounded → 347MB witnessed 2026-04-21).
 _gui_fh = _RFH(log_file, mode='a', encoding='utf-8',
                maxBytes=25 * 1024 * 1024, backupCount=5)
@@ -3611,6 +3706,17 @@ def call_stop_api():
     Call the stop API to stop AI control processing
     """
     try:
+        # Skip the cloud-trainer notification when the URL isn't
+        # configured.  Local installs have no cloud trainer to stop,
+        # so an empty stop_api_url is the documented "no-op" path
+        # (see core.config_cache.get_stop_api_url docstring).
+        if not args.stop_api_url:
+            logger.info(
+                "stop API not configured (HEVOLVE_STOP_API_URL unset) — "
+                "skipping cloud-trainer stop notification (no-op for "
+                "local installs)"
+            )
+            return True
         logger.info(f"Calling stop API ay {args.stop_api_url}")
 
         # Try to get user data from storage
@@ -5691,30 +5797,148 @@ def start_flask():
                 "message": "CORS is working correctly"
             })
 
-        # Start the Flask application via waitress (production WSGI)
+        # Start the Flask application — Hypercorn (ASGI) primary,
+        # Waitress fallback.  This is the BUNDLE entry point: Nunba.exe
+        # runs app.py; app.py imports main.py as the Flask app provider.
         # Use _dynamic_wsgi_app when flask_app isn't ready yet — it will
         # automatically route to flask_app once main.py import completes.
+        #
+        # Hypercorn (ASGI) wins for the same reasons as the HARTOS sibling:
+        # asyncio loop multiplexes connection IO so idle keep-alive / SSE
+        # clients don't burn worker threads (waitress was holding one
+        # thread per connection regardless of activity — that's how
+        # /tts/setup-engine queue-depth-68 happened with threads=8).
+        # Sync Flask handlers run in loop.run_in_executor() against
+        # NUNBA_WORKER_THREADS (default 128) so /dashboard/agents and
+        # /health stay responsive while a TTS install grinds.
+        # Falls through to Waitress on ImportError so older bundles /
+        # cx_Freeze installs missing the h2/wsproto chain still boot.
         _wsgi_target = _serving_app if _serving_app is flask_app else _dynamic_wsgi_app
-        # Lazy import — avoids crash if waitress wasn't bundled in frozen exe
         try:
-            from waitress import serve as _serve
-            logger.info(f"Starting Waitress server on port {args.port} (app={'full' if _serving_app is flask_app else 'dynamic-dispatcher'})")
-            _serve(_wsgi_target, host="0.0.0.0", port=args.port, threads=8)
-        except ImportError:
-            logger.warning("waitress not available, falling back to Flask dev server")
-            # Patch stdout/stderr before .run() to prevent click.echo crash
-            # in frozen GUI exes where console file descriptors are closed
-            import io as _io
-            for _attr in ('stdout', 'stderr'):
-                _stream = getattr(sys, _attr, None)
-                if _stream is None:
-                    setattr(sys, _attr, open(os.devnull, 'w', encoding='utf-8'))
-                else:
+            _worker_threads = int(os.environ.get('NUNBA_WORKER_THREADS', '128'))
+        except (TypeError, ValueError):
+            _worker_threads = 128
+
+        try:
+            # Hypercorn's `worker_serve` installs SIGINT / SIGTERM /
+            # SIGBREAK handlers via `signal.signal()`.  That call only
+            # works in the main thread; from a worker thread it raises
+            # `ValueError: signal only works in main thread of the main
+            # interpreter`.  On Windows the asyncio policy first tries
+            # `loop.add_signal_handler` (raises NotImplementedError on
+            # ProactorEventLoop), then falls back to `signal.signal`
+            # which then raises ValueError -> hypercorn aborts.
+            #
+            # In a desktop GUI app the signal handlers are dead code
+            # anyway: pywebview owns the main thread, the user shuts
+            # down via the tray icon / window-close callback (which
+            # routes through `desktop.tray_handler`), and POSIX signals
+            # never fire on a frozen Win32 GUI app.  So patch
+            # `signal.signal` to silently no-op when called from a
+            # non-main thread — hypercorn's signal-install becomes a
+            # no-op, and the rest of `worker_serve` proceeds normally.
+            #
+            # Scope: the patch is applied BEFORE hypercorn imports and
+            # is intentionally left in place for the lifetime of the
+            # process (hypercorn never returns from `serve`; no other
+            # call site needs the original behaviour).
+            import signal as _sig_patch
+            import threading as _th_check
+            if _th_check.current_thread() is not _th_check.main_thread():
+                _orig_signal_signal = _sig_patch.signal
+                def _silent_signal(signum, handler):
                     try:
-                        _stream.fileno()
-                    except (ValueError, OSError, _io.UnsupportedOperation):
+                        return _orig_signal_signal(signum, handler)
+                    except (ValueError, OSError):
+                        # Non-main-thread or unavailable signum on this
+                        # platform — degrade to the default disposition.
+                        return _sig_patch.SIG_DFL
+                _silent_signal._hartos_thread_safe = True  # marker for tests
+                _sig_patch.signal = _silent_signal
+                logger.info(
+                    "Patched signal.signal to no-op outside main thread "
+                    "(hypercorn signal-handler install will silently skip)"
+                )
+
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+
+            from hypercorn.asyncio import serve as _hcserve
+            from hypercorn.config import Config
+            from hypercorn.middleware import AsyncioWSGIMiddleware
+
+            _hc_config = Config()
+            _hc_config.bind = [f'0.0.0.0:{args.port}']
+            _hc_config.keep_alive_timeout = 120
+            _hc_config.h11_max_incomplete_size = 16 * 1024 * 1024
+            _hc_config.accesslog = None
+            _hc_config.errorlog = '-'
+
+            _asgi_app = AsyncioWSGIMiddleware(_wsgi_target)
+
+            async def _hc_runner():
+                _loop = asyncio.get_running_loop()
+                _loop.set_default_executor(ThreadPoolExecutor(
+                    max_workers=_worker_threads, thread_name_prefix='nunba'))
+                await _hcserve(_asgi_app, _hc_config)
+
+            logger.info(
+                f"Starting Hypercorn (ASGI) on 0.0.0.0:{args.port} "
+                f"(executor_threads={_worker_threads}, "
+                f"app={'full' if _serving_app is flask_app else 'dynamic-dispatcher'})"
+            )
+            asyncio.run(_hc_runner())
+        except (ImportError, NotImplementedError, ValueError, RuntimeError) as _hc_exc:
+            # Broad on purpose.  Three known failure shapes here, all of
+            # which should degrade to Waitress instead of killing the
+            # server thread:
+            #   * ImportError      - hypercorn not installed.
+            #   * NotImplementedError - asyncio.add_signal_handler() on
+            #     Windows ProactorEventLoop in a non-main thread.
+            #   * ValueError       - hypercorn's worker_serve calls
+            #     signal.signal() which raises "signal only works in
+            #     main thread of the main interpreter" because
+            #     start_flask is invoked from the NunbaGUI thread, not
+            #     the main thread (main thread is bound to pywebview).
+            #     2026-04-28 server.log:114 reproduced this and the
+            #     prior `except ImportError` let it escape to the outer
+            #     `except Exception` which sys.exit(1)'d the worker
+            #     thread, leaving :5000 unbound for the whole boot.
+            #   * RuntimeError     - asyncio loop already running from
+            #     a parent context (rare; covered defensively).
+            # Waitress is signal-handler-free and thread-safe, so the
+            # fallback is the correct behaviour for every case above.
+            logger.warning(
+                f"Hypercorn boot failed ({type(_hc_exc).__name__}: "
+                f"{_hc_exc}) — falling back to Waitress"
+            )
+            try:
+                from waitress import serve as _serve
+                # threads=8 was the historical value; bumped to 64 on the
+                # fallback path so a degraded boot (no hypercorn) still has
+                # enough headroom for the dashboard + SSE + slow installs.
+                _w_threads = int(os.environ.get('NUNBA_WAITRESS_THREADS', '64'))
+                logger.info(
+                    f"Starting Waitress server on port {args.port} "
+                    f"(threads={_w_threads}, "
+                    f"app={'full' if _serving_app is flask_app else 'dynamic-dispatcher'})"
+                )
+                _serve(_wsgi_target, host="0.0.0.0", port=args.port, threads=_w_threads)
+            except ImportError:
+                logger.warning("waitress not available, falling back to Flask dev server")
+                # Patch stdout/stderr before .run() to prevent click.echo crash
+                # in frozen GUI exes where console file descriptors are closed
+                import io as _io
+                for _attr in ('stdout', 'stderr'):
+                    _stream = getattr(sys, _attr, None)
+                    if _stream is None:
                         setattr(sys, _attr, open(os.devnull, 'w', encoding='utf-8'))
-            _serving_app.run(debug=False, host="0.0.0.0", port=args.port, use_reloader=False)
+                    else:
+                        try:
+                            _stream.fileno()
+                        except (ValueError, OSError, _io.UnsupportedOperation):
+                            setattr(sys, _attr, open(os.devnull, 'w', encoding='utf-8'))
+                _serving_app.run(debug=False, host="0.0.0.0", port=args.port, use_reloader=False)
     except Exception as e:
         logger.error(f"Error starting Flask server: {str(e)}")
         logger.error(traceback.format_exc())
@@ -6907,11 +7131,27 @@ def main():
                 # React either didn't mount OR WebView2 compositor is suspended.
                 # In both cases the reload path (with post-load resize kick)
                 # is the safest recovery.
+                # Preserve the URL the user is currently on — the
+                # taskbar-restore / shown / events.restored watchdogs all
+                # fire AFTER the user has been navigating, so reloading
+                # _local_url ('/local') yanks them back to the home page
+                # from wherever they were (/admin, /chat, /agents/...).
+                # Same get_current_url-then-fallback pattern used at
+                # app.py:5036 for the focus-route reload path.
+                try:
+                    _cur = (_window.get_current_url() or '').strip()
+                except Exception:
+                    _cur = ''
+                _target = (
+                    _local_url if (not _cur or 'about:blank' in _cur)
+                    else _cur
+                )
                 logger.warning(
                     f"[REMOUNT:{origin}] React not mounted ({state}) — "
-                    f"{'navigating' if attempt == 0 else 'reloading'}")
+                    f"{'navigating' if attempt == 0 else 'reloading'} "
+                    f"to {_target}")
                 try:
-                    _window.load_url(_local_url)
+                    _window.load_url(_target)
                 except Exception as e:
                     logger.warning(f"[REMOUNT:{origin}] load_url failed: {e}")
                     continue

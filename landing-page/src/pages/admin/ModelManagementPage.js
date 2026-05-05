@@ -273,6 +273,12 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
         padding: 16,
         border: '1px solid #2a3a4a',
         opacity: model.enabled === false ? 0.5 : 1,
+        // Belt-and-braces: clip any descendant row that exceeds the
+        // card's width.  The Purpose row's flexWrap (above) handles
+        // 99% of cases; this keeps the card visually contained even
+        // if a future row regresses to single-line flex.
+        overflow: 'hidden',
+        minWidth: 0,
       }}
     >
       <div
@@ -390,9 +396,20 @@ function ModelCard({model, onLoad, onUnload, onDownload, onSetPurpose}) {
         </div>
       </div>
 
-      {/* Purpose selector — multi-toggle */}
+      {/* Purpose selector — multi-toggle.  flexWrap so the full
+          purpose set (draft / main / vision / caption / grounding /
+          tts / stt / diarization / audio_gen / video_gen) wraps to
+          a second row inside the card on narrow viewports instead
+          of overflowing past the right edge. */}
       <div
-        style={{display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center'}}
+        style={{
+          display: 'flex',
+          gap: 6,
+          rowGap: 6,
+          marginBottom: 8,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
       >
         <span style={{fontSize: 11, color: '#99a'}}>Purpose:</span>
         {validPurposes.map((p) => {
@@ -1204,6 +1221,11 @@ function BrowseHuggingFaceTab({onInstalled}) {
 export default function ModelManagementPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Surface explicit fetch errors so a hanging / 500 backend never leaves
+  // the page on a forever-spinner.  See bug 2026-04-28 where a Redis-ping
+  // deadlock in VLMLoader.is_loaded() blocked /api/admin/models for >60s
+  // without ever returning, and the page sat on "Loading model catalog..."
+  const [loadError, setLoadError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [mode, setMode] = useState('installed'); // 'installed' | 'browse'
   const [showAdd, setShowAdd] = useState(false);
@@ -1211,18 +1233,50 @@ export default function ModelManagementPage() {
   const [providerCaps, setProviderCaps] = useState(null);
 
   const fetchModels = useCallback(async () => {
+    setLoadError(null);
+    // Hard wall-clock so the spinner state is bounded — even if the
+    // Flask handler hangs in a blocking syscall (e.g. Redis ping with no
+    // connect-timeout), the browser AbortController frees the UI.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
+      const fetchOne = async (url) => {
+        const res = await fetch(url, {signal: controller.signal});
+        if (!res.ok) {
+          let detail = '';
+          try {
+            const body = await res.json();
+            detail = body.error || body.message || '';
+          } catch {
+            /* non-JSON error body */
+          }
+          throw new Error(
+            `${url} → HTTP ${res.status}${detail ? ': ' + detail : ''}`
+          );
+        }
+        return res.json();
+      };
       const [modelsRes, capsRes] = await Promise.all([
-        fetch('/api/admin/models').then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/admin/providers/capabilities').then((r) =>
-          r.ok ? r.json() : null
-        ),
+        fetchOne('/api/admin/models'),
+        fetchOne('/api/admin/providers/capabilities').catch((e) => {
+          // capabilities is non-critical — log but don't block render.
+          // eslint-disable-next-line no-console
+          console.warn('providers/capabilities failed:', e);
+          return null;
+        }),
       ]);
       if (modelsRes) setData(modelsRes);
       if (capsRes) setProviderCaps(capsRes.capabilities);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      const msg =
+        e.name === 'AbortError'
+          ? 'Backend timed out after 30s — /api/admin/models did not respond.'
+          : String(e.message || e);
+      setLoadError(msg);
+      // eslint-disable-next-line no-console
+      console.error('Model catalog fetch failed:', msg);
     }
+    clearTimeout(timeoutId);
     setLoading(false);
   }, []);
 
@@ -1277,7 +1331,37 @@ export default function ModelManagementPage() {
   if (!data)
     return (
       <div style={{color: '#f44336', padding: 40, textAlign: 'center'}}>
-        Failed to load model catalog
+        <div style={{marginBottom: 12, fontWeight: 600}}>
+          Failed to load model catalog
+        </div>
+        {loadError && (
+          <div
+            style={{
+              color: '#ffcdd2',
+              fontSize: 13,
+              fontFamily: 'monospace',
+              background: '#2a1a1a',
+              padding: '10px 14px',
+              borderRadius: 6,
+              border: '1px solid #f44336',
+              maxWidth: 640,
+              margin: '0 auto 12px',
+              wordBreak: 'break-word',
+            }}
+          >
+            {loadError}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            fetchModels();
+          }}
+          style={{...btnStyle('#6C63FF'), padding: '8px 16px'}}
+        >
+          Retry
+        </button>
       </div>
     );
 

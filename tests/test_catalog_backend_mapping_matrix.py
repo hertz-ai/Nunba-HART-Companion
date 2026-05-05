@@ -170,12 +170,28 @@ class TestLegacyMappings:
         if b1 and b2:
             assert b1 == b2, f"{hyphen}→{b1} vs {underscore}→{b2}"
 
-    def test_pocket_tts_is_its_own_backend(self):
-        # pocket_tts was promoted from a Piper fallback alias to its own
-        # first-class HARTOS backend (registered in tts_router
-        # ENGINE_REGISTRY with its own pocket_tts_synthesize call).
-        # The catalog → backend mapping reflects that promotion.
-        assert _CATALOG_TO_BACKEND.get('pocket-tts') == 'pocket_tts'
+    def test_pocket_tts_routes_to_piper(self):
+        # 2026-05-04 root-cause fix: pocket_tts is NOT bundled in
+        # Nunba's python-embed (no native loader, no required
+        # package).  The HARTOS catalog still exposes a 'tts-pocket-tts'
+        # entry, but Nunba routes it to BACKEND_PIPER — the canonical
+        # CPU fallback that IS bundled and IS in every ladder.
+        # Both hyphen ('pocket-tts') and underscore ('pocket_tts')
+        # forms must collapse to Piper because HARTOS catalog uses
+        # hyphens while ENGINE_REGISTRY uses underscores; either form
+        # may flow through _get_lang_preference().
+        from tts.tts_engine import BACKEND_PIPER
+        assert _CATALOG_TO_BACKEND.get('pocket-tts') == BACKEND_PIPER
+        assert _CATALOG_TO_BACKEND.get('pocket_tts') == BACKEND_PIPER
+
+    def test_luxtts_routes_to_piper(self):
+        # luxtts is an internal HARTOS tool — Nunba doesn't run it
+        # in-process.  Same root-cause fix as pocket_tts: was
+        # self-mapped in _BACKEND_TO_REGISTRY_KEY producing a
+        # literal-echo entry; now declared in
+        # _CPU_FALLBACK_CATALOG_IDS and routed to BACKEND_PIPER.
+        from tts.tts_engine import BACKEND_PIPER
+        assert _CATALOG_TO_BACKEND.get('luxtts') == BACKEND_PIPER
 
     def test_espeak_maps_to_piper(self):
         # espeak has no standalone backend; routed through Piper as the

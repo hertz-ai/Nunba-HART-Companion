@@ -149,6 +149,7 @@ class TestErrorHandlerDecorator:
         the decorated fn returns a coroutine.  Proves the wrapper
         is async-style."""
         import inspect
+
         from routes.chatbot_routes import error_handler
 
         @error_handler

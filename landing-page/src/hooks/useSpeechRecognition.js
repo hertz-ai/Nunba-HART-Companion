@@ -37,6 +37,10 @@ export default function useSpeechRecognition(config = {}) {
   const [isListening, setIsListening] = useState(false);
   const [confidence, setConfidence] = useState(-1);
   const [error, setError] = useState(null);
+  // Which STT path is active — exposed as a state so the UI can show a
+  // local-vs-cloud privacy badge.  null = idle, 'ws' = local Whisper,
+  // 'browser' = browser SpeechRecognition (cloud-backed in Chrome/Edge).
+  const [activeMethod, setActiveMethod] = useState(null);
 
   const mountedRef = useRef(true);
   const wsRef = useRef(null);
@@ -109,6 +113,7 @@ export default function useSpeechRecognition(config = {}) {
 
           if (mountedRef.current) {
             activeMethodRef.current = 'ws';
+            setActiveMethod('ws');
             setIsListening(true);
           }
           resolve(true);
@@ -169,6 +174,7 @@ export default function useSpeechRecognition(config = {}) {
     recognition.onstart = () => {
       if (!mountedRef.current) return;
       activeMethodRef.current = 'browser';
+      setActiveMethod('browser');
       setIsListening(true);
       setError(null);
     };
@@ -261,7 +267,10 @@ export default function useSpeechRecognition(config = {}) {
     }
 
     activeMethodRef.current = null;
-    if (mountedRef.current) setIsListening(false);
+    if (mountedRef.current) {
+      setActiveMethod(null);
+      setIsListening(false);
+    }
   }, []);
 
   const resetTranscript = useCallback(() => {
@@ -293,5 +302,11 @@ export default function useSpeechRecognition(config = {}) {
     stopListening,
     resetTranscript,
     error,
+    // Path indicator: 'ws' when local HARTOS Whisper is connected,
+    // 'browser' when falling back to the browser SpeechRecognition API
+    // (cloud-backed in Chrome/Edge), null when idle.  UI uses this to
+    // show users whether their audio stays local or is sent to the cloud.
+    activeMethod,
+    usingFallback: activeMethod === 'browser',
   };
 }

@@ -56,10 +56,56 @@ KNOWN_LLM_ENDPOINTS = [
 ]
 
 
+def _scan_via_canonical_resolver() -> dict | None:
+    """First-priority scan: ask HARTOS's canonical LLM URL resolver.
+
+    ``core.port_registry.get_local_llm_url()`` walks 7 candidate
+    sources (env vars, ``~/.nunba/llama_config.json:server_port``,
+    ``external_llm_endpoint.base_url``, port-registry default, …) and
+    probes each.  If a Nunba-managed llama-server is running on a
+    non-default port (e.g. 8082), the legacy KNOWN_LLM_ENDPOINTS list
+    misses it but this resolver finds it.  Routing through
+    ``core.health_probe.probe_llm`` keeps a SINGLE source of truth —
+    no parallel "is the LLM up?" implementations (Gate 4 / DRY).
+
+    Returns the legacy shape that ``scan_existing_llm_endpoints``
+    callers expect, or None when the resolver can't reach anything.
+    """
+    try:
+        from core.health_probe import probe_llm
+    except ImportError:
+        return None
+    info = probe_llm()
+    if info.get('status') != 'up':
+        return None
+    url = info.get('url') or ''
+    if not url:
+        return None
+    base = url.rstrip('/').rstrip('/v1').rstrip('/')
+    models = info.get('models') or []
+    name = models[0] if models else 'llama.cpp (canonical resolver)'
+    logger.info(
+        f"Canonical LLM resolver found running server at {base} "
+        f"(model={name}) — reusing instead of starting a new one")
+    return {
+        "name": name,
+        "base_url": base,
+        "completions": base + "/v1/chat/completions",
+        "type": "openai",
+    }
+
+
 def scan_existing_llm_endpoints() -> dict | None:
     """
     Scan for existing LLM endpoints on the system.
     Returns the first working endpoint found, or None if none found.
+
+    Lookup order:
+      1. ``core.health_probe.probe_llm`` — canonical Nunba/HARTOS
+         resolver (covers env, llama_config.json, port_registry).
+      2. Legacy KNOWN_LLM_ENDPOINTS list — third-party LLMs (Ollama,
+         LM Studio, vLLM, …) that the canonical resolver doesn't know
+         about.
 
     Returns:
         Dict with endpoint info if found: {"name", "base_url", "completions", "type"}
@@ -67,6 +113,13 @@ def scan_existing_llm_endpoints() -> dict | None:
     """
     logger.info("Scanning for existing LLM endpoints...")
 
+    # 1. Canonical resolver first — finds Nunba's own llama-server on
+    # whatever port it actually bound to (8082 etc.), not just :8080.
+    canonical = _scan_via_canonical_resolver()
+    if canonical:
+        return canonical
+
+    # 2. Legacy third-party LLM scan — Ollama, LM Studio, vLLM, etc.
     for endpoint in KNOWN_LLM_ENDPOINTS:
         try:
             # Try the health endpoint
@@ -1509,43 +1562,96 @@ class LlamaConfig:
             if _use_zinc:
                 env["RADV_PERFTEST"] = "coop_matrix"
 
+            # Capture llama-server stdout/stderr to a dedicated log file
+            # so diagnostics survive the process death.  Previously stdout
+            # was subprocess.PIPE which (a) only got drained during the
+            # startup loop, leaving the buffer to fill and BLOCK the
+            # server after start_server() returned, (b) lost all
+            # post-mortem context on external death (CUDA crash, OOM).
+            # See task #80 — the silent-crash investigation that
+            # surfaced this gap.
+            _llama_log_dir = os.path.join(
+                os.path.expanduser('~'), 'Documents', 'Nunba', 'logs'
+            )
+            try:
+                os.makedirs(_llama_log_dir, exist_ok=True)
+            except Exception:
+                _llama_log_dir = bin_dir  # fallback to binary dir
+            _llama_log_path = os.path.join(
+                _llama_log_dir, f'llama_server_{desired_port}.log'
+            )
+            # Append-mode preserves history across restarts.  Write a
+            # session-start banner so a tail can locate the current run.
+            try:
+                _llama_log_fh = open(_llama_log_path, 'ab')
+                _banner = (
+                    f"\n===== {time.strftime('%Y-%m-%dT%H:%M:%S')} "
+                    f"llama-server start port={desired_port} "
+                    f"model={model_preset.display_name} =====\n"
+                ).encode()
+                _llama_log_fh.write(_banner)
+                _llama_log_fh.flush()
+                logger.info(
+                    f"llama-server stdout/stderr → {_llama_log_path}"
+                )
+            except Exception as _log_err:
+                logger.warning(
+                    f"Could not open llama-server log file at "
+                    f"{_llama_log_path}: {_log_err} — falling back to DEVNULL"
+                )
+                _llama_log_fh = subprocess.DEVNULL
+                _llama_log_path = None
+
             self.server_process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # Merge stderr into stdout (prevents pipe deadlock)
-                text=True,
-                bufsize=1,  # Line-buffered for real-time reading
+                stdout=_llama_log_fh,
+                stderr=subprocess.STDOUT,  # merge into same file
                 cwd=bin_dir,
                 env=env,
                 startupinfo=startupinfo,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
+            # Close our handle on the file — the subprocess holds its own
+            # inherited handle.  Keeping ours open just leaks an FD per
+            # restart.  DEVNULL is a sentinel; nothing to close.
+            if _llama_log_fh is not subprocess.DEVNULL:
+                try:
+                    _llama_log_fh.close()
+                except Exception:
+                    pass
 
-            # Wait for server to be ready (matching TrueFlow's approach)
-            # Read stdout on each iteration to prevent pipe buffer from filling up
-            # and blocking the server process.
+            # Wait for server to be ready.  We no longer drain stdout
+            # in-process — the OS routes it to the dedicated log file
+            # (above), so the buffer can never fill up and block the
+            # server.  Liveness is detected via check_server_running()
+            # (HTTP /health).
             timeout_seconds = 120 if model_preset.has_vision else 60
             start_time = time.time()
             logger.info(f"Waiting for server to start (timeout: {timeout_seconds}s)...")
 
-            while time.time() - start_time < timeout_seconds:
-                # Drain server output to prevent pipe deadlock
-                if self.server_process.stdout:
-                    try:
-                        line = self.server_process.stdout.readline()
-                        if line:
-                            logger.debug(f"llama-server: {line.strip()}")
-                    except Exception:
-                        pass
+            def _read_log_tail(n_bytes: int = 2000) -> str:
+                """Return the last n_bytes of the llama-server log for
+                diagnostic output.  Used when the process dies during
+                startup so the operator sees WHY without grepping a
+                separate file.  Bounded read; non-fatal."""
+                if not _llama_log_path:
+                    return ''
+                try:
+                    with open(_llama_log_path, 'rb') as _diag:
+                        _diag.seek(0, 2)
+                        _size = _diag.tell()
+                        _diag.seek(max(0, _size - n_bytes))
+                        return _diag.read().decode('utf-8', errors='replace')
+                except Exception:
+                    return ''
 
+            while time.time() - start_time < timeout_seconds:
                 # Check if process died early
                 if self.server_process.poll() is not None:
                     logger.error("llama-server process died during startup")
-                    # Drain remaining output for diagnostics
-                    if self.server_process.stdout:
-                        remaining = self.server_process.stdout.read()
-                        if remaining:
-                            logger.error(f"Server output: {remaining[:2000]}")
+                    _tail = _read_log_tail(2000)
+                    if _tail:
+                        logger.error(f"Server output (tail):\n{_tail}")
                     return False
 
                 # Check health endpoint

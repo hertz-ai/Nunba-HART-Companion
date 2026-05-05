@@ -32,6 +32,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # hartos_backend_src/ is .gitignored — developers `git clone` HARTOS
+      # into it manually for desktop builds.  CI does the same here so
+      # models/catalog.py and the rest of the HARTOS shim layer can
+      # resolve `import integrations.service_tools.model_catalog` once
+      # PYTHONPATH=/app/hartos_backend_src kicks in (set in the staging
+      # compose file).  Uses HEVOLVE_REPO_TOKEN (org PAT) so the clone
+      # works whether HARTOS is private or public.
+      - name: Clone HARTOS source into hartos_backend_src/
+        env:
+          GH_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          git clone --depth=1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/hertz-ai/HARTOS.git" \
+            hartos_backend_src
+          echo "HARTOS source layout (top-level):"
+          ls hartos_backend_src | head -20
+
       - name: Install jq + curl (probe deps)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq curl
 
@@ -44,11 +61,16 @@ jobs:
           echo "Stack launched. PID table:"
           docker compose -f docker-compose.staging.yml ps
 
-      - name: Wait for nunba healthy (max 8 min)
+      - name: Wait for nunba healthy (max 12 min)
+        # Bumped from 8min to 12min: the staging container does pip
+        # install of the full requirements.txt on every boot (~3min)
+        # plus the Flask app's own startup (~30s).  Combined with the
+        # docker healthcheck's 5min start_period, the previous 8min
+        # cap occasionally clipped real green runs.
         run: |
-          for i in $(seq 1 48); do
+          for i in $(seq 1 72); do
             status=$(docker inspect --format '{{.State.Health.Status}}' nunba-staging-app 2>/dev/null || echo starting)
-            echo "  [$i/48] nunba: $status"
+            echo "  [$i/72] nunba: $status"
             if [ "$status" = "healthy" ]; then exit 0; fi
             sleep 10
           done

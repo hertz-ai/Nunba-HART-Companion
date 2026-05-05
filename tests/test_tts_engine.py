@@ -86,10 +86,19 @@ class TestBackendConstants:
 
 class TestFallbackEngineCapabilities:
     def test_all_backends_present(self):
-        from tts.tts_engine import BACKEND_KOKORO
+        # 10 backends: 7 original + 3 mid-VRAM tier (MeloTTS, XTTS-v2,
+        # MMS-TTS) added 2026-04-29 to fill the 1-3 GB coverage gap so
+        # every SUPPORTED_LANG_DICT code has a light-tier engine.
+        from tts.tts_engine import (
+            BACKEND_KOKORO,
+            BACKEND_MELOTTS,
+            BACKEND_MMS_TTS,
+            BACKEND_XTTS_V2,
+        )
         expected = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
                     BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
-                    BACKEND_PIPER}
+                    BACKEND_PIPER,
+                    BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS}
         assert set(_FALLBACK_ENGINE_CAPABILITIES.keys()) == expected
 
     def test_f5_vram(self):
@@ -160,8 +169,28 @@ class TestLangEnginePreference:
     def test_english_last_choice_is_piper(self):
         assert _FALLBACK_LANG_ENGINE_PREFERENCE['en'][-1] == BACKEND_PIPER
 
-    def test_spanish_first_choice_is_cosyvoice3(self):
-        assert _FALLBACK_LANG_ENGINE_PREFERENCE['es'][0] == BACKEND_COSYVOICE3
+    def test_spanish_first_choice_is_pip_installable_light_engine(self):
+        """Pre-2026-04-29 this asserted CosyVoice3 (later Chatterbox-ML
+        per J213).  As of 2026-04-29 the mid-VRAM tier (MeloTTS 1.5 GB,
+        XTTS-v2 2.5 GB) takes the primary slot for international
+        languages: pip-installable AND fits in 4 GB consumer GPUs.
+        See test_tts_language_routing_matrix.py § 3 for the full
+        policy doc.
+        """
+        from tts.tts_engine import (
+            _FALLBACK_ENGINE_CAPABILITIES,
+            BACKEND_MELOTTS,
+            BACKEND_MMS_TTS,
+            BACKEND_XTTS_V2,
+        )
+        first = _FALLBACK_LANG_ENGINE_PREFERENCE['es'][0]
+        assert first in {BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS}, (
+            f"Spanish first-choice {first!r} is not in the mid-VRAM "
+            f"primary tier."
+        )
+        caps = _FALLBACK_ENGINE_CAPABILITIES[first]
+        assert 'es' in caps['languages']
+        assert caps['vram_gb'] <= 3.0
 
     def test_indic_languages_prefer_indic_parler(self):
         for lang in _INDIC_LANGS:
@@ -197,17 +226,34 @@ class TestCatalogMapping:
             assert _CATALOG_TO_BACKEND[cat_id] == be
 
     def test_backend_to_catalog_contains_all_backends(self):
-        # _BACKEND_TO_CATALOG carries the 7 primary backends PLUS two
-        # string-only keys ('luxtts', 'pocket_tts') that are retained
-        # for frozen-HARTOS compatibility — they have no top-level
-        # BACKEND_* constant because they never ship as their own
-        # backend, they fall through to the CPU in-process path.
-        from tts.tts_engine import BACKEND_KOKORO
+        # _BACKEND_TO_CATALOG is derived from _BACKEND_TO_REGISTRY_KEY,
+        # so any new BACKEND_* constant added there flows through here
+        # automatically.  Carries the 10 primary backends (7 original
+        # + 3 mid-VRAM tier added 2026-04-29).
+        #
+        # 2026-05-04 fix: the dict no longer carries 'luxtts' /
+        # 'pocket_tts' string-only keys.  Those were self-mappings
+        # inside _BACKEND_TO_REGISTRY_KEY ("kept for frozen HARTOS
+        # compat until rebuild") that produced a literal-echo entry
+        # in _CATALOG_TO_BACKEND ('pocket_tts' → 'pocket_tts'),
+        # causing the catalog ladder to "select" pocket_tts as a
+        # real backend and audio synthesis to silently fail.  CPU
+        # fallback aliases now live in _CPU_FALLBACK_CATALOG_IDS and
+        # only appear in _CATALOG_TO_BACKEND (one-way mapping to
+        # BACKEND_PIPER) — they were never valid Nunba backend
+        # constants in the first place.
+        from tts.tts_engine import (
+            BACKEND_KOKORO,
+            BACKEND_MELOTTS,
+            BACKEND_MMS_TTS,
+            BACKEND_XTTS_V2,
+        )
         primary = {BACKEND_F5, BACKEND_CHATTERBOX_TURBO, BACKEND_CHATTERBOX_ML,
                    BACKEND_INDIC_PARLER, BACKEND_COSYVOICE3, BACKEND_KOKORO,
-                   BACKEND_PIPER}
-        compat = {'luxtts', 'pocket_tts'}
-        assert set(_BACKEND_TO_CATALOG.keys()) == primary | compat
+                   BACKEND_PIPER,
+                   # Mid-VRAM tier — 2026-04-29
+                   BACKEND_MELOTTS, BACKEND_XTTS_V2, BACKEND_MMS_TTS}
+        assert set(_BACKEND_TO_CATALOG.keys()) == primary
 
 
 class TestKokoroEnglishLadder:

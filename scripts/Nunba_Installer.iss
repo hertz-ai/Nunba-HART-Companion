@@ -72,8 +72,18 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--setup-ai"; Description: "Confi
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} - Your LocalMind"; Flags: nowait postinstall skipifsilent shellexec
 
 [Dirs]
-; Create the log directory in user Documents
-Name: "{userdocs}\Nunba\logs"; Flags: uninsalwaysuninstall
+; (Intentionally empty.)
+;
+; The previous entry pre-created `{userdocs}\Nunba\logs` here, but
+; PrivilegesRequired=admin elevates Setup.exe to the admin token →
+; `{userdocs}` resolves to the ADMIN user's Documents, not the user
+; who launched Setup.  Result: an empty dir in the wrong profile +
+; an Inno Setup compile-time warning ("UsedUserAreasWarning").
+;
+; The app self-creates `~/Documents/Nunba/{data,logs}/` at first run
+; via `core.platform_paths.get_data_dir()` / `get_log_dir()`
+; (app.py:391-397, runs as the actual user), so no installer-side
+; pre-creation is needed.
 
 [Code]
 // Check if the .NET Framework 4.5 or higher is installed
@@ -269,8 +279,21 @@ begin
         // Remove the install dir itself if empty
         RemoveDir(ExpandConstant('{app}'));
 
-        // Clean up user Documents directory
-        DelTree(ExpandConstant('{userdocs}\Nunba'), True, True, True);
+        // User data (chat history, agent_data/, memory_graph/, DBs) lives
+        // under `~/Documents/Nunba/`.  We INTENTIONALLY do not touch it
+        // on uninstall:
+        //   1. Under PrivilegesRequired=admin, `{userdocs}` resolves to
+        //      the admin user's Documents — which is NOT where the app
+        //      (running as the actual user) wrote its data.  A DelTree
+        //      here would either no-op (wrong path) or wipe the admin's
+        //      unrelated files (wrong target).
+        //   2. Wiping a user's chat history / agent memory on a routine
+        //      uninstall is a privacy + UX mis-step.  Reinstalls expect
+        //      to find prior conversations intact; full removal is the
+        //      user's explicit choice (manual delete).
+        // If true cleanup is ever wanted, do it via a separate
+        // "Remove Nunba data" Uninstall task with `runascurrentuser`
+        // so `{userdocs}` resolves to the right profile.
 
         // Remove startup registry entry
         try

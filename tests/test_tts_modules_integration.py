@@ -6,7 +6,6 @@ Targets:
   * tts/language_segmenter.py (237 LOC)
   * tts/vibevoice_tts.py
   * tts/tts_handshake.py (397 LOC)
-  * tts/indic_parler_worker.py (189 LOC)
   * tts/package_installer.py (1006 LOC)
   * tts/backend_venv.py (465 LOC)
 
@@ -207,13 +206,15 @@ class TestTTSHandshake:
 
 
 # ════════════════════════════════════════════════════════════════════════
-# tts/indic_parler_worker.py — subprocess entrypoint
+# tts/indic_parler_worker.py — REMOVED (#53)
 # ════════════════════════════════════════════════════════════════════════
-
-class TestIndicParlerWorker:
-    def test_module_loads(self):
-        import tts.indic_parler_worker as ipw
-        assert ipw is not None
+# The duplicate __main__ entrypoint was retired in favour of the central
+# dispatcher (HARTOS integrations/service_tools/gpu_worker._dispatch_and_run)
+# spawned via ToolWorker(python_exe=<venv python>).  No replacement test
+# is added here — the venv-isolation primitive itself stays covered by
+# tests/journey/test_J216_venv_isolates_transformers.py (uses `six` to
+# prove the mechanics) and the central dispatcher path is exercised by
+# tests/unit/test_gpu_worker.py.
 
 
 # ════════════════════════════════════════════════════════════════════════

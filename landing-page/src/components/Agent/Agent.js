@@ -268,7 +268,7 @@ const AgentPage = () => {
         const greeting = langGreetings[selectedLang] || langGreetings.en;
 
         return (
-            <div className="relative h-screen" style={{ background: '#0F0E17', overflow: 'hidden' }}>
+            <div className="relative h-screen" style={{ background: 'black', overflow: 'hidden' }}>
                 {_particles.slice(0, 20).map((p, i) => (
                     <div key={i} style={{
                         position: 'absolute', left: `${p.x}%`, top: `${p.y}%`,
@@ -434,13 +434,24 @@ const AgentPage = () => {
     const heroName = agentData?.name || "Hevolve";
     const heroDesc = agentData?.video_text === "This is Static Description" ? "" : agentData?.video_text;
     const heroImg = agentData?.teacher_image_url || AgentPoster;
+    // Display-mode awareness: the big floating hero avatar only makes sense
+    // in 'video' mode.  In 'audio' (default) and 'text' modes the user
+    // explicitly asked for a text/voice-only experience — showing the
+    // avatar contradicts that intent.  Reads the same localStorage key
+    // Demopage owns (`nunba_media_mode`) so the two surfaces stay in sync
+    // without a parallel signal.  Default falls through to 'audio' to
+    // match Demopage:340.
+    const _mediaMode = (typeof window !== 'undefined' && window.localStorage)
+        ? (window.localStorage.getItem('nunba_media_mode') || 'audio')
+        : 'audio';
+    const showHeroAvatar = _mediaMode === 'video';
     const heroProps = { heroName, heroDesc, heroImg, hartName, heroEntrance };
 
     return (
         <div className="relative h-screen">
             {/* Hero Section — particle background + entrance animation + blur crossfade */}
             <section id="hero-section" className="absolute inset-0 text-white overflow-hidden" style={{
-                background: '#0F0E17',
+                background: 'black',
                 opacity: heroVisible ? 1 : 0, filter: heroVisible ? 'blur(0px)' : 'blur(6px)',
                 transition: 'opacity 2s ease-in-out, filter 1.8s ease-in-out',
                 zIndex: heroVisible ? 30 : 5, pointerEvents: heroVisible ? 'auto' : 'none',
@@ -461,8 +472,10 @@ const AgentPage = () => {
                 {/* Mobile */}
                 <div className="flex flex-col h-screen md:hidden" style={entranceStyle(heroEntrance)}>
                     <div className="h-[35vh] flex items-center justify-center relative">
-                        <img src={heroImg} alt="hero" className="absolute top-0 object-cover rounded-lg"
-                            style={{ width: getVideoWidthforMobile(), animation: 'heroFloat 4s ease-in-out infinite' }} />
+                        {showHeroAvatar && (
+                            <img src={heroImg} alt="hero" className="absolute top-0 object-cover rounded-lg"
+                                style={{ width: getVideoWidthforMobile(), animation: 'heroFloat 4s ease-in-out infinite' }} />
+                        )}
                     </div>
                     <div className="h-[50vh] flex flex-col items-center justify-center text-center px-6">
                         <HeroContent {...heroProps} mobile />
@@ -477,8 +490,10 @@ const AgentPage = () => {
                         <div className="w-full mb-16 md:mb-24 lg:mb-48">
                             <HeroContent {...heroProps} mobile={false} />
                         </div>
-                        <img src={heroImg} alt="hero" className="absolute bottom-20 md:bottom-32 lg:bottom-44 right-5 object-cover rounded-lg"
-                            style={{ width: getVideoWidthforMobile(), animation: 'heroFloat 4s ease-in-out infinite' }} />
+                        {showHeroAvatar && (
+                            <img src={heroImg} alt="hero" className="absolute bottom-20 md:bottom-32 lg:bottom-44 right-5 object-cover rounded-lg"
+                                style={{ width: getVideoWidthforMobile(), animation: 'heroFloat 4s ease-in-out infinite' }} />
+                        )}
                     </div>
                 </div>
 

@@ -1,4 +1,10 @@
-import { encountersApi } from '../../../services/socialApi';
+import BleMatchCard from './shared/BleMatchCard';
+import DiscoverableTogglePanel from './shared/DiscoverableTogglePanel';
+import IcebreakerDraftSheet from './shared/IcebreakerDraftSheet';
+
+import { useSocial } from '../../../contexts/SocialContext';
+import { subscribeEncounterMatch } from '../../../services/realtimeService';
+import { bleEncounterApi, encountersApi } from '../../../services/socialApi';
 import { socialTokens } from '../../../theme/socialTokens';
 import { animFadeInUp, animFadeInScale } from '../../../utils/animations';
 import EmptyState from '../shared/EmptyState';
@@ -24,6 +30,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function EncountersPage() {
   const navigate = useNavigate();
+  const { currentUser } = useSocial();
   const [tab, setTab] = useState(0);
 
   // --- Nearby Now ---
@@ -111,6 +118,73 @@ export default function EncountersPage() {
     else if (tab === 3) loadHistory();
   }, [tab, loadSuggestions, loadHistory]);
 
+  // --- BLE Matches (Tab 4) ---
+  // Consumes bleEncounterApi.listMatches (was dead code per
+  // master-orchestrator backfill run aa3ead1; F2 IcebreakerDraftSheet
+  // wires onto the "Send icebreaker" callback below).
+  const [bleMatches, setBleMatches] = useState([]);
+  const [bleMatchesLoading, setBleMatchesLoading] = useState(false);
+
+  const loadBleMatches = useCallback(async () => {
+    setBleMatchesLoading(true);
+    try {
+      const res = await bleEncounterApi.listMatches();
+      // Axios envelope: res.data === {success, data: {matches, count}}
+      const payload = res?.data?.data || res?.data || {};
+      setBleMatches(Array.isArray(payload.matches) ? payload.matches : []);
+    } catch {
+      /* silent — tab will show empty state */
+    }
+    setBleMatchesLoading(false);
+  }, []);
+
+  // Auto-load on mount AND on encounter-match WAMP events.  Subscription
+  // lives at the page level (not gated on tab) so a fresh match badge
+  // can be surfaced even while the user is on another tab.
+  useEffect(() => {
+    loadBleMatches();
+    const unsubscribe = subscribeEncounterMatch(() => {
+      loadBleMatches();
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [loadBleMatches]);
+
+  // F2 IcebreakerDraftSheet — single modal instance lifted to this
+  // page (Option b from the F2 brief): one DOM modal, one WAMP
+  // subscription (the modal subscribes itself), per-match dismiss
+  // filtered server-side by match.id.  See
+  // components/Social/Encounters/shared/IcebreakerDraftSheet.jsx for
+  // mission-anchor enforcement (AI never sends, edit-before-send,
+  // WAMP filter by match_id, 24h expiry surface).
+  const [currentIcebreakerMatch, setCurrentIcebreakerMatch] = useState(null);
+
+  const handleSendIcebreaker = (match) => {
+    setCurrentIcebreakerMatch(match);
+  };
+
+  const handleIcebreakerClose = useCallback(() => {
+    setCurrentIcebreakerMatch(null);
+  }, []);
+
+  const handleIcebreakerSent = useCallback(() => {
+    // After the user approves, refresh the BLE match list so
+    // BleMatchCard re-renders with the updated icebreaker_*_status
+    // (the WAMP echo also refreshes via the subscribeEncounterMatch
+    // path above; this is a belt-and-suspenders fetch).
+    loadBleMatches();
+  }, [loadBleMatches]);
+
+  const handleHideMatch = (match) => {
+    // F2 follow-up will call /encounter/map-pins toggle.  Placeholder
+    // for now; declining the match itself is a separate verb.
+    if (typeof window !== 'undefined' && window.console) {
+      // eslint-disable-next-line no-console
+      console.log('[encounters] hide-from-map requested for match', match?.id);
+    }
+  };
+
   const handleAccept = async (encounter) => {
     try {
       await encountersApi.acknowledge(encounter.id);
@@ -139,6 +213,15 @@ export default function EncountersPage() {
         Encounters
       </Typography>
 
+      {/* F1 GREENLIT (master-orchestrator aa3ead1) — discoverable consent
+          surface mounts ABOVE the tab bar so it's visible across every tab,
+          including BLE Matches.  See
+          components/Social/Encounters/shared/DiscoverableTogglePanel.jsx
+          for mission-anchor documentation. */}
+      <Box sx={{ mb: 2 }}>
+        <DiscoverableTogglePanel />
+      </Box>
+
       <Tabs
         value={tab}
         onChange={(e, v) => { setTab(v); setSelectedMissedId(null); }}
@@ -152,6 +235,7 @@ export default function EncountersPage() {
         <Tab label="Missed Connections" />
         <Tab label="Discovery" />
         <Tab label="History" />
+        <Tab label="BLE Matches" />
       </Tabs>
 
       {/* ---- Tab 0: Nearby Now ---- */}
@@ -322,6 +406,48 @@ export default function EncountersPage() {
           )}
         </Box>
       )}
+
+      {/* ---- Tab 4: BLE Matches ---- */}
+      {tab === 4 && (
+        <Box sx={{ ...animFadeInUp(0) }} data-testid="ble-matches-tab">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Connections from nearby — both of you said yes.
+          </Typography>
+          {bleMatchesLoading ? (
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <CircularProgress />
+            </Box>
+          ) : bleMatches.length === 0 ? (
+            <EmptyState message="No mutual encounters yet. They appear once both sides say yes." />
+          ) : (
+            bleMatches.map((m, i) => (
+              <Box key={m.id} sx={{ ...animFadeInScale(i * 100) }}>
+                <BleMatchCard
+                  match={m}
+                  currentUserId={currentUser?.id}
+                  onIcebreaker={handleSendIcebreaker}
+                  onHide={handleHideMatch}
+                />
+              </Box>
+            ))
+          )}
+        </Box>
+      )}
+
+      {/* F2 IcebreakerDraftSheet — single modal instance for the page.
+          Opened via BleMatchCard.onIcebreaker -> handleSendIcebreaker
+          which sets currentIcebreakerMatch state.  The modal owns the
+          WAMP subscription (filtered by match.id) and the
+          draft/approve/decline flow.  Mounted outside any tab branch
+          so the modal stays visible if the user switches tabs while a
+          draft is open. */}
+      <IcebreakerDraftSheet
+        open={!!currentIcebreakerMatch}
+        match={currentIcebreakerMatch}
+        viewer={currentUser}
+        onClose={handleIcebreakerClose}
+        onSent={handleIcebreakerSent}
+      />
     </>
   );
 }

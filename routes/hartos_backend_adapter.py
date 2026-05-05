@@ -152,15 +152,36 @@ _hartos_initialized = False
 # was removed 2026-04-19 to avoid a confusing duplicate definition.
 
 
-def _background_hartos_init():
-    """Import HARTOS in background thread. Runs at module load, not on first chat."""
+def _attempt_hartos_init():
+    """One attempt at importing HARTOS.  Returns True on success, False on failure.
+
+    Split out from `_background_hartos_init` so the outer driver can retry
+    transient failures (e.g. corrupt dist-info during pip activity, network
+    flake during HF model warmup) without making each attempt a separate
+    background thread.
+
+    DOES NOT mark `_hartos_initialized = True` on failure — the retry loop
+    decides when to give up so a transient error stops cascading into
+    "Tier-1 dead for the rest of the process lifetime."  See 2026-04-26
+    incident: a one-shot KeyError from transformers' packages_distributions
+    scan left the agent daemon dead and the admin dashboard empty until
+    process restart.
+    """
     global _hartos_backend_available, _hevolve_app, _active_tier, _hartos_initialized
 
     with _hartos_init_lock:
         if _hartos_initialized:
-            return
+            return True
         try:
-            from hart_intelligence import app as hevolve_app
+            # ── CANONICAL LOADER ──────────────────────────────────────
+            # This single thread is the ONLY place in the entire
+            # ecosystem that may eager-import hart_intelligence.  Every
+            # other reader uses ``core.safe_hartos_attr.safe_hartos_attr``
+            # (a sys.modules dict lookup) so worker threads never race
+            # the import lock.  The TID251 noqa below is intentional and
+            # required — see HARTOS pyproject.toml [tool.ruff.lint.
+            # flake8-tidy-imports.banned-api] for the rule rationale.
+            from hart_intelligence import app as hevolve_app  # noqa: TID251
             _hartos_backend_available = True
             _hevolve_app = hevolve_app
             _active_tier = "Tier-1 (direct in-process LangChain)"
@@ -169,7 +190,7 @@ def _background_hartos_init():
             logger.info("=" * 60)
 
             # Patch publish_async for thinking traces
-            import hart_intelligence as _lgapi
+            import hart_intelligence as _lgapi  # noqa: TID251
             _orig = _lgapi.publish_async
 
             def _patched(topic, message, timeout=2.0):
@@ -195,8 +216,10 @@ def _background_hartos_init():
 
             logger.info("  Thinking trace capture: ACTIVE")
             _hartos_initialized = True
+            return True
         except Exception as _ie:
-            _hartos_initialized = True  # mark done even on failure
+            # Don't mark _hartos_initialized = True here — let the retry
+            # driver decide.  Final-attempt failure path below sets it.
             # Write to file directly — logger may be silenced in frozen builds.
             # Hardening:
             #   * O_NOFOLLOW + O_CREAT + 0o600 → same-user malware cannot
@@ -205,9 +228,9 @@ def _background_hartos_init():
             #     HF tokens / API keys (transformers errors love to echo
             #     ``HF_TOKEN=hf_...`` in their messages).
             try:
-                import traceback as _tb
                 import io as _io
                 import re as _re_scrub
+                import traceback as _tb
                 _err_path = os.path.join(
                     os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
                     'hartos_init_error.log',
@@ -259,6 +282,62 @@ def _background_hartos_init():
             else:
                 _active_tier = "Tier-2 (HTTP proxy to port 6777)"
                 logger.info(f"BACKEND ADAPTER: Tier-1 unavailable — Tier-2 proxy ({_ie})")
+            return False
+
+
+# Retry schedule for transient Tier-1 import failures.  Total budget is
+# ~15 min: 60s + 120s + 240s + 480s before giving up and committing to
+# Tier-2/Tier-3 fallback.  Each attempt is a full import re-try; failures
+# clear langchain/transformers from sys.modules so a transient corrupt
+# dist-info or pip race has a chance to resolve before the next attempt.
+_HARTOS_INIT_BACKOFF_SCHEDULE = (60, 120, 240, 480)
+
+
+def _background_hartos_init():
+    """Driver: try HARTOS import, retry on transient failures with backoff.
+
+    Replaces the previous one-shot init that left Tier-1 dead for the
+    process lifetime if a single transient error fired during boot.
+    Each attempt:
+      1. Calls `_attempt_hartos_init()` (returns True on success).
+      2. If success → done, _hartos_initialized was set inside attempt.
+      3. If failure → wait `_HARTOS_INIT_BACKOFF_SCHEDULE[i]` seconds and retry.
+      4. After all attempts exhausted, mark `_hartos_initialized = True`
+         to commit to Tier-2/Tier-3 (no more retries until next restart).
+    """
+    global _hartos_initialized
+
+    if _attempt_hartos_init():
+        return
+
+    for _i, _wait in enumerate(_HARTOS_INIT_BACKOFF_SCHEDULE):
+        logger.info(f"BACKEND ADAPTER: Tier-1 retry in {_wait}s "
+                    f"(attempt {_i + 2}/{len(_HARTOS_INIT_BACKOFF_SCHEDULE) + 1})")
+        time.sleep(_wait)
+
+        # Evict half-loaded modules so the next attempt is a fresh import.
+        # The transformers / langchain / hart_intelligence chain is the
+        # one that actually crashed; clearing it lets the retry pick up
+        # any pip activity or filesystem self-heal that happened in the
+        # backoff window.
+        for _stale in list(sys.modules):
+            if _stale.startswith(('hart_intelligence', 'langchain_classic',
+                                   'transformers')):
+                sys.modules.pop(_stale, None)
+
+        # Allow re-attempt: clear the lock-guarded done flag so the
+        # next _attempt_hartos_init() actually runs the body.
+        with _hartos_init_lock:
+            _hartos_initialized = False
+
+        if _attempt_hartos_init():
+            return
+
+    # All attempts failed — commit to fallback for the rest of this process.
+    with _hartos_init_lock:
+        _hartos_initialized = True
+    logger.warning("BACKEND ADAPTER: Tier-1 retry budget exhausted — "
+                   "committed to Tier-2/Tier-3 fallback for the rest of this session")
 
 
 # ── HARTOS import lifecycle — EXPLICIT KICKOFF ONLY ──
@@ -368,11 +447,29 @@ def _fallback_chat(text: str, user_id: str = None, **kwargs) -> dict[str, Any]:
             }
             lang = _lang_names.get(preferred_lang, 'English')
 
+            # Brand identity sourced from HARTOS core.constants so the
+            # draft prompt (HARTOS speculative_dispatcher) and this
+            # cold-boot fallback can never drift on brand wording.
+            # Lazy import + try/except: hart_backend may not be
+            # importable yet at the cold-boot moment _fallback_chat
+            # actually fires — so a hardcoded literal stays as the
+            # safety net.  Keep the literal in sync with
+            # core.constants.NUNBA_BRAND_IDENTITY when either changes.
+            try:
+                from core.constants import NUNBA_BRAND_IDENTITY as _BRAND
+            except ImportError:
+                _BRAND = (
+                    "You are Nunba, a friendly and helpful local AI "
+                    "assistant. Hevolve.ai is the web cloud version "
+                    "of Nunba — same intelligence, different "
+                    "deployment. With hive enabled, you crowdsource "
+                    "intelligence from peer Nunba devices and Hevolve "
+                    "cloud nodes."
+                )
             system_prompt = (
-                f"You are Nunba, a friendly and helpful local AI assistant. "
-                f"You are part of Hevolve — a personal AI platform that runs locally "
-                f"on the user's device. Privacy-first: everything stays on the user's "
-                f"device. Respond in {lang}. Be concise and natural."
+                f"{_BRAND} "
+                f"Privacy-first: everything stays on the user's device. "
+                f"Respond in {lang}. Be concise and natural."
             )
 
             messages = [{"role": "system", "content": system_prompt}]
@@ -572,7 +669,17 @@ def get_prompts(user_id: str = None) -> dict[str, Any]:
         try:
             with _hevolve_app.test_client() as client:
                 resp = client.get('/prompts', query_string=params)
-                return resp.get_json() or {}
+                data = resp.get_json() or {}
+                # HARTOS /prompts returns a LIST of prompts directly;
+                # coerce to {"prompts": [...]} so callers using
+                # data.get('error') / data.get('prompts') don't crash
+                # with AttributeError on the list shape.  Was a real
+                # bug: chatbot_routes.py:2210 tried result.get('error')
+                # on a list and the agent dropdown silently lost the
+                # HARTOS-side agents 3x per chat.
+                if isinstance(data, list):
+                    data = {"prompts": data}
+                return data
         except Exception as e:
             logger.warning(f"Direct get_prompts failed: {e}")
 
@@ -594,7 +701,12 @@ def get_prompts(user_id: str = None) -> dict[str, Any]:
             timeout=(CONNECT_TIMEOUT, REQUEST_TIMEOUT),
         )
         _http_fail_count = 0
-        return _handle_response(response)
+        data = _handle_response(response)
+        # Same list-vs-dict coerce as the in-process path - keeps the
+        # contract identical for both transports.
+        if isinstance(data, list):
+            data = {"prompts": data}
+        return data
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         _http_fail_count += 1
         _http_fail_time = time.time()

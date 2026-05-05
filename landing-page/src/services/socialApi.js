@@ -287,6 +287,44 @@ export const bleEncounterApi = {
   topics: () => socialApi.get('/encounter/topics'),
 };
 
+// --- User Consent (W0c F3) — JWT-authed, append-only ---
+// Wraps HARTOS integrations/social/consent_api.py (`/api/social/consent*`).
+// Append-only invariants enforced server-side: every grant is a NEW row;
+// revoke flips revoked_at on the most-recent active row but never rewrites
+// granted_at.  See HARTOS consent_api.py docstring (commit f05a396).
+//
+// IMPORTANT (DRY guard): NEVER call /api/consent/<user_id>/* — that is the
+// LEGACY upsert surface in consent_service.py whose CONSENT_TYPES allowlist
+// pre-dates 'cloud_capability'.  Only `/api/social/consent` is correct.
+export const consentApi = {
+  // POST /api/social/consent — APPEND a new row (grant)
+  grant: ({consent_type, scope, agent_id, metadata}) =>
+    socialApi.post('/consent', {
+      consent_type,
+      scope,
+      agent_id,
+      metadata,
+    }),
+
+  // POST /api/social/consent/revoke — set revoked_at on the active row
+  revoke: ({consent_type, scope, agent_id}) =>
+    socialApi.post('/consent/revoke', {
+      consent_type,
+      scope,
+      agent_id,
+    }),
+
+  // GET /api/social/consent — list (newest-first by granted_at)
+  list: ({consent_type, active_only} = {}) => {
+    const params = {};
+    if (consent_type !== undefined) params.consent_type = consent_type;
+    if (active_only !== undefined) {
+      params.active_only = active_only ? 'true' : 'false';
+    }
+    return socialApi.get('/consent', {params});
+  },
+};
+
 // --- Agent Evolution ---
 export const evolutionApi = {
   get: (agentId) => socialApi.get(`/agents/${agentId}/evolution`),
@@ -835,6 +873,64 @@ export const mcpApi = {
   tools: (serverId) => socialApi.get(`/mcp/servers/${serverId}/tools`),
   register: (data) => socialApi.post('/mcp/register', data),
   discover: (params) => socialApi.get('/mcp/discover', {params}),
+};
+
+// --- Mentions (Phase 7a) — universal @-mention autocomplete.
+// scope: { kind?: 'human'|'agent'|'all', community_id?, conversation_id?, limit? }
+// Server flag-gated by `mentions_autocomplete`; off → returns [].
+export const mentionsApi = {
+  autocomplete: (q, scope = {}) =>
+    socialApi.get('/users/autocomplete', {
+      params: {q, ...scope},
+    }),
+  list: (params) => socialApi.get('/mentions', {params}),
+  markRead: (id) => socialApi.post(`/mentions/${id}/read`),
+};
+
+// --- Friends (Phase 7c.1) — symmetric Friendship state machine.
+// Coexists with usersApi.follow / unfollow per Plan B.1.
+// Server flag-gated (`friends_v2`); off → list endpoints return [].
+export const friendsApi = {
+  sendRequest: (target_user_id) =>
+    socialApi.post('/friends/request', {target_user_id}),
+  accept: (friendship_id) =>
+    socialApi.post(`/friends/request/${friendship_id}/accept`),
+  reject: (friendship_id) =>
+    socialApi.post(`/friends/request/${friendship_id}/reject`),
+  cancel: (friendship_id) =>
+    socialApi.post(`/friends/request/${friendship_id}/cancel`),
+  unfriend: (user_id) =>
+    socialApi.post(`/friends/${user_id}/unfriend`),
+  list: (status = 'active') =>
+    socialApi.get('/friends', {params: {status}}),
+  listPending: () =>
+    socialApi.get('/friends', {params: {status: 'pending'}}),
+  listBlocks: () => socialApi.get('/friends/blocks'),
+  block: (user_id, reason) =>
+    socialApi.post(`/friends/${user_id}/block`,
+                   reason ? {reason} : undefined),
+  unblock: (user_id) => socialApi.post(`/friends/${user_id}/unblock`),
+};
+
+// --- Invites (Phase 7c.2) — community + conversation invites.
+// Server flag-gated (`invites_v2`).  Three shapes:
+//   1. Targeted user — invitee_id set
+//   2. Off-platform email — invitee_email set
+//   3. Shareable link — neither set; server returns invite_code
+export const invitesApi = {
+  send: ({parent_kind, parent_id, invitee_id, invitee_email,
+          role_offered, expires_in_days} = {}) =>
+    socialApi.post('/invites', {
+      parent_kind, parent_id, invitee_id, invitee_email,
+      role_offered, expires_in_days,
+    }),
+  accept: (invite_id) => socialApi.post(`/invites/${invite_id}/accept`),
+  reject: (invite_id) => socialApi.post(`/invites/${invite_id}/reject`),
+  listIncoming: (include_responded = false) =>
+    socialApi.get('/invites/incoming',
+                  include_responded ?
+                    {params: {include_responded: 'true'}} : undefined),
+  resolveCode: (code) => socialApi.get(`/invites/code/${code}`),
 };
 
 // --- Marketplace ---

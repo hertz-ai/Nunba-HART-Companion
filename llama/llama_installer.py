@@ -1022,9 +1022,90 @@ class LlamaInstaller:
             return False
 
     def get_model_path(self, preset: ModelPreset) -> str | None:
-        """Get the full path to a downloaded model (searches Nunba + sibling dirs)"""
-        result = self._find_file_in_dirs(preset.file_name, min_size=100_000_000)
-        return str(result) if result else None
+        """Get the full path to a downloaded model.
+
+        Lookup order:
+          1. Canonical ``ModelCatalog`` entry by display name — if
+             HARTOS has the model registered as installed with a
+             ``local_path``, use that.  Catches the case where a
+             prior install/import recorded the model in the catalog
+             but at a path the legacy filename-walk doesn't search.
+          2. Legacy filename walk across Nunba + sibling project
+             dirs (~/.nunba, ~/.trueflow, ~/.ollama, HF cache).
+             Preserves cross-tool reuse — the catalog doesn't scan
+             those dirs itself.
+
+        Completeness validation (applied to BOTH lookup paths):
+          - Size ≥ 90% of ``preset.size_mb`` — catches partial
+            downloads of large models that the legacy 100 MB floor
+            silently accepted (e.g. 4B model at 1.5 GB out of 2.91 GB).
+            10% tolerance allows for preset.size_mb estimate drift —
+            actual GGUF size vs the registered preset-size sometimes
+            varies by 4-7% across quant revisions (live measurement
+            2026-05-01: 2776 MB actual vs 2910 MB preset = 95.4%).
+          - GGUF magic header (``b'GGUF'`` at offset 0) — catches
+            truncated/corrupt files at any size.
+
+        Returns the absolute path string, or None if the model is
+        genuinely not on disk anywhere OR is on disk but incomplete.
+        """
+        # Compute completeness threshold from the preset's expected
+        # size, with a 10% tolerance for preset estimate drift and a
+        # 100 MB floor for legacy presets that didn't set size_mb.
+        expected_bytes = int((preset.size_mb or 100) * 1024 * 1024)
+        min_bytes = max(100_000_000, int(expected_bytes * 0.90))
+
+        # 1. Canonical catalog lookup first — single source of truth
+        # for "is this model installed?".  Avoids the redundant
+        # re-download that hits when filename casing/quant variants
+        # don't match the legacy walker (root-cause logged 2026-05-01:
+        # wizard re-downloaded Qwen3.5-4B-UD-Q4_K_XL.gguf even though
+        # it was already registered + on disk).
+        try:
+            from models.catalog import ModelType, get_catalog
+            catalog = get_catalog()
+            entries = catalog.get_models(model_type=ModelType.LLM)
+            for entry in entries:
+                if entry.display_name != preset.display_name:
+                    continue
+                local_path = getattr(entry, 'local_path', '') or ''
+                if not local_path:
+                    continue
+                from pathlib import Path as _P
+                p = _P(local_path)
+                if self._is_gguf_complete(p, min_bytes):
+                    return str(p)
+        except Exception as e:
+            # Catalog unreachable / not yet populated — fall through
+            # to legacy walker.  Don't block model lookup on catalog
+            # availability.
+            logger.debug(f"Catalog lookup skipped, falling back to filename walk: {e}")
+
+        # 2. Legacy filename walk — Nunba + sibling project dirs
+        result = self._find_file_in_dirs(preset.file_name, min_size=min_bytes)
+        if result and self._is_gguf_complete(result, min_bytes):
+            return str(result)
+        return None
+
+    @staticmethod
+    def _is_gguf_complete(path, min_bytes: int) -> bool:
+        """Return True iff `path` exists, is at least `min_bytes`, AND
+        starts with the GGUF magic header.
+
+        Combined size + magic check — size catches partial downloads,
+        magic catches corruption/wrong-format files.  Cheap (single
+        4-byte read).
+        """
+        try:
+            if not path.is_file():
+                return False
+            if path.stat().st_size < min_bytes:
+                return False
+            with open(path, 'rb') as fh:
+                magic = fh.read(4)
+            return magic == b'GGUF'
+        except Exception:
+            return False
 
     def get_mmproj_path(self, preset: ModelPreset) -> str | None:
         """Get the full path to a downloaded mmproj file (searches Nunba + sibling dirs)"""

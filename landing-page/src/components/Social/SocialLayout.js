@@ -28,6 +28,7 @@ import ScienceIcon from '@mui/icons-material/Science';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import BackupIcon from '@mui/icons-material/Backup';
 import PaletteIcon from '@mui/icons-material/Palette';
+import PrivacyTipIcon from '@mui/icons-material/PrivacyTip';
 import AutoModeIcon from '@mui/icons-material/AutoMode';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import MemoryIcon from '@mui/icons-material/Memory';
@@ -222,6 +223,12 @@ const navGroups = [
         path: '/social/settings/appearance',
         icon: <PaletteIcon />,
         minRole: 'guest',
+      },
+      {
+        label: 'Privacy',
+        path: '/social/settings/privacy',
+        icon: <PrivacyTipIcon />,
+        minRole: 'flat',
       },
     ],
   },

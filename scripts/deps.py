@@ -31,6 +31,14 @@ CORE_DEPS = {
     "flask-cors": "6.0.2",
     "werkzeug": "3.1.5",
     "waitress": "3.0.2",
+    # Hypercorn = primary ASGI server (matches HARTOS sibling).  Single
+    # config / single binary across desktop bundle and central Docker.
+    # Lifts thread-per-connection cost on idle keep-alive (waitress
+    # holds a worker for every connection regardless of activity);
+    # lets the dashboard/health/admin polls drain even while a slow
+    # /tts/setup-engine pip install or LLM inference is in flight.
+    # Waitress kept above as a safe fallback.
+    "hypercorn": "0.17.3",
     # Desktop GUI -- pywebview + pyautogui need a windowing system at
     # IMPORT time (Quartz on macOS, Win32 on Windows, X11/Wayland on
     # Linux).  Headless Linux CI runners (no DISPLAY) USED TO fail on
@@ -125,7 +133,15 @@ EMBED_DEPS = {
     # subprocesses spawned from python-embed/python.exe CAN'T see the cx_Freeze
     # lib/ numpy/regex/tqdm/yaml. Without these pins every transformers-based TTS
     # worker (Indic Parler, Chatterbox, F5) crashes on load.
-    "regex": "2024.11.6",
+    # transformers 5.6.2 fails its module-load dep check with
+    # `regex>=2025.10.22 is required for a normal functioning of this
+    # module, but found regex==2024.11.6` — Chatterbox Turbo / Indic
+    # Parler / F5 all crash before loading because they import
+    # transformers (probe_chatterbox_turbo.err, 2026-04-27).  Bumping
+    # the floor to 2025.11.3 (latest stable, satisfies the >=2025.10.22
+    # requirement and forward-compatible with future transformers
+    # patches that tightened the floor again).
+    "regex": "2025.11.3",
     "numpy": "1.26.4",
     "tqdm": "4.67.1",
     "pyyaml": "6.0.2",

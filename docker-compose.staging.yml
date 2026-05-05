@@ -87,19 +87,62 @@ services:
       - NUNBA_DISABLE_VLM=1           # skip MiniCPM sidecar
       - NUNBA_LLAMA_URL=http://llama:8080
       - NUNBA_CROSSBAR_URL=ws://crossbar:8088/ws
+      # main.py:472 sets CBURL=ws://localhost:{NUNBA_WAMP_PORT}/ws but
+      # only `if not os.environ.get('CBURL')` — i.e. the env var is the
+      # authoritative override.  Staging needs the WAMP client to point
+      # at the `crossbar` service hostname instead of localhost.  Same
+      # for WAMP_URL (HTTP publish bridge) — there's no separate
+      # crossbarhttp3 bridge in this stack, so route HTTP publishes
+      # to the Flask app's own /publish endpoint at port 5000.
+      - CBURL=ws://crossbar:8088/ws
+      - WAMP_URL=http://localhost:5000/publish
       - NUNBA_MCP_BEARER=staging-e2e-token-do-not-use-in-prod
+      # Single-instance lock at ~/.nunba/nunba.lock can spuriously fail
+      # under containerized restarts (overlayfs flock quirks, healthcheck
+      # restart loops re-importing app.py before old fd is GC'd).  The
+      # docker container IS the isolation boundary here, so we don't need
+      # app-level single-instance protection.  app.py honours this env var
+      # as one of the documented skip-keys (see app.py _check_single_instance
+      # and the _test_envs tuple).
+      - NUNBA_SKIP_SINGLE_INSTANCE=1
+      # main.py:5491 defaults bind_host to 127.0.0.1 for security on
+      # local installs.  In docker the app needs to bind 0.0.0.0 so
+      # the published port (5000:5000) routes traffic from the host's
+      # /:5000 to the container's hypercorn instance — otherwise
+      # external probes hit "Connection reset by peer" because
+      # hypercorn refuses non-loopback peers.
+      - NUNBA_BIND_HOST=0.0.0.0
+      # models/catalog.py imports `integrations.service_tools.model_catalog`
+      # from the bundled HARTOS source tree.  Production desktop builds
+      # freeze that tree into the Python path; in CI we mount the repo
+      # at /app and need to extend PYTHONPATH explicitly so the import
+      # resolves.  Without this, e2e-staging crashes at startup with
+      # ModuleNotFoundError: No module named 'integrations'.
+      - PYTHONPATH=/app/hartos_backend_src
       - PYTHONUNBUFFERED=1
     depends_on:
       llama: { condition: service_healthy }
       crossbar: { condition: service_healthy }
     command: >
       bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq --no-install-recommends libsndfile1 curl &&
         pip install --no-cache-dir -r requirements.txt &&
         python main.py --port 5000 --background
       "
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      # Python-based TCP probe — `python` is always present, `curl`
+      # only after apt-get install completes.  Using CMD (list form,
+      # no shell) avoids YAML quote-escaping issues that left the
+      # previous CMD-SHELL probe stuck in `starting` for all 720s.
+      # TCP-only check is more reliable than HTTP /health: it
+      # succeeds the moment hypercorn binds the port, regardless
+      # of whether the /health endpoint registration finished yet.
+      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',5000)); s.close()"]
       interval: 15s
       timeout: 10s
       retries: 40
-      start_period: 180s
+      # pip install of the full requirements.txt takes ~3min on a
+      # cold runner; bumping start_period to 5min keeps the unhealthy
+      # latch from snapping shut before the Flask app even boots.
+      start_period: 300s

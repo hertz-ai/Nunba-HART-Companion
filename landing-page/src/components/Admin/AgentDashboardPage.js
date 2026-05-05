@@ -1,4 +1,4 @@
-import { dashboardApi } from '../../services/socialApi';
+import { SOCIAL_API_URL } from '../../config/apiBase';
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -24,7 +24,17 @@ import {
 import React, { useState, useEffect, useRef } from 'react';
 
 
-const POLL_INTERVAL = 5000;
+// SSE-driven refresh + heartbeat fallback.
+//
+// HEARTBEAT_INTERVAL is the safety-net poll cadence for when SSE is
+// disconnected (browser tab backgrounded, server restart) or when a
+// state change happens without a corresponding `dashboard.invalidate`
+// emit (e.g. expert-agent registry mutation we haven't wired yet).
+// 30s is intentional — long enough to not stack on the waitress queue
+// even under throttle, short enough that a missed event surfaces in
+// at most half a minute.  Fast updates land via SSE in real time.
+const HEARTBEAT_INTERVAL = 30000;
+const REFETCH_DEBOUNCE_MS = 250;
 
 const cardStyle = {
   background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.95) 100%)',
@@ -132,21 +142,61 @@ export default function AgentDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const intervalRef = useRef(null);
+  const refs = useRef({etag: null, abort: null, debounce: null, hb: null, es: null});
 
+  // Native fetch with If-None-Match + AbortController.  Cancels prior
+  // in-flight before issuing the next, so the waitress queue can't
+  // stack our polls.  304 keeps the previous data on screen.
   const fetchDashboard = async () => {
+    if (refs.current.abort) refs.current.abort.abort();
+    const ctrl = new AbortController();
+    refs.current.abort = ctrl;
     try {
-      const res = await dashboardApi.agents();
-      setData(res.data || res);
+      const headers = refs.current.etag ? {'If-None-Match': refs.current.etag} : {};
+      const r = await fetch(`${SOCIAL_API_URL}/dashboard/agents`, {
+        signal: ctrl.signal, headers, credentials: 'include',
+      });
+      const tag = r.headers.get('etag');
+      if (tag) refs.current.etag = tag;
+      if (r.status === 200) {
+        const body = await r.json();
+        setData(body.data || body);
+      }
+      // 304: keep current `data` as-is (server says nothing changed)
       setLastUpdated(new Date());
-    } catch { /* ignore */ }
-    setLoading(false);
+    } catch (err) {
+      if (err?.name !== 'AbortError') { /* keep previous data on error */ }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchDashboard();
-    intervalRef.current = setInterval(fetchDashboard, POLL_INTERVAL);
-    return () => clearInterval(intervalRef.current);
+
+    // SSE live channel.  HARTOS bootstrap.py bridges
+    // agent_goal.changed / coding_goal.changed / action_state.changed
+    // / daemon.status.changed → 'dashboard.invalidate'.  Coalesce
+    // bursts via 250ms debounce so 5 goal updates in a tick = 1 fetch.
+    const refetch = () => {
+      if (refs.current.debounce) clearTimeout(refs.current.debounce);
+      refs.current.debounce = setTimeout(fetchDashboard, REFETCH_DEBOUNCE_MS);
+    };
+    try {
+      const es = new EventSource(`${SOCIAL_API_URL}/events/stream`);
+      refs.current.es = es;
+      es.addEventListener('dashboard.invalidate', refetch);
+      es.onerror = () => { /* auto-reconnects; heartbeat is the safety net */ };
+    } catch { /* SSE unsupported — heartbeat covers it */ }
+
+    refs.current.hb = setInterval(fetchDashboard, HEARTBEAT_INTERVAL);
+    return () => {
+      const r = refs.current;
+      if (r.hb) clearInterval(r.hb);
+      if (r.debounce) clearTimeout(r.debounce);
+      if (r.abort) r.abort.abort();
+      if (r.es) r.es.close();
+    };
   }, []);
 
   const agents = data?.agents || [];
@@ -166,7 +216,7 @@ export default function AgentDashboardPage() {
               Agent Dashboard
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-              Truth-grounded live view — auto-refreshes every 5s
+              Truth-grounded live view — pushed via SSE, heartbeat 30s
               {lastUpdated && ` | ${lastUpdated.toLocaleTimeString()}`}
             </Typography>
           </Box>

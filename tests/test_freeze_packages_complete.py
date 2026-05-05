@@ -231,6 +231,117 @@ def test_setup_freeze_packages_contains_sympy():
     )
 
 
+# ─────────────────────────────────────────────────────────────────────
+# SRP single-source-of-truth for HARTOS packages in the Nunba bundle.
+#
+# HARTOS packages (core / integrations / security) live in TWO
+# legitimate runtime locations:
+#   1. Install root (top-level `core/`, `integrations/`, `security/`)
+#      — produced by `include_files` in setup_freeze_nunba.py.  This
+#      is the canonical copy for the main Nunba.exe runtime.
+#   2. python-embed/Lib/site-packages/ — produced by `pip install -e
+#      ./HARTOS` (sibling-deps installer at top of setup_freeze_nunba)
+#      and kept fresh by build.py's HARTOS sync.  This is the canonical
+#      copy for SUBPROCESS runtimes (gpu_worker, llama, parler).
+#
+# cx_Freeze's static tracer wants to ALSO bundle these into `lib/`
+# whenever main.py does any `from core.X import Y`.  That third copy
+# is a parallel path: `lib/` sits earlier on sys.path than the install
+# root, so a partial `lib/<pkg>/` shadows the canonical full copy and
+# the .exe crashes with `ModuleNotFoundError` on any function-local
+# import the tracer missed.
+#
+# Four production outages have been variants of this shadow problem:
+#   - 2026-04-21: dev `.venv\Lib\site-packages` shadow
+#   - 2026-04-24: bundle's own lib/ stripped by sys.path scrubber
+#   - 2026-04-25: stale user `%APPDATA%\Roaming\Python\…\site-packages`
+#   - 2026-04-26: partial `lib/core/` from cx_Freeze tracer
+#
+# Each was patched in app.py with more sys.path scrubbing — fixing the
+# symptom, not the root cause.  The SRP fix is the cx_Freeze-level
+# `excludes` block guarded by this test: cx_Freeze stops trying to be
+# the bundler for HARTOS code, leaving the two legitimate paths (top-
+# level via include_files, python-embed via pip) as the only routes.
+# ─────────────────────────────────────────────────────────────────────
+
+_HARTOS_EXCLUDED_PACKAGES = (
+    'core',
+    'integrations',
+    'security',
+    'agent_ledger',
+    'hevolve_database',
+)
+
+
+def test_setup_freeze_excludes_hartos_packages():
+    """SRP guard: cx_Freeze must NOT bundle HARTOS packages into lib/.
+
+    They live at the install root (include_files) for the main exe and
+    in python-embed/Lib/site-packages/ for subprocesses.  A third copy
+    in lib/<pkg>/ shadows the install-root copy and crashes the .exe
+    with ModuleNotFoundError on any function-local import cx_Freeze's
+    tracer skipped (the shadow is partial because the tracer only
+    follows module-scope imports)."""
+    setup_py = os.path.join(_SCRIPTS, 'setup_freeze_nunba.py')
+    with open(setup_py, encoding='utf-8') as fh:
+        tree = ast.parse(fh.read(), filename=setup_py)
+
+    excludes = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == 'build_exe_options'
+            and isinstance(node.value, ast.Dict)
+        ):
+            for key, value in zip(node.value.keys, node.value.values):
+                if (
+                    isinstance(key, ast.Constant)
+                    and key.value == 'excludes'
+                    and isinstance(value, ast.List)
+                ):
+                    excludes = [
+                        elt.value for elt in value.elts
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                    ]
+                    break
+    assert excludes, "Could not locate build_exe_options['excludes']"
+
+    missing = [p for p in _HARTOS_EXCLUDED_PACKAGES if p not in excludes]
+    assert not missing, (
+        f"setup_freeze_nunba.py excludes[] missing HARTOS packages: "
+        f"{missing}.  Without these excludes, cx_Freeze's static tracer "
+        f"will create a partial lib/<pkg>/ that shadows the canonical "
+        f"top-level install-root copy.  See module docstring for the "
+        f"4-outage history this guard prevents."
+    )
+
+
+def test_setup_freeze_does_not_pull_hartos_into_packages():
+    """Inverse guard: HARTOS packages must NOT be in packages[] either.
+
+    Listing them in packages[] would force cx_Freeze to bundle them
+    into lib/<pkg>/ — exactly the shadow we exclude against.  This
+    test catches well-meaning regressions like 'add core to packages[]
+    so cx_Freeze includes the whole tree' (the 2026-04-26 first-pass
+    fix that pointed in the wrong direction)."""
+    packages = _extract_packages_list_from_setup_freeze()
+    leaked = [
+        p for p in packages
+        if p in _HARTOS_EXCLUDED_PACKAGES
+        or any(p.startswith(prefix + '.') for prefix in _HARTOS_EXCLUDED_PACKAGES)
+    ]
+    assert not leaked, (
+        f"setup_freeze_nunba.py packages[] leaks HARTOS modules: "
+        f"{leaked}.  HARTOS code is bundled via include_files (top-"
+        f"level) + pip install -e (python-embed/site-packages); listing "
+        f"any HARTOS module in packages[] tells cx_Freeze to ALSO bundle "
+        f"a third copy in lib/, re-introducing the shadow problem this "
+        f"file's docstring documents."
+    )
+
+
 def test_setup_freeze_excludes_does_not_list_sympy():
     """Guard against re-adding sympy to the excludes list.  The
     excludes list was the dual of the symptoms above — if sympy is

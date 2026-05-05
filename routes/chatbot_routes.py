@@ -2317,17 +2317,151 @@ def chat_route():
     # To avoid duplicate audio, we check if HARTOS handled the request (Tier-1).
     # If Tier-2/3 produced the text, we synthesize here.
 
-    # Find the agent configuration
-    agent_config = None
+    # ── Agent identity resolution (server-derived; client agent_type is ignored) ──
+    #
+    # Client payload semantics:
+    #   * `prompt_id` is the canonical agent identifier.
+    #     - 0 / null  → default Hevolve / draft-first
+    #     - > 0       → user-created agent (PROMPTS_DIR/{prompt_id}.json)
+    #     - < 0       → reserved for future built-in registry (not used today)
+    #   * `agent_id` (legacy string registry key like 'local_assistant',
+    #     'cloud_radha', etc.) is still accepted for back-compat but only
+    #     consulted when prompt_id can't resolve.  Any client-minted synthetic
+    #     string ('orphan_49', 'ghost_*', etc.) silently falls back to default
+    #     instead of returning 400 — the user keeps chatting under Hevolve.
+    #   * `agent_type` from the request is NEVER read.  The server derives type
+    #     from the resolved agent (registry config or 'local' for user agents).
+    #     This eliminates the 'Unknown agent type: orphan' bug class —
+    #     denormalized data on the wire was the root cause.
+    #
+    # Migration plan in `memory/project_agent_id_int_collapse.md`:
+    #   Phase 1 (this commit): server tolerant; frontend unchanged.
+    #   Phase 2: frontend stops sending agent_id and agent_type.
+    #   Phase 3: server rejects requests that send those fields.
     all_agents = LOCAL_AGENTS + CLOUD_AGENTS
-    for agent in all_agents:
-        if agent['id'] == agent_id:
-            agent_config = agent
-            break
+    _default_agent = next(
+        (a for a in LOCAL_AGENTS if a.get('id') == 'local_assistant'),
+        LOCAL_AGENTS[0] if LOCAL_AGENTS else {'id': 'local_assistant', 'type': 'local'},
+    )
 
-    # Determine agent type from config or parameter
-    if agent_config:
-        agent_type = agent_config.get('type', agent_type)
+    def _coerce_int(v):
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str) and v.lstrip('-').isdigit():
+            try:
+                return int(v)
+            except ValueError:
+                return None
+        return None
+
+    def _resolve_agent(_prompt_id, _agent_id_legacy):
+        """Return (agent_config, resolved_agent_id, resolved_type, resolved_prompt_id).
+
+        Resolution order:
+          1. prompt_id > 0 with prompt file -> user agent (type='local').
+          2. agent_id_legacy in registry (LOCAL_AGENTS/CLOUD_AGENTS) -> built-in.
+          3. agent_id_legacy as digit with prompt file -> user agent.
+          4. Caller sent a real prompt_id but no recipe is on disk
+             (cross-device user, recipe missing locally) -> PRESERVE
+             prompt_id + signal create-mode so HARTOS enters
+             gather_info / create_recipe instead of casually chatting
+             with local_assistant in disguise.  See chat-routing
+             trace 2026-05-04 (Speech Therapy from Recents): prior
+             behaviour silently swapped prompt_id to None and routed
+             to local_assistant, hiding the recipe-missing fact from
+             both the user and the dispatcher.
+          5. No prompt_id at all -> silent fallback to default
+             (no 400, the casual-chat case).
+
+        Returns ``(agent_config, resolved_agent_id, resolved_type,
+        resolved_prompt_id, force_create_agent)``.  ``force_create_agent``
+        is the new field added 2026-05-04 (commit b719eb47); the only
+        caller is the unpack at the call site below.
+        """
+        _pid_int = _coerce_int(_prompt_id)
+        # 1. User agent via prompt_id
+        if _pid_int is not None and _pid_int > 0:
+            try:
+                from core.platform_paths import get_prompts_dir
+                _prompts_dir = get_prompts_dir()
+            except ImportError:
+                _prompts_dir = os.path.join(
+                    os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts')
+            if os.path.isfile(os.path.join(_prompts_dir, f'{_pid_int}.json')):
+                return ({'id': _pid_int, 'type': 'local'}, _pid_int,
+                        'local', _pid_int, False)
+        # 2. Registry lookup by string key
+        if _agent_id_legacy:
+            for _a in all_agents:
+                if _a.get('id') == _agent_id_legacy:
+                    return (_a, _agent_id_legacy, _a.get('type', 'local'),
+                            _pid_int, False)
+        # 3. agent_id legacy as digit (some old clients sent prompt_id in agent_id)
+        _aid_int = _coerce_int(_agent_id_legacy)
+        if _aid_int is not None and _aid_int > 0:
+            try:
+                from core.platform_paths import get_prompts_dir
+                _prompts_dir = get_prompts_dir()
+            except ImportError:
+                _prompts_dir = os.path.join(
+                    os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts')
+            if os.path.isfile(os.path.join(_prompts_dir, f'{_aid_int}.json')):
+                return ({'id': _aid_int, 'type': 'local'}, _aid_int,
+                        'local', _aid_int, False)
+        # 4. Caller sent a real numeric prompt_id but the recipe
+        #    isn't local. Preserve it + force create-mode so HARTOS
+        #    enters the gather_info -> create_recipe pipeline.  No
+        #    casual chat during agent creation - that's the design
+        #    intent for cross-device users (recipe was created on
+        #    another device and hasn't synced yet).
+        #
+        #    NOTE: this branch is intentionally narrow to the
+        #    numeric-prompt_id case.  We do NOT force-create for a
+        #    synthetic-string _agent_id_legacy ('orphan_49',
+        #    'ghost_*') here — that contradicts the lines 2329-2331
+        #    contract: "Any client-minted synthetic string silently
+        #    falls back to default instead of returning 400 — the
+        #    user keeps chatting under Hevolve."  Forcing create
+        #    on a synthetic string would send HARTOS into create_recipe
+        #    with a bogus identifier and produce an agent the user
+        #    never asked for.  Synthetic strings fall through to step 5.
+        if _pid_int is not None and _pid_int > 0:
+            logger.warning(
+                'Recipe missing locally for prompt_id=%s - forcing '
+                'create_agent=True so HARTOS routes to gather_info / '
+                'create_recipe (was previously silently falling back '
+                'to local_assistant which hid the cross-device sync '
+                'gap from the user)', _pid_int)
+            return ({'id': _pid_int, 'type': 'local'}, _pid_int,
+                    'local', _pid_int, True)
+        # 5. No usable prompt_id and either no agent_id_legacy OR a
+        #    synthetic string we can't resolve -> default casual chat
+        #    under Hevolve, per the lines 2329-2331 contract.
+        return (_default_agent, _default_agent['id'],
+                _default_agent.get('type', 'local'), None, False)
+
+    agent_config, agent_id, agent_type, prompt_id, _force_create_agent = \
+        _resolve_agent(prompt_id, agent_id)
+    # When _resolve_agent had to fall back due to missing recipe (step 4),
+    # force create_agent=True so HARTOS hard-routes to autogen instead of
+    # casually chatting via the draft-first path.  Per design intent: no
+    # point in casual chat when we know we need to (re)create an agent.
+    if _force_create_agent and not create_agent:
+        create_agent = True
+        logger.info(
+            'create_agent forced True by _resolve_agent fallback - '
+            'HARTOS will route to gather_info/create_recipe pipeline')
+    # Log when client-supplied agent_type differed from the derived one — helps
+    # us confirm the back-compat shim is the only path being exercised once
+    # frontend Phase 2 lands.
+    _client_type = data.get('agent_type')
+    if _client_type and _client_type != agent_type:
+        logger.info(
+            "chat: client-supplied agent_type=%r ignored; server derived %r "
+            "from agent_id=%r prompt_id=%r (Phase-1 back-compat shim, see "
+            "memory/project_agent_id_int_collapse.md)",
+            _client_type, agent_type, agent_id, prompt_id,
+        )
 
     # ============== LOCAL AGENT ==============
     if agent_type == 'local':
@@ -2418,25 +2552,23 @@ def chat_route():
         # --- Tier 1: Try LangChain pipeline via adapter (port 6777) ---
         if HEVOLVE_CHAT_AVAILABLE:
             try:
-                # Determine langchain prompt_id:
-                # - Built-in local agents (local_assistant, etc.) → None → regular LangChain chat
-                # - Custom agents with numeric prompt_id AND a HARTOS prompt file → create/reuse flow
-                # - Agents without a prompt file → casual chat (no prompt_id)
+                # Determine langchain prompt_id from _resolve_agent's
+                # already-classified result (single source of truth -
+                # the prior inline file-check here was a parallel path
+                # that double-stripped prompt_id, hiding the missing-
+                # recipe case from HARTOS even when create_agent=True
+                # was set by step 4 of _resolve_agent).
+                #
+                # Three cases _resolve_agent returns map cleanly to:
+                #   step 1 / step 3 (digit + file exists)  → pass int
+                #   step 2 (registry hit, e.g. local_assistant) → None
+                #   step 4 (forced create-mode) → keep prompt_id so
+                #     HARTOS gather/create can use the same id the
+                #     user clicked instead of auto-generating a new one
+                #     and creating a stranger agent
                 langchain_prompt_id = None
-                _candidate_pid = prompt_id or agent_id
-                if _candidate_pid and str(_candidate_pid).isdigit():
-                    # Only pass prompt_id to HARTOS if the agent has a prompt file
-                    # (user-created agents). Hardcoded default agents (e.g. id=54)
-                    # don't have prompt files and should go to casual LangChain chat.
-                    try:
-                        from core.platform_paths import get_prompts_dir
-                        _prompt_file = os.path.join(get_prompts_dir(), f'{_candidate_pid}.json')
-                    except ImportError:
-                        _prompt_file = os.path.join(
-                            os.path.expanduser('~'), 'Documents', 'Nunba', 'data', 'prompts',
-                            f'{_candidate_pid}.json')
-                    if os.path.isfile(_prompt_file):
-                        langchain_prompt_id = int(_candidate_pid)
+                if prompt_id and str(prompt_id).isdigit():
+                    langchain_prompt_id = int(prompt_id)
 
                 # Intent routing (casual_conv / create_agent / channel
                 # connect nudge) is performed inside HARTOS by the
@@ -2818,8 +2950,23 @@ def chat_route():
                 'success': False
             })
 
-    # Unknown agent type
-    return jsonify({'error': f'Unknown agent type: {agent_type}'}), 400
+    # Unreachable in practice: _resolve_agent always returns type ∈
+    # {'local', 'cloud'} (its default fallback covers everything,
+    # including stale prompt_ids and client-minted synthetic agent_ids).
+    # Kept as a defensive 500 so a future registry entry with an invalid
+    # type fails loud server-side instead of returning a misleading 400
+    # to the client.
+    logger.error(
+        "chat: _resolve_agent returned unexpected type=%r for "
+        "agent_id=%r prompt_id=%r — registry corruption?",
+        agent_type, agent_id, prompt_id,
+    )
+    return jsonify({
+        'error': 'Server registry inconsistency — agent type unknown',
+        'agent_id': agent_id,
+        'agent_type': agent_type,
+        'success': False,
+    }), 500
 
 
 def backend_health_route():

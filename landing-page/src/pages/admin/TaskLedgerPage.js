@@ -19,30 +19,53 @@ export default function TaskLedgerPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [stats, setStats] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // /api/agent-engine/ledger/* is gated by @require_auth on HARTOS
+  // (integrations/agent_engine/api.py).  Match the canonical token
+  // read site from services/axiosFactory.js:29 — `access_token` in
+  // localStorage is what every other admin call uses.  Without this
+  // header the backend returns 401 and the page would render empty
+  // with no diagnostic, which is exactly the bug we just fixed.
+  const _authHeaders = () => {
+    const token = localStorage.getItem('access_token');
+    return token ? {Authorization: `Bearer ${token}`} : {};
+  };
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       const params = statusFilter ? `?status=${statusFilter}&limit=100` : '?limit=100';
-      const res = await fetch(`/api/agent-engine/ledger/tasks${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) setTasks(data.tasks || []);
+      const res = await fetch(`/api/agent-engine/ledger/tasks${params}`,
+                              {headers: _authHeaders()});
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setTasks(data.tasks || []);
+      } else {
+        setTasks([]);
+        // Surface the backend's own error (e.g. 401 missing auth,
+        // 501 agent_ledger not installed, 500 internal) so the page
+        // doesn't silently say "No tasks found" when something is
+        // actually wrong.
+        const why = data.error || `HTTP ${res.status}`;
+        setErrorMsg(`Ledger unavailable: ${why}`);
       }
     } catch (err) {
-      console.warn('Ledger fetch failed:', err.message);
+      setTasks([]);
+      setErrorMsg(`Ledger fetch failed: ${err.message}`);
     }
     setLoading(false);
   }, [statusFilter]);
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/agent-engine/ledger/stats');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) setStats(data.stats);
-      }
-    } catch { /* ignore */ }
+      const res = await fetch('/api/agent-engine/ledger/stats',
+                              {headers: _authHeaders()});
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) setStats(data.stats);
+      else setStats(null);
+    } catch { setStats(null); }
   }, []);
 
   useEffect(() => { fetchTasks(); fetchStats(); }, [fetchTasks, fetchStats]);
@@ -82,6 +105,15 @@ export default function TaskLedgerPage() {
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
+        </Box>
+      ) : errorMsg ? (
+        <Box sx={{ py: 4, textAlign: 'center' }}>
+          <Typography color="error" sx={{ fontWeight: 600 }}>
+            {errorMsg}
+          </Typography>
+          <Typography color="text.secondary" variant="caption">
+            Check the HARTOS server log for details.
+          </Typography>
         </Box>
       ) : tasks.length === 0 ? (
         <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
