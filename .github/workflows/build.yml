@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - main
+      - test-local-deployment-with-gpu
     tags:
       - 'v*'
   # Manual trigger from GitHub UI
