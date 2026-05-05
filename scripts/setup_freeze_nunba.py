@@ -777,6 +777,19 @@ hevolve_files = find_hevolve_modules()
 build_exe_options["include_files"].extend(hevolve_files)
 
 
+# Resolve HARTOS directory: _deps/HARTOS (CI: actions/checkout) or ../HARTOS (local dev)
+_project_dir_for_hartos = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_hartos_dir = None
+for _hd_candidate in [
+    os.path.join(_project_dir_for_hartos, '_deps', 'HARTOS'),
+    os.path.join(os.path.dirname(_project_dir_for_hartos), 'HARTOS'),
+]:
+    if os.path.isdir(_hd_candidate):
+        _hartos_dir = _hd_candidate
+        break
+if _hartos_dir is None:
+    _hartos_dir = os.path.join(os.path.dirname(_project_dir_for_hartos), 'HARTOS')
+
 # Always include agent_ledger from sibling dir (namespace package issue).
 # agent_ledger is core to distributed coordination (TaskLedger UI,
 # DistributedTaskCoordinator, LedgerPubSub delegation broadcasts) and
@@ -806,19 +819,7 @@ if _agent_ledger_resolved is None:
     )
 
 
-# Include HARTOS package directories if not pip-installed (integrations, core, security)
-# Check _deps/HARTOS first (CI: actions/checkout), then ../HARTOS (local dev)
-_project_dir_for_hartos = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_hartos_dir = None
-for _hd_candidate in [
-    os.path.join(_project_dir_for_hartos, '_deps', 'HARTOS'),
-    os.path.join(os.path.dirname(_project_dir_for_hartos), 'HARTOS'),
-]:
-    if os.path.isdir(_hd_candidate):
-        _hartos_dir = _hd_candidate
-        break
-if _hartos_dir is None:
-    _hartos_dir = os.path.join(os.path.dirname(_project_dir_for_hartos), 'HARTOS')
+# Include HARTOS package directories (integrations, core, security) via include_files
 _hartos_packages = [
     ("integrations", "integrations"),
     ("core", "core"),
