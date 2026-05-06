@@ -227,6 +227,19 @@ def _bootstrap_worker(language: str) -> None:
     """Background worker — delegates to orchestrator for all model logic."""
     global _state
     try:
+        # Resolve the orchestrator singleton ONCE up front.  Phase 3
+        # below dispatches via ``orch.auto_load(...)``; without this
+        # binding the call site raised ``NameError: name 'orch' is not
+        # defined`` and the auto-setup chat bubble showed up as
+        # ``Load error: name 'orch' is not defined`` for STT (and would
+        # have for every other model_type in BOOTSTRAP_ORDER).  Lazy
+        # import keeps cx_Freeze degraded-mode boot tolerant: if
+        # models.orchestrator can't be imported we let the outer except
+        # turn the whole bootstrap into a single 'done' with error
+        # rather than NameError-ing per-step.
+        from models.orchestrator import get_orchestrator
+        orch = get_orchestrator()
+
         # ── Phase 1: Detect hardware (via orchestrator's vram_manager) ──
         _update(phase='detecting')
         gpu_info = _detect_hardware()

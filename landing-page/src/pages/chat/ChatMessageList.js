@@ -197,6 +197,15 @@ const ChatMessageList = ({
         }
 
         if (message.type === 'setup_progress') {
+          // Soft-delete: a dismissed card stays in the messages array
+          // (so chat-sync replicas, history, and any future "undo"
+          // affordance still see the record) but renders nothing.  We
+          // checked once here rather than inside SetupProgressCard so
+          // the dismissed bubble doesn't claim layout space + key
+          // collisions stay impossible.
+          if (message.dismissed) {
+            return null;
+          }
           // Retry / Switch-engine handlers POST to the TTS handshake
           // API; success fires a fresh tts_handshake SSE which the
           // Demopage listener grafts back onto this card by engine.
@@ -228,6 +237,17 @@ const ChatMessageList = ({
               console.warn('[handshake] switch failed', e);
             }
           };
+          // Soft-dismiss: flip ``dismissed:true`` on this message in
+          // place so the next render skips it.  The setup_progress
+          // SSE listener in Demopage looks the message up by jobType,
+          // so a dismissed record can still be re-located if a fresh
+          // event arrives — the user can resurrect the card by
+          // triggering another setup run.
+          const handleDismiss = () => {
+            setMessages((prev) => prev.map((m, i) => (
+              i === index ? { ...m, dismissed: true } : m
+            )));
+          };
           return (
             <SetupProgressCard
               key={`setup-${message.jobType || index}`}
@@ -237,6 +257,7 @@ const ChatMessageList = ({
               handshake={message.handshake || { status: 'pending' }}
               onRetry={handleRetry}
               onSwitchEngine={handleSwitchEngine}
+              onDismiss={handleDismiss}
             />
           );
         }

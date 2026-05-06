@@ -1,4 +1,5 @@
-import { Box, Typography, LinearProgress, Fade, Button, Stack } from '@mui/material';
+import { Box, IconButton, Typography, LinearProgress, Fade, Button, Stack, Tooltip } from '@mui/material';
+import { X as CloseIcon } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 
 /**
@@ -29,6 +30,18 @@ import React, { useState, useEffect, useRef } from 'react';
  *        this flips to 'ready' or 'failed'.
  *   onRetry?: () => void         — user clicked Retry on failed handshake
  *   onSwitchEngine?: (engine: string) => void — user picked a fallback
+ *   onDismiss?: () => void       — user clicked the soft-dismiss × button.
+ *                                  Caller should mark the underlying chat
+ *                                  message as dismissed (soft-delete) rather
+ *                                  than removing it — the history is kept,
+ *                                  the bubble just stops rendering.  The
+ *                                  dismiss control only appears once the
+ *                                  setup has reached a terminal state
+ *                                  (handshake ready/failed OR install
+ *                                  failure) — we don't allow dismissing a
+ *                                  card that's still actively loading,
+ *                                  because that would orphan the running
+ *                                  job from any user-visible signal.
  */
 
 const JOB_LABELS = {
@@ -51,6 +64,7 @@ export default function SetupProgressCard({
   handshake = { status: 'pending' },
   onRetry,
   onSwitchEngine,
+  onDismiss,
 }) {
   const [showComplete, setShowComplete] = useState(false);
   const scrollRef = useRef(null);
@@ -136,6 +150,7 @@ export default function SetupProgressCard({
             fontWeight: 600,
             fontSize: '0.85rem',
             letterSpacing: '0.02em',
+            flex: 1,
           }}>
             {handshakeReady
               ? `${label} Ready`
@@ -145,6 +160,29 @@ export default function SetupProgressCard({
                   ? `Verifying ${label} voice...`
                   : `Setting up ${label}...`}
           </Typography>
+          {/* Soft-dismiss × — only once the card has a terminal
+              verdict. Calling onDismiss is the caller's signal to mark
+              the message as dismissed in chat state (soft-delete: the
+              record stays, the bubble just stops rendering). */}
+          {typeof onDismiss === 'function' && (handshakeReady || isFailed) && (
+            <Tooltip title="Dismiss" placement="left" arrow>
+              <IconButton
+                size="small"
+                aria-label="Dismiss setup card"
+                onClick={onDismiss}
+                sx={{
+                  color: 'rgba(255,255,255,0.5)',
+                  p: 0.25,
+                  '&:hover': {
+                    color: 'rgba(255,255,255,0.95)',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                  },
+                }}
+              >
+                <CloseIcon size={14} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
 
         {/* Progress bar */}
