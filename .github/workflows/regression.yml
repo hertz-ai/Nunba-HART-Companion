@@ -104,7 +104,12 @@ jobs:
         # other repo, the beacon below surfaces a clear failure in
         # annotations so we can add a dedicated PAT.
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer HEVOLVE_REPO_TOKEN (the org-wide PAT used by every
+          # other actions/checkout step in this repo) over the
+          # default GITHUB_TOKEN, which only has scope on Nunba and
+          # 401s against hertz-ai/HARTOS.  Same fix as quality.yml's
+          # `Install HARTOS (hart-backend)` step (commit a1dd4e54).
+          GH_TOKEN: ${{ secrets.HEVOLVE_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           echo "::notice title=hartos install::attempting git clone hertz-ai/HARTOS"
           if git clone --depth 1 \
@@ -113,7 +118,7 @@ jobs:
             pip install --no-deps ../HARTOS || true
             echo "::notice title=hartos install::OK — hart-backend installed"
           else
-            echo "::warning title=hartos install::FAILED — default GITHUB_TOKEN cannot reach hertz-ai/HARTOS; pytest main/harness/e2e will ImportError on integrations.*.  Add a NUNBA_HARTOS_TOKEN secret with repo read scope and wire it into env.GH_TOKEN."
+            echo "::warning title=hartos install::FAILED — neither HEVOLVE_REPO_TOKEN nor GITHUB_TOKEN reached hertz-ai/HARTOS; pytest main/harness/e2e will ImportError on integrations.*."
           fi
 
       - name: Install React app + Cypress (landing-page)
