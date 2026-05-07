@@ -263,6 +263,63 @@ class TestChatRoute:
         data = response.get_json()
         assert "error" in data
 
+    def test_resolve_agent_fallback_block_sets_BOTH_create_and_autonomous(self):
+        """Source-level regression guard: when _resolve_agent step 4 fires,
+        the route MUST force BOTH create_agent=True AND
+        autonomous_creation=True.  Forcing only create_agent leaves
+        autonomous=False and HARTOS lands in the interview-only path
+        (gather_info asks "what to name your agent?") instead of the
+        auto-create+execute path (_autonomous_gather_info → recipe()).
+
+        This pins the fix from 2026-05-07 — see chatbot_routes.py:2464.
+        Witnessed regression on 2026-05-06 17:04:51 with "open notepad
+        and type hi" (request f8794588): user typed a free-text task,
+        Nunba forced create_agent=True only, HARTOS returned "What
+        would you like to name your agent (the personal name part,
+        like a pet or companion)?" — the work never executed.
+
+        Source-level rather than behavior-level because Flask-routed
+        behavior tests are brittle on the chat() handler (model
+        availability gates, request-context fixtures, OS path patching
+        all interact badly).  An AST guard that names the contract
+        in the source is the simplest fix-rotation defense — any
+        future PR that drops the autonomous_creation=True line will
+        flip this red.
+        """
+        import re
+        from pathlib import Path
+
+        cr_path = Path(__file__).parent.parent / 'routes' / 'chatbot_routes.py'
+        src = cr_path.read_text(encoding='utf-8')
+
+        # Find the if-block at "if _force_create_agent and not create_agent:"
+        # and capture up to ~25 following non-blank lines.
+        match = re.search(
+            r'if\s+_force_create_agent\s+and\s+not\s+create_agent\s*:\s*\n'
+            r'((?:[ \t]+[^\n]*\n){1,25})',
+            src,
+        )
+        assert match, (
+            "Could not find the `if _force_create_agent and not create_agent:` "
+            "block in chatbot_routes.py — has the fallback been renamed?"
+        )
+        block = match.group(1)
+
+        assert re.search(r'\bcreate_agent\s*=\s*True\b', block), (
+            "Fallback block must set create_agent=True — that's the "
+            "original cross-device-sync fix (commit b719eb47, "
+            "task #62)."
+        )
+        assert re.search(r'\bautonomous_creation\s*=\s*True\b', block), (
+            "Fallback block must ALSO set autonomous_creation=True so "
+            "HARTOS routes the request to _autonomous_gather_info → "
+            "recipe() (auto-fill identity + execute) instead of the "
+            "interview-only gather_info path that asks 'name your "
+            "agent?'.  This is the 2026-05-07 fix for the missing-"
+            "recipe + free-text-task case (e.g. 'open notepad and "
+            "type hi' on 2026-05-06 17:04:51 — request f8794588)."
+        )
+
 
 class TestBackendHealthRoute:
     """Test GET /backend/health endpoint."""

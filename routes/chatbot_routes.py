@@ -2446,11 +2446,29 @@ def chat_route():
     # force create_agent=True so HARTOS hard-routes to autogen instead of
     # casually chatting via the draft-first path.  Per design intent: no
     # point in casual chat when we know we need to (re)create an agent.
+    #
+    # ALSO force autonomous_creation=True so HARTOS enters
+    # `if autonomous:` at hart_intelligence_entry.py:6731 — that's the
+    # path that (a) runs find_matching_agent for REUSE, (b) calls
+    # _autonomous_gather_info (LLM auto-fills identity, with a partial-
+    # salvage fallback at hart_intelligence_entry.py:5817), then (c)
+    # immediately calls recipe() which executes via the autogen tool
+    # group (visual_execution / call_visual_task / etc).  Without this,
+    # autonomous=False sends the request to the interview-only branch
+    # at line 6827 that asks "what would you like to name your agent?"
+    # — useless for a free-text task prompt where the user just wanted
+    # the work done.  Witnessed 2026-05-06 17:04:51 with "open notepad
+    # and type hi" (request f8794588) — gather_info paused at turn 1/12
+    # and never reached recipe().  This single flag flip routes the
+    # same fallback to the auto-create+execute pipeline.
     if _force_create_agent and not create_agent:
         create_agent = True
+        autonomous_creation = True
         logger.info(
-            'create_agent forced True by _resolve_agent fallback - '
-            'HARTOS will route to gather_info/create_recipe pipeline')
+            'create_agent + autonomous_creation forced True by '
+            '_resolve_agent fallback - HARTOS will route to '
+            '_autonomous_gather_info → recipe() (auto-fill identity '
+            'and execute), not the interview-only path')
     # Log when client-supplied agent_type differed from the derived one — helps
     # us confirm the back-compat shim is the only path being exercised once
     # frontend Phase 2 lands.
