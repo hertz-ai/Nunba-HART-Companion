@@ -5210,22 +5210,46 @@ h6,
   }
 }
 
-/* Teams-style thin scrollbar — consistent across Windows/macOS/Linux */
+/* Modern auto-hide thin scrollbar — appears as a faint line at rest,
+ * expands + brightens on hover/scroll.  Pattern: reserve 10px gutter
+ * (so layout never jumps), make the thumb VISUALLY thin via a 3px
+ * transparent border using `background-clip: padding-box`; on hover
+ * shrink the border → thumb appears wider, color brightens.  Smooth
+ * 220ms transitions on color + border-width.  Firefox uses
+ * scrollbar-width:thin (no per-element transitions there, but it's
+ * already thin so the at-rest state matches).  Same canon palette
+ * (rgba white) — works on dark + light surfaces. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.15) transparent;
+  scrollbar-color: rgba(255,255,255,0.10) transparent;
 }
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
-  border-radius: 3px;
+  background: rgba(255,255,255,0.10);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background 220ms ease, border-width 220ms ease;
 }
+/* Hovering ANYWHERE on the container surfaces the scrollbar — same
+ * affordance as macOS / VS Code / Notion: thumb thickens + brightens
+ * without a layout shift. */
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.26);
+  border-width: 2px;
+}
+/* Direct hover on the thumb itself — the "I'm grabbing it" state. */
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.42);
+  border-width: 1px;
+}
+*::-webkit-scrollbar-thumb:active {
+  background: rgba(255,255,255,0.55);
+  border-width: 0;
 }

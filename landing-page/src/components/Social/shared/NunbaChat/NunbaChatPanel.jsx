@@ -744,10 +744,29 @@ function PanelContent() {
             display: 'flex',
             flexDirection: 'column',
             gap: 1,
-            '&::-webkit-scrollbar': {width: 4},
+            // Modern auto-hide scrollbar — same pattern as the global
+            // rule in tailwind.css.  Thumb thins to a faint pill at rest
+            // and expands + brightens on hover/scroll.  10px gutter
+            // reserved so layout never jumps when the bar appears.
+            '&::-webkit-scrollbar': {width: 10},
             '&::-webkit-scrollbar-thumb': {
-              bgcolor: alpha(theme.palette.common.white, 0.08),
-              borderRadius: 2,
+              bgcolor: alpha(theme.palette.common.white, 0.10),
+              borderRadius: '999px',
+              border: '3px solid transparent',
+              backgroundClip: 'padding-box',
+              transition: 'background 220ms ease, border-width 220ms ease',
+            },
+            '&:hover::-webkit-scrollbar-thumb': {
+              bgcolor: alpha(theme.palette.common.white, 0.26),
+              borderWidth: '2px',
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              bgcolor: alpha(theme.palette.common.white, 0.42),
+              borderWidth: '1px',
+            },
+            '&::-webkit-scrollbar-thumb:active': {
+              bgcolor: alpha(theme.palette.common.white, 0.55),
+              borderWidth: 0,
             },
           }}
         >
