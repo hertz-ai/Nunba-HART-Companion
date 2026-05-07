@@ -653,7 +653,68 @@ class TestInstallBackendPackages:
 
 class TestChatterboxClassRegression:
     """Pins the five real failure modes the chatterbox install path
-    revealed.  See the class-banner comment above for the bug log."""
+    revealed.  See the class-banner comment above for the bug log.
+
+    Test-design contract — read before adding tests here:
+    -----------------------------------------------------
+    These tests cover the SELF-HEAL MECHANISM itself
+    (`_self_heal_missing_transitives` + `install_backend_packages`),
+    NOT the venv-routing decision.  In production today,
+    chatterbox_turbo has `install_target='venv'` and
+    `_self_heal_missing_transitives` correctly bails out at
+    package_installer.py:1228 (chatterbox-tts pins torch==2.6 which
+    can't coexist with main's 2.11).
+
+    For these tests, the autouse fixture below overrides the spec to
+    `install_target='main'` so the heal mechanism runs and we can
+    assert its behavior.  The OPPOSITE contract — that venv engines
+    DO bail out — has its own dedicated test
+    (``test_self_heal_bails_out_for_venv_target_engines`` below).
+    Single source of truth, no parallel tests of the same path.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _stub_main_target_chatterbox(self, monkeypatch):
+        """Force chatterbox_turbo's effective install_target to 'main'
+        for these tests so the heal mechanism runs end-to-end.
+
+        Two module-level data structures need patching together — they
+        both flow from the same `_hartos_engine_registry()` source at
+        module load time, so patching only one leaves the other stale
+        and `install_backend_packages` early-returns at "No packages
+        needed" before reaching the self-heal code.
+
+        Single source: this fixture is the only place either dict is
+        rewritten in this test file.  Tests do not patch them inline.
+        """
+        class _StubSpec:
+            engine_id = 'chatterbox_turbo'
+            required_package = 'chatterbox'
+            tool_module = 'integrations.service_tools.chatterbox_tool'
+            install_target = 'main'
+            pip_install_plan = (
+                'huggingface_hub>=0.27.0,<0.29.0',
+                'torchaudio',
+                'chatterbox-tts',
+                'librosa',
+                'soundfile',
+                'resemble-perth',
+            )
+
+        monkeypatch.setattr(
+            pi, '_hartos_engine_registry',
+            lambda: {'chatterbox_turbo': _StubSpec()},
+        )
+        # BACKEND_PACKAGES is the cached output of
+        # _build_backend_packages_from_hartos() — venv-target engines
+        # land with an empty list there, which makes
+        # install_backend_packages early-return at "No packages needed".
+        # Override with the real chatterbox-tts pip plan so the heal
+        # path exercises end-to-end.
+        monkeypatch.setitem(
+            pi.BACKEND_PACKAGES, 'chatterbox_turbo',
+            list(_StubSpec.pip_install_plan),
+        )
 
     def setup_method(self):
         # Each test starts from a clean cache — the bugs in cycles 2/3
@@ -1027,6 +1088,62 @@ class TestChatterboxClassRegression:
         assert ok is False, "git_clone engine probe must report False when not cloned"
         # find_spec should have been queried (the guard's check)
         fs.assert_called()
+
+    # ── Venv-routing bail-out (opposite of the heal-in-main contract) ──
+
+    def test_self_heal_bails_out_for_venv_target_engines(self, monkeypatch):
+        """`_self_heal_missing_transitives` MUST bail out cleanly for
+        engines with `install_target='venv'`.  Heal-in-main is wrong
+        for those: chatterbox-tts pins torch==2.6 vs main's 2.11,
+        parler-tts pins transformers<4.47 vs main's 5.x — installing
+        their transitives one-by-one into main only ever exhausts
+        max_iter and surfaces "Failed" to the user.
+
+        Pinned 2026-04-29 (witnessed legacy main-env chatterbox install
+        spinning the heal loop).  Same source-of-truth check the
+        sibling tests above bypass via the autouse fixture; here we
+        UNDO the fixture's override and assert the bail-out.
+        """
+        class _VenvSpec:
+            engine_id = 'chatterbox_turbo'
+            required_package = 'chatterbox'
+            install_target = 'venv'
+            pip_install_plan = ('chatterbox-tts',)
+
+        # Override the autouse fixture's main-target stub for this
+        # test only — we want the REAL contract here.
+        monkeypatch.setattr(
+            pi, '_hartos_engine_registry',
+            lambda: {'chatterbox_turbo': _VenvSpec()},
+        )
+
+        # Track whether pip got called.  For venv engines, the heal
+        # function must bail BEFORE invoking pip — single-line guard
+        # at package_installer.py:1228.
+        with patch.object(pi, '_run_pip',
+                          return_value=(True, 'ok')) as mock_pip, \
+             patch('tts._torch_probe.check_backend_runnable',
+                   return_value=False) as mock_probe, \
+             patch('tts._torch_probe._resolve_paths', return_value=True):
+            ok, healed = pi._self_heal_missing_transitives('chatterbox_turbo')
+
+        assert ok is True, (
+            "Venv-target engine must return ok=True (the heal contract "
+            "treats unhealable-in-main as 'not yet installed', NOT failed)"
+        )
+        assert healed == [], (
+            "Venv-target engine must heal NOTHING in main — got "
+            f"{healed!r}.  The bail-out at package_installer.py:1228 "
+            f"must fire before any pip call."
+        )
+        assert mock_pip.call_count == 0, (
+            f"Venv-target engine must NOT trigger pip in the heal "
+            f"path; got {mock_pip.call_count} pip call(s)."
+        )
+        assert mock_probe.call_count == 0, (
+            f"Venv-target engine must bail out BEFORE running the "
+            f"deep probe; got {mock_probe.call_count} probe call(s)."
+        )
 
     # ── Composition test: all five bugs in one install ──
 
