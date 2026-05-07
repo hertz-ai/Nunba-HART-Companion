@@ -624,6 +624,12 @@ export const chatApi = {
   // Health check
   health: () => chatApiClient.get('/backend/health'),
 
+  // LLM readiness (drives the boot-time message queue gate in Demopage).
+  // Returns {available: bool, llm_mode, first_run, ...}.  Distinct from
+  // backend/health which is a GPU-tier classifier — this one tells us
+  // whether the local LLM is actually loaded and reachable.
+  llmStatus: () => chatApiClient.get('/api/llm/status'),
+
   // Network status
   networkStatus: () => chatApiClient.get('/network/status'),
 

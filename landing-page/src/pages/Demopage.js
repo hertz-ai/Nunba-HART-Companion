@@ -54,6 +54,11 @@ import realtimeService from '../services/realtimeService';
 // ── TTS hook for offline text-to-speech ──
 import {useTTS} from '../hooks/useTTS';
 
+// ── Local engine readiness — gates messageQueue while local LLM is booting.
+//    Returns true in steady-state and on health-endpoint failure (optimistic),
+//    so existing send behavior is unchanged when there is no boot to wait on.
+import {useLocalEngineReady} from '../hooks/useLocalEngineReady';
+
 // ── Extracted sub-components ──
 import GpuTierBadge from '../components/chat/GpuTierBadge';
 import AgentSidebar from './chat/AgentSidebar';
@@ -111,9 +116,14 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
 
   const [shouldScroll, setShouldScroll] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [messageQueue, setMessageQueue] = useState([]); // Queue for messages sent while loading
+  const [messageQueue, setMessageQueue] = useState([]); // Queue for messages sent while loading or while local engine is booting
   const lastMessageSentAtRef = useRef(0); // Timestamp of last sent message
   const [editingQueueId, setEditingQueueId] = useState(null); // Track which queue item is being edited
+  // Local-engine readiness gate.  Defaults true (optimistic) — only flips
+  // false when /api/llm/status reports `available:false`.  Once true,
+  // sticky-true for the session.  See hooks/useLocalEngineReady.js for
+  // the zero-regression contract.
+  const engineReady = useLocalEngineReady();
   const [requestId, setRequestId] = useState(null);
   const requestIdRef = useRef(null);
   // Keep ref in sync — handleDataReceived (useCallback) reads the ref to filter
@@ -541,8 +551,11 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
   }, [autoContinueFlag]);
 
   // ── Message queue: auto-send next queued message when loading finishes ──
+  // Also fires when engineReady transitions true→ (i.e., when a local-engine
+  // boot completes), so messages typed during boot autopush exactly the same
+  // way as messages typed during a previous in-flight request.
   useEffect(() => {
-    if (!loading && messageQueue.length > 0) {
+    if (!loading && engineReady && messageQueue.length > 0) {
       const [next, ...rest] = messageQueue;
       setMessageQueue(rest);
       // Directly set inputMessage and call handleSend via ref on next tick
@@ -551,7 +564,7 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
         if (handleSendRef.current) handleSendRef.current();
       }, 50);
     }
-  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loading, engineReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Safety: flush stuck queue items after 10s if loading is still true ──
   useEffect(() => {
@@ -2901,10 +2914,18 @@ const ChatInterface = ({agentData, embeddedMode, onReady}) => {
     logger.log(isPersonalisedEndpoint, 'isPersonalisedEndpoint');
 
     if (!inputMessage.trim() && !fileUrl && !userImage) return;
-    // Queue message ONLY if there's an active request AND it's been less than 10s since last message.
-    // After 10s, allow sending even while a previous request is processing (concurrent requests).
+    // Queue message when:
+    //   - A previous request is in flight (loading) AND it's been less than
+    //     10s since the last sent message (existing throttle behavior); OR
+    //   - The local engine is still booting (engineReady=false).
+    //
+    // engineReady defaults to true and is sticky-true once observed ready,
+    // so steady-state behavior is identical to the pre-engineReady gate.
+    // The boot-time branch ignores the 10s throttle window — during boot
+    // there is no "previous request" to wait on; messages should buffer
+    // for the entire boot, not just 10s.
     const timeSinceLastMsg = Date.now() - lastMessageSentAtRef.current;
-    if (loading && timeSinceLastMsg < 10000) {
+    if ((loading && timeSinceLastMsg < 10000) || !engineReady) {
       setMessageQueue((prev) => [...prev, { text: inputMessage.trim(), id: Date.now() }]);
       setInputMessage('');
       return;
