@@ -25,6 +25,11 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+# Single source of truth for the probe-err file path — the writer
+# (`tts._torch_probe._write_probe_err`) and the readers/context
+# builders below all use this so the path formula cannot drift.
+from tts._torch_probe import probe_err_path
+
 logger = logging.getLogger('NunbaTTSInstaller')
 
 # huggingface_hub 0.29+ removes is_offline_mode needed by transformers <5.x
@@ -1047,11 +1052,10 @@ def install_backend_packages(backend: str,
                     'attempted_packages': packages,
                     'healed_during_loop': healed,
                     'path': 'early-return (all-pip-installed)',
-                    'probe_err_file': os.path.join(
-                        os.path.expanduser('~'),
-                        'Documents', 'Nunba', 'logs',
-                        f'probe_{backend}.err',
-                    ),
+                    # Single source of truth for the probe-err path —
+                    # was inline `os.path.join(..., 'probe_{backend}.err')`
+                    # repeated 3x in this file before consolidation.
+                    'probe_err_file': probe_err_path(backend),
                 },
             )
         except Exception:
@@ -1142,11 +1146,7 @@ def install_backend_packages(backend: str,
                         'display_name': display_name,
                         'attempted_packages': packages,
                         'healed_during_loop': healed,
-                        'probe_err_file': os.path.join(
-                            os.path.expanduser('~'),
-                            'Documents', 'Nunba', 'logs',
-                            f'probe_{backend}.err',
-                        ),
+                        'probe_err_file': probe_err_path(backend),
                     },
                 )
             except Exception:
@@ -1244,10 +1244,7 @@ def _self_heal_missing_transitives(
     if not _resolve_paths():
         return True, []
 
-    err_file = os.path.join(
-        os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
-        f'probe_{backend}.err',
-    )
+    err_file = probe_err_path(backend)
 
     healed: list[str] = []
     for iteration in range(max_iter):

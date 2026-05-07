@@ -22,6 +22,44 @@ _usp = None        # User site-packages path
 _tlib = None       # torch/lib DLL path
 
 
+def probe_err_path(backend: str) -> str:
+    """Return the canonical path to a backend's probe-error file.
+
+    ``~/Documents/Nunba/logs/probe_<backend>.err``.  Single source of
+    truth — both `_write_probe_err` (writer) and downstream consumers
+    in `tts.package_installer` (which include the path in error_advice
+    context dicts AND read the file in `_self_heal_missing_transitives`
+    to discover missing transitives) call this so the path formula
+    cannot drift between writer and reader.  Underscore prefix dropped
+    so `package_installer` can import it as a supported public symbol.
+    """
+    return os.path.join(
+        os.path.expanduser('~'), 'Documents', 'Nunba', 'logs',
+        f'probe_{backend}.err',
+    )
+
+
+def _write_probe_err(backend: str, content: str) -> None:
+    """Write a backend probe failure to the canonical err-file path.
+
+    Both the venv-routed branch and the python-embed branch of
+    ``check_backend_runnable`` use this so the err-file write logic
+    cannot drift between them.  Best-effort — silently no-ops on any
+    OSError so a logging blunder never aborts the probe.
+
+    The file is rewritten on each failure (not appended).  Operators
+    grep this file when triaging a broken engine; the latest failure
+    is what they need.
+    """
+    _err_file = probe_err_path(backend)
+    try:
+        os.makedirs(os.path.dirname(_err_file), exist_ok=True)
+        with open(_err_file, 'w') as _ef:
+            _ef.write(content)
+    except Exception:
+        pass
+
+
 def _resolve_paths():
     """Resolve python-embed and user site-packages paths once."""
     global _embed_py, _usp, _tlib
@@ -186,11 +224,13 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
     # location), fall through to the normal subprocess probe so a
     # post-clone install gets verified properly.  This way the guard
     # is a no-op for engines the user has already set up.
+    install_target = 'main'
     try:
         from integrations.channels.media.tts_router import ENGINE_REGISTRY
         _spec = ENGINE_REGISTRY.get(backend)
-        if (_spec is not None
-                and getattr(_spec, 'install_target', 'main') == 'git_clone'):
+        if _spec is not None:
+            install_target = getattr(_spec, 'install_target', 'main') or 'main'
+        if install_target == 'git_clone':
             import importlib.util as _ilu
             if _ilu.find_spec(import_name) is None:
                 _backend_cache[backend] = False
@@ -205,6 +245,71 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
         # HARTOS spec unreachable in dev mode → fall through to the
         # normal probe; same behavior as before this guard existed.
         pass
+
+    # Venv-quarantined engines (install_target='venv', e.g. chatterbox_turbo,
+    # indic_parler) have their packages installed into a dedicated venv at
+    # ~/Documents/Nunba/data/venvs/<backend>/, NOT into python-embed.  Probing
+    # the import via _run_in_embed for these engines is guaranteed-wrong:
+    # python-embed never sees the package, OR it sees a stale main-interp
+    # copy whose transitives diverge from the venv's pinned set.  Symptom
+    # observed in probe_chatterbox_turbo.err 2026-05-07: traceback shows
+    # `python-embed/Lib/site-packages/chatterbox/` (main interp) failing on
+    # `import omegaconf` even though omegaconf IS installed in the venv.
+    # Route the probe through invoke_in_venv to test the actual interpreter
+    # that synth will run under.
+    if install_target == 'venv':
+        try:
+            from tts.backend_venv import invoke_in_venv, is_venv_healthy
+        except ImportError:
+            # Defensive — if backend_venv isn't importable here, fall back
+            # to the embed probe (better than silently skipping).
+            invoke_in_venv = None  # type: ignore
+            is_venv_healthy = None  # type: ignore
+        if invoke_in_venv is not None:
+            # ensure_venv inside invoke_in_venv would create the venv if
+            # missing; for a probe we just want to test "is it usable RIGHT
+            # NOW" — short-circuit when the venv directory doesn't exist.
+            try:
+                if is_venv_healthy is not None and not is_venv_healthy(backend):
+                    _backend_cache[backend] = False
+                    logger.info(
+                        "Backend probe: %s (%s) NOT importable — venv at "
+                        "~/Documents/Nunba/data/venvs/%s does not exist or "
+                        "lacks python.exe (install_target='venv' but install "
+                        "has not run)", backend, import_name, backend,
+                    )
+                    return False
+            except Exception:
+                pass
+            try:
+                rc, out, err = invoke_in_venv(
+                    backend, import_name, [], timeout=30, _probe_mode=True,
+                )
+            except Exception as _ve:
+                logger.debug("venv probe spawn failed for %s: %s", backend, _ve)
+                _backend_cache[backend] = False
+                return False
+            ok = rc == 0
+            _backend_cache[backend] = ok
+            if ok:
+                logger.info(
+                    "Backend probe: %s (%s) importable (venv subprocess)",
+                    backend, import_name,
+                )
+            else:
+                _write_probe_err(
+                    backend,
+                    f"venv probe rc={rc}\n"
+                    f"-- stdout --\n{out}\n-- stderr --\n{err}\n",
+                )
+                logger.info(
+                    "Backend probe: %s (%s) NOT importable in venv "
+                    "(rc=%d, see probe_%s.err)",
+                    backend, import_name, rc, backend,
+                )
+            return ok
+        # invoke_in_venv unavailable — fall through to the embed probe
+        # below; not ideal but keeps the probe non-fatal.
 
     try:
         r = _run_in_embed(
@@ -222,13 +327,10 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
         if ok:
             logger.info("Backend probe: %s (%s) importable (subprocess)", backend, import_name)
         else:
-            # Write full error to file for debugging (log truncates)
-            try:
-                _err_file = os.path.join(os.path.expanduser('~'), 'Documents', 'Nunba', 'logs', f'probe_{backend}.err')
-                with open(_err_file, 'w') as _ef:
-                    _ef.write(r.stderr)
-            except Exception:
-                pass
+            # Single source of truth for probe-err file writes (#refactor:
+            # was a duplicate try/except + path-compute block prior to
+            # consolidation with _write_probe_err).
+            _write_probe_err(backend, r.stderr)
             logger.info("Backend probe: %s (%s) NOT importable (see probe_%s.err)",
                         backend, import_name, backend)
         return ok
