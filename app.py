@@ -7724,8 +7724,10 @@ def handle_protocol_launch():
         protocol_url = args.protocol
         logger.info(f"Processing protocol URL: {protocol_url}")
 
-        # Sometimes Windows passes the full URL, sometimes just parameters
-        if not protocol_url.startswith('hevolveai://'):
+        # Sometimes Windows passes the full URL, sometimes just parameters.
+        # Both 'hevolveai://' (legacy) and 'nunba://' (UNIF-G4) are valid.
+        _SCHEMES = ('hevolveai://', 'nunba://')
+        if not any(protocol_url.startswith(s) for s in _SCHEMES):
             protocol_url = 'hevolveai://' + protocol_url
             logger.info(f"Added protocol prefix: {protocol_url}")
 
@@ -7746,6 +7748,40 @@ def handle_protocol_launch():
         except Exception as params_err:
             logger.error(f"Parameter parsing failed: {str(params_err)}")
             params = {}
+
+        # ── UNIF-G4: deep-link routing ──
+        # Recognized canonical paths (both nunba:// and hevolveai://):
+        #   /invite/<code>             → accept friend invite
+        #   /meet/<platform>/<room>    → join external audio/video room
+        #   /group/<platform>/<group>  → join external group chat
+        # These are dispatched to HARTOS via /api/social/* handlers; no
+        # parallel routing logic added — same agent tools (Invite_Friend,
+        # Join_External_Room) execute the verb.
+        deeplink_path = (parsed.path or '').strip('/')
+        deeplink_segments = [s for s in deeplink_path.split('/') if s]
+        if deeplink_segments and deeplink_segments[0] in ('invite', 'meet', 'group'):
+            args.background = False  # bring app forward for any deep link
+            kind = deeplink_segments[0]
+            try:
+                import json as _json
+                import urllib.request as _urlreq
+                payload = {'kind': kind, 'segments': deeplink_segments[1:],
+                           'scheme': parsed.scheme}
+                req = _urlreq.Request(
+                    'http://127.0.0.1:5000/api/social/deeplink',
+                    data=_json.dumps(payload).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
+                    method='POST',
+                )
+                _urlreq.urlopen(req, timeout=5).read()
+                logger.info(f"Deep-link {kind} dispatched: {deeplink_segments}")
+            except Exception as deep_err:
+                # Log only — don't fail the launch.  The Liquid UI
+                # accept/join card will still appear once Flask is up
+                # because the AgentOverlay subscribes to the same
+                # WAMP topic the handler emits onto.
+                logger.warning(f"Deep-link dispatch deferred (Flask not ready?): {deep_err}")
+                args.deeplink_pending = payload
 
         # Handle different actions
         action = params.get('action', ['show'])[0] if params.get('action') else 'show'

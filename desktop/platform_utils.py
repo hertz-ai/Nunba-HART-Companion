@@ -182,19 +182,31 @@ def set_window_always_on_top(window_handle, on_top=True):
 
 
 def register_protocol_handler(protocol="hevolveai", app_path=None):
-    """Register a custom URL protocol handler"""
+    """Register one or more custom URL protocol handlers.
+
+    `protocol` accepts a single string (back-compat) OR an iterable
+    of strings.  Both `hevolveai://` (legacy) and `nunba://` (UNIF-G4)
+    schemes register through the same OS path.  Callers needing the
+    full canonical set may pass `protocol=('hevolveai', 'nunba')`.
+    """
     if app_path is None:
         if getattr(sys, 'frozen', False):
             app_path = sys.executable
         else:
             app_path = os.path.abspath(__file__)
 
-    if IS_WINDOWS:
-        _register_protocol_windows(protocol, app_path)
-    elif IS_MACOS:
-        _register_protocol_macos(protocol, app_path)
-    elif IS_LINUX:
-        _register_protocol_linux(protocol, app_path)
+    if isinstance(protocol, (list, tuple, set)):
+        schemes = [str(p) for p in protocol if p]
+    else:
+        schemes = [str(protocol)]
+
+    for scheme in schemes:
+        if IS_WINDOWS:
+            _register_protocol_windows(scheme, app_path)
+        elif IS_MACOS:
+            _register_protocol_macos(scheme, app_path)
+        elif IS_LINUX:
+            _register_protocol_linux(scheme, app_path)
 
 
 def _register_protocol_windows(protocol, app_path):
