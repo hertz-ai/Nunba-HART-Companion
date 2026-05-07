@@ -232,27 +232,49 @@ class TestIsCudaTorch:
 # ========================== get_torch_variant =============================
 
 class TestGetTorchVariant:
+    """Pins ``get_torch_variant`` for each branch.
+
+    Function flow (package_installer.py:485-509): check
+    ``user_site_packages/torch/version.py`` FIRST (file branch);
+    fall back to ``import torch`` (sys.modules branch) only if the
+    file is absent.
+
+    Tests need to patch BOTH:
+    - ``os.path.isfile`` → False  (skip the file branch — otherwise
+      a developer machine with real CUDA torch under
+      ``~/.nunba/site-packages/torch/`` short-circuits to 'cu124'
+      regardless of what the test stubbed in ``sys.modules``).
+    - ``sys.modules['torch']`` → fake module (exercise the import
+      branch with the desired ``__version__``).
+
+    Same pattern as ``test_is_cuda_torch_no_user_site_torch`` at
+    line 226 — single source of "skip the file branch" idiom.
+    """
 
     def test_cpu_variant(self):
         fake_torch = types.ModuleType('torch')
         fake_torch.__version__ = '2.4.0+cpu'
-        with patch.dict(sys.modules, {'torch': fake_torch}):
+        with patch('os.path.isfile', return_value=False), \
+             patch.dict(sys.modules, {'torch': fake_torch}):
             assert pi.get_torch_variant() == 'cpu'
 
     def test_cuda_variant(self):
         fake_torch = types.ModuleType('torch')
         fake_torch.__version__ = '2.4.0+cu124'
-        with patch.dict(sys.modules, {'torch': fake_torch}):
+        with patch('os.path.isfile', return_value=False), \
+             patch.dict(sys.modules, {'torch': fake_torch}):
             assert pi.get_torch_variant() == 'cu124'
 
     def test_unknown_variant(self):
         fake_torch = types.ModuleType('torch')
         fake_torch.__version__ = '2.4.0'
-        with patch.dict(sys.modules, {'torch': fake_torch}):
+        with patch('os.path.isfile', return_value=False), \
+             patch.dict(sys.modules, {'torch': fake_torch}):
             assert pi.get_torch_variant() == 'unknown'
 
     def test_no_torch(self):
-        with patch.dict(sys.modules, {'torch': None}):
+        with patch('os.path.isfile', return_value=False), \
+             patch.dict(sys.modules, {'torch': None}):
             assert pi.get_torch_variant() == 'none'
 
 
@@ -1531,12 +1553,24 @@ class TestConstants:
         # install_requires even though it imports it unconditionally.
         # The HARTOS-side install plan MUST list librosa so a fresh
         # desktop install of chatterbox is actually synth-functional.
+        #
+        # Test refreshed for the venv-routing era (post-#58 + #82):
+        # chatterbox engines moved to install_target='venv', so their
+        # install plans now live in BACKEND_VENV_PACKAGES (not
+        # BACKEND_PACKAGES, which holds an empty list as a keyspace
+        # placeholder for venv engines).  Check both dicts so the
+        # test catches the gap regardless of which routing the engine
+        # uses today — the contract is "librosa MUST be in the
+        # canonical install plan".
         for engine in ('chatterbox_turbo', 'chatterbox_multilingual',
                        'chatterbox_ml'):
-            plan = pi.BACKEND_PACKAGES.get(engine, [])
-            assert 'librosa' in plan, (
-                f"{engine}.pip_install_plan missing librosa — install would "
-                f"silently leave chatterbox unable to synthesize. plan={plan}"
+            main_plan = pi.BACKEND_PACKAGES.get(engine, [])
+            venv_plan = pi.BACKEND_VENV_PACKAGES.get(engine, [])
+            combined = list(main_plan) + list(venv_plan)
+            assert 'librosa' in combined, (
+                f"{engine}.pip_install_plan missing librosa — install "
+                f"would silently leave chatterbox unable to synthesize. "
+                f"main_plan={main_plan} venv_plan={venv_plan}"
             )
 
     def test_chatterbox_install_plan_excludes_omegaconf_chain(self):

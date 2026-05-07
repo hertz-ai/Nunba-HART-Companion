@@ -326,6 +326,16 @@ BACKEND_DISPLAY_NAMES = {
     'omnivoice':               'OmniVoice (646 languages, voice clone)',
     'espeak':                  'eSpeak NG (CPU last-resort fallback)',
     'makeittalk':              'MakeItTalk (cloud, English)',
+    # HARTOS engines added after this dict's last refresh.  Keep
+    # alphabetised within this block so future drifts are obvious.
+    # TestConstants.test_display_names_match_backends pins the
+    # complete keyspace — add new engines here AND add a real
+    # display string (no auto-generation) so progress callbacks
+    # surface a sensible label.
+    'melotts':                 'MeloTTS (6 languages, neural)',
+    'mms_tts':                 'MMS-TTS (50+ languages via VITS)',
+    'neutts_air':              'NeuTTS Air (English, on-device voice clone)',
+    'xtts_v2':                 'XTTS-v2 (17 languages, voice clone)',
 }
 
 # Lock to prevent concurrent installs (in-process)
