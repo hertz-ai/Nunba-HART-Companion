@@ -70,6 +70,7 @@ def test_venv_engine_uses_invoke_in_venv_not_embed(monkeypatch, tmp_path):
         captured['backend'] = backend
         captured['import_name'] = import_name
         captured['_probe_mode'] = _probe_mode
+        captured['timeout'] = timeout
         return (0, '', '')  # rc=0 = importable
 
     def _fake_is_venv_healthy(backend, probe_module=None):
@@ -103,6 +104,20 @@ def test_venv_engine_uses_invoke_in_venv_not_embed(monkeypatch, tmp_path):
     assert not embed_called, (
         'Bug regression: _run_in_embed was called for a venv-quarantined '
         'engine — the probe is testing python-embed instead of the venv'
+    )
+
+    # Single-source-of-truth: probe timeout MUST match the canonical
+    # _IMPORT_PROBE_TIMEOUT in backend_venv (90s default,
+    # NUNBA_TTS_IMPORT_PROBE_TIMEOUT env-overridable).  Otherwise we
+    # have a parallel timeout for the same logical operation
+    # ("verify import in venv") — the reason chatterbox_turbo's
+    # 30s probe failed before #81 raised the install-time timeout
+    # to 90s.  No reverting here.
+    from tts.backend_venv import _IMPORT_PROBE_TIMEOUT
+    assert captured.get('timeout') == _IMPORT_PROBE_TIMEOUT, (
+        f'venv probe timeout drifted from canonical '
+        f'tts.backend_venv._IMPORT_PROBE_TIMEOUT ({_IMPORT_PROBE_TIMEOUT}); '
+        f'got {captured.get("timeout")!r}'
     )
 
 

@@ -259,12 +259,17 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
     # that synth will run under.
     if install_target == 'venv':
         try:
-            from tts.backend_venv import invoke_in_venv, is_venv_healthy
+            from tts.backend_venv import (
+                _IMPORT_PROBE_TIMEOUT,
+                invoke_in_venv,
+                is_venv_healthy,
+            )
         except ImportError:
             # Defensive — if backend_venv isn't importable here, fall back
             # to the embed probe (better than silently skipping).
             invoke_in_venv = None  # type: ignore
             is_venv_healthy = None  # type: ignore
+            _IMPORT_PROBE_TIMEOUT = 30  # type: ignore
         if invoke_in_venv is not None:
             # ensure_venv inside invoke_in_venv would create the venv if
             # missing; for a probe we just want to test "is it usable RIGHT
@@ -282,8 +287,18 @@ def check_backend_runnable(backend: str, import_name: str) -> bool:
             except Exception:
                 pass
             try:
+                # Reuse backend_venv's canonical _IMPORT_PROBE_TIMEOUT
+                # (90s default, env-overridable via
+                # NUNBA_TTS_IMPORT_PROBE_TIMEOUT) — same value
+                # `is_venv_healthy` and `install_into_venv`'s post-install
+                # verify already use.  Per #81: chatterbox_turbo cold-start
+                # needs > 30s when CUDA initializes on import; raising the
+                # ceiling once means all three probe sites get the
+                # consistent timeout.  Single source of truth, no parallel
+                # values.
                 rc, out, err = invoke_in_venv(
-                    backend, import_name, [], timeout=30, _probe_mode=True,
+                    backend, import_name, [],
+                    timeout=_IMPORT_PROBE_TIMEOUT, _probe_mode=True,
                 )
             except Exception as _ve:
                 logger.debug("venv probe spawn failed for %s: %s", backend, _ve)
