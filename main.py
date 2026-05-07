@@ -2818,6 +2818,21 @@ def admin_models_hub_install():
                     'validate_reason': validate_reason,
                     'started_at': _download_progress[safe_id]['started_at'],
                 }
+
+                # ── Clear persisted TTS demotions on a successful TTS
+                # install. Reinstalling a previously-demoted engine
+                # (e.g. user re-downloaded missing weights) should give
+                # the ladder a fresh chance instead of waiting for the
+                # 7-day TTL. Cleared globally because hf_id → BACKEND_*
+                # mapping is fuzzy and the user's intent ("I just
+                # repaired TTS") covers the whole TTS subsystem anyway.
+                if validated and category == 'tts':
+                    try:
+                        from tts.tts_engine import TTSEngine
+                        TTSEngine.clear_persisted_demotions()
+                    except Exception as _ce:
+                        logging.debug(
+                            f"[hub-install] TTS demotion clear skipped: {_ce}")
             except Exception as e:
                 _download_progress[safe_id] = {
                     'status': 'error', 'percent': 0,

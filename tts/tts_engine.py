@@ -50,6 +50,48 @@ BACKEND_MMS_TTS = "mms_tts"
 BACKEND_NONE = "none"
 
 # ════════════════════════════════════════════════════════════════════
+# Persisted-demotion state (negative-finding cache)
+# ════════════════════════════════════════════════════════════════════
+# Without this cache, a deterministically-broken top-of-ladder engine
+# (e.g. chatterbox_turbo with corrupt weights, OOM under sustained VRAM
+# pressure) is re-tried 3 times every boot before in-session demotion
+# kicks in. Persisting demotions across reboots eliminates the wasted
+# 3-failure cost. The cache is purely SUBTRACTIVE: selection still
+# walks the quality-ordered ladder top-down in
+# `_select_backend_for_language`; demotion just removes a candidate
+# from contention. A NEWLY-installed top engine is therefore picked up
+# automatically on the next boot because it has no demotion record.
+#
+# Self-healing: a demotion auto-expires after `_DEMOTION_TTL_SECONDS`,
+# is wiped on schema mismatch (covers Nunba ladder updates that may
+# have moved the engine to a different rung), and can be cleared by
+# the admin endpoint or the hub-install hook (so reinstalling a
+# previously-demoted engine gives it a fresh chance).
+_TTS_STATE_SCHEMA = 1
+_DEMOTION_TTL_SECONDS = 7 * 86400
+
+
+def _get_tts_state_path() -> str:
+    """Return the canonical path to the persisted TTS state file.
+
+    Uses ``core.platform_paths.get_db_dir`` (the same resolver that
+    owns ``hart_language.json``) so the file lives next to the other
+    user-state JSON blobs and respects ``NUNBA_DATA_DIR`` /
+    ``HARTOS_DATA_DIR`` overrides. Falls back to the literal
+    `~/Documents/Nunba/data/` only if the resolver isn't importable
+    (degraded-mode dev environment); the production path resolves
+    through the helper.
+    """
+    try:
+        from core.platform_paths import get_db_dir
+        return os.path.join(get_db_dir(), 'tts_state.json')
+    except Exception:
+        return os.path.join(
+            os.path.expanduser('~'), 'Documents', 'Nunba',
+            'data', 'tts_state.json',
+        )
+
+# ════════════════════════════════════════════════════════════════════
 # Global TTS tempo knob. Default is "balanced" per the project
 # guideline "speed > naturalness default". Resolution order:
 #   1. TTS_SPEED_PROFILE env var
@@ -1276,6 +1318,20 @@ class TTSEngine:
         # well-understood circuit.
         self._failure_threshold = 3
 
+        # Hydrate persisted demotions from prior boots — the negative-
+        # finding cache that prevents the ladder from re-burning 3
+        # failures every boot on a deterministically-broken top engine.
+        # Selection (`_select_backend_for_language`) is unchanged; the
+        # ladder still walks top-down, demotion is purely subtractive.
+        # A newly-installed top engine has no demotion record so it is
+        # picked up automatically on the very next boot — discovery is
+        # the ladder, persistence only suppresses known-bad rungs until
+        # `_DEMOTION_TTL_SECONDS` expiry, schema bump, or admin reset.
+        try:
+            self._load_persisted_demotions()
+        except Exception as _he:
+            logger.debug(f"TTS demotion hydrate skipped: {_he}")
+
         # Hardware info (detected lazily)
         self.gpu_info = None
         self.has_gpu = False
@@ -1729,6 +1785,13 @@ class TTSEngine:
         demoting it would leave the engine with no backend. If Piper
         keeps failing the right answer is to surface that to the user
         (text-only fallback), not to silently eject it.
+
+        At demotion threshold the backend is also written to the
+        persisted-demotion cache so the next boot does not waste 3
+        more failures on the same broken engine.
+        ``_DEMOTION_TTL_SECONDS`` (7 days) bounds the persistence so
+        transient causes (driver flap, weights mid-download) self-heal
+        without admin intervention.
         """
         if not backend or backend == BACKEND_PIPER or backend == BACKEND_NONE:
             return
@@ -1741,6 +1804,10 @@ class TTSEngine:
                 f"after {n} consecutive failures — ladder will skip it. "
                 f"Reset on next successful synth."
             )
+            try:
+                self._save_persisted_demotions()
+            except Exception as _pe:
+                logger.debug(f"TTS demotion persist skipped: {_pe}")
 
     def _record_backend_success(self, backend: str) -> None:
         """Clear the per-backend failure counter on a successful synth.
@@ -1757,6 +1824,205 @@ class TTSEngine:
 
     def _is_demoted(self, backend: str) -> bool:
         return backend in self._demoted_backends
+
+    # ── Persisted demotion cache (cross-boot negative findings) ─────
+    # See module-level docstring above ``_TTS_STATE_SCHEMA`` for the
+    # full design rationale. These three helpers are the ONLY code
+    # that touches ``tts_state.json`` — selection is intentionally
+    # unaware of persistence (Gate 4: no parallel selection paths).
+
+    def _load_persisted_demotions(self) -> None:
+        """Hydrate ``_demoted_backends`` from disk, dropping expired
+        and Piper-poisoned entries.
+
+        Self-healing rules (any one drops a row):
+          * TTL: ``expires_at`` in the past
+          * Schema bump: ``schema`` field differs from
+            ``_TTS_STATE_SCHEMA`` → wipe all (covers ladder
+            restructuring across Nunba versions)
+          * Backend is Piper / NONE — never let a stale file demote
+            the absolute fallback
+
+        Quietly returns on every error path: a missing/corrupt state
+        file MUST NOT block engine init.
+        """
+        path = _get_tts_state_path()
+        if not os.path.isfile(path):
+            return
+        try:
+            with open(path, encoding='utf-8') as _f:
+                data = json.load(_f)
+        except (OSError, ValueError) as e:
+            logger.debug(f"TTS state file unreadable ({e}) — starting fresh")
+            return
+
+        if data.get('schema') != _TTS_STATE_SCHEMA:
+            logger.info(
+                f"TTS state schema mismatch (got {data.get('schema')!r}, "
+                f"expected {_TTS_STATE_SCHEMA}) — dropping all persisted "
+                f"demotions on hydrate"
+            )
+            return
+
+        persisted = data.get('demoted')
+        if not isinstance(persisted, dict):
+            return
+
+        import time as _time
+        now = _time.time()
+        hydrated: list[str] = []
+        expired: list[str] = []
+        for backend, info in persisted.items():
+            if not isinstance(info, dict):
+                continue
+            expires_at = info.get('expires_at')
+            if not isinstance(expires_at, (int, float)) or expires_at < now:
+                expired.append(backend)
+                continue
+            if backend in (BACKEND_PIPER, BACKEND_NONE):
+                continue
+            self._demoted_backends.add(backend)
+            self._consecutive_failures[backend] = info.get(
+                'failures_at_demotion', self._failure_threshold)
+            hydrated.append(backend)
+
+        if hydrated:
+            logger.info(
+                f"TTS persisted demotion: hydrated {len(hydrated)} entries "
+                f"({', '.join(sorted(hydrated))}) — ladder will skip these "
+                f"until TTL expiry, hub-install, or admin reset."
+            )
+        if expired:
+            logger.info(
+                f"TTS persisted demotion: dropped {len(expired)} expired "
+                f"entries on hydrate ({', '.join(sorted(expired))})"
+            )
+            try:
+                self._save_persisted_demotions()
+            except Exception:
+                pass
+
+    def _save_persisted_demotions(self) -> None:
+        """Atomic-write the in-memory demotion set to disk.
+
+        Atomic via tempfile + ``os.replace`` so a crash mid-write
+        cannot leave a half-written file. Piper / NONE are filtered
+        out before serialisation so a future bug that adds them to
+        ``_demoted_backends`` cannot leak into the persistent cache.
+        """
+        path = _get_tts_state_path()
+
+        import time as _time
+        now = _time.time()
+        demoted_payload: dict[str, dict[str, Any]] = {}
+        for backend in self._demoted_backends:
+            if backend in (BACKEND_PIPER, BACKEND_NONE):
+                continue
+            demoted_payload[backend] = {
+                'first_demoted_at': now,
+                'expires_at': now + _DEMOTION_TTL_SECONDS,
+                'failures_at_demotion': self._consecutive_failures.get(
+                    backend, self._failure_threshold),
+            }
+        payload = {
+            'schema': _TTS_STATE_SCHEMA,
+            'updated_at': now,
+            'demoted': demoted_payload,
+        }
+
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+        except OSError as e:
+            logger.debug(f"TTS state dir create skipped: {e}")
+            return
+
+        import tempfile as _tf
+        try:
+            fd, tmp = _tf.mkstemp(
+                prefix='tts_state.', suffix='.tmp',
+                dir=os.path.dirname(path),
+            )
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as _f:
+                    json.dump(payload, _f)
+                    _f.flush()
+                    try:
+                        os.fsync(_f.fileno())
+                    except OSError:
+                        pass
+                os.replace(tmp, path)
+            except Exception:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+                raise
+        except OSError as e:
+            logger.warning(f"Failed to persist TTS demotion state: {e}")
+
+    @classmethod
+    def clear_persisted_demotions(cls, backend: str | None = None) -> int:
+        """Clear persisted demotion entries from ``tts_state.json``.
+
+        Wired from two call sites:
+          * the hub-install completion hook in ``main.py`` —
+            reinstalling a previously-demoted engine should give it
+            a fresh chance on the next selection
+          * an admin-reset endpoint (future) so support flows have a
+            big red button
+
+        ``backend=None`` clears every demotion. Returns the count of
+        rows removed (0 when no state file exists). Idempotent and
+        safe under concurrent calls (``os.replace`` is atomic).
+        """
+        path = _get_tts_state_path()
+        if not os.path.isfile(path):
+            return 0
+        try:
+            with open(path, encoding='utf-8') as _f:
+                data = json.load(_f)
+        except (OSError, ValueError):
+            return 0
+
+        persisted = data.get('demoted')
+        if not isinstance(persisted, dict) or not persisted:
+            return 0
+
+        if backend is None:
+            cleared = len(persisted)
+            data['demoted'] = {}
+        else:
+            if backend not in persisted:
+                return 0
+            del persisted[backend]
+            cleared = 1
+
+        import tempfile as _tf
+        try:
+            fd, tmp = _tf.mkstemp(
+                prefix='tts_state.', suffix='.tmp',
+                dir=os.path.dirname(path),
+            )
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as _f:
+                    json.dump(data, _f)
+                os.replace(tmp, path)
+            except Exception:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+                raise
+        except OSError as e:
+            logger.warning(f"Failed to clear persisted TTS demotions: {e}")
+            return 0
+
+        if cleared:
+            logger.info(
+                f"Cleared {cleared} persisted TTS demotion(s) "
+                f"({'all' if backend is None else backend})"
+            )
+        return cleared
 
     def _select_backend_for_language(self, language='en') -> str:
         """Select the best TTS backend for a language.
