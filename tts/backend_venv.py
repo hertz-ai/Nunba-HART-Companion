@@ -333,6 +333,18 @@ def install_into_venv(
 
     with open(log_path, "a", encoding="utf-8") as log_f:
         log_f.write(f"\n===== {time.strftime('%Y-%m-%dT%H:%M:%S')} install {packages} =====\n")
+        # Diagnostic header: pyexe + cwd + sys.platform — required for
+        # #82.  The 2026-04-29 indic_parler install log was 234 bytes
+        # (banner only, no pip output) — root cause was a non-Timeout
+        # exception raised in the subprocess.run below that NEVER got
+        # logged (only TimeoutExpired was caught).  Logging pyexe up
+        # front means a FileNotFoundError / OSError leaves diagnostic
+        # context behind even if the subprocess raises before its
+        # output makes it to disk.
+        log_f.write(
+            f"-- pyexe={str(pyexe)!r} exists={os.path.exists(str(pyexe))} "
+            f"platform={sys.platform!r} packages_count={len(packages)}\n"
+        )
         log_f.flush()
 
         si = cf = None
@@ -374,6 +386,25 @@ def install_into_venv(
             log_f.flush()
         except subprocess.TimeoutExpired:
             log_f.write("-- pip+setuptools+wheel upgrade TIMEOUT (300s) — continuing\n")
+            log_f.flush()
+        except Exception as _up_err:
+            # CATCH-ALL for #82 — pre-fix the subprocess.run raising
+            # FileNotFoundError (pyexe missing) or OSError left zero
+            # forensic trace.  Now we log the exception type + message
+            # AND continue (return False with msg) so the upstream
+            # caller can dispatch self-heal via #102's wiring.
+            import traceback as _tb
+            log_f.write(
+                f"-- pip+setuptools+wheel upgrade FAILED with non-timeout "
+                f"exception: {type(_up_err).__name__}: {_up_err}\n"
+            )
+            log_f.write(f"-- traceback:\n{_tb.format_exc()}\n")
+            log_f.flush()
+            return (
+                False,
+                f"pip pre-upgrade failed: {type(_up_err).__name__}: "
+                f"{_up_err} (see {log_path})"
+            )
 
         # Install packages one-by-one so a failure localises to the
         # offending spec. Retry transient failures (network blip, mirror
