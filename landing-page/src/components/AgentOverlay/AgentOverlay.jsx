@@ -21,7 +21,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const MAX_OVERLAYS = 3;
 const AUTO_DISMISS_MS = 15000;
-const PERSIST_TYPES = new Set(['checkout', 'approval', 'form']);
+const PERSIST_TYPES = new Set(['checkout', 'approval', 'form', 'meet_copilot']);
 
 const GLASS = {
   background: 'rgba(20, 20, 30, 0.92)',
@@ -352,6 +352,84 @@ function LayoutOverlay({ data }) {
   );
 }
 
+function MeetCopilotOverlay({ data, onDismiss }) {
+  const stateColors = { live: SUCCESS, paused: '#F39C12', ended: 'rgba(255,255,255,0.4)' };
+  const stateColor = stateColors[data.state] || INFO_BLUE;
+  const lines = Array.isArray(data.transcript_lines) ? data.transcript_lines : [];
+  const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+  const actionItems = Array.isArray(data.action_items) ? data.action_items : [];
+  const participants = Array.isArray(data.participants) ? data.participants : [];
+
+  const handleLeave = () => {
+    if (data.call_id) {
+      fetch(`${API_BASE_URL}/api/social/agent/leave-room`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ call_id: data.call_id }),
+      }).catch(() => {});
+    }
+    onDismiss && onDismiss();
+  };
+
+  return (
+    <Box sx={{ minWidth: 280 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+        <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: stateColor,
+                   boxShadow: data.state === 'live' ? `0 0 8px ${stateColor}` : 'none' }} />
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, flex: 1 }}>
+          {data.platform || 'meet'}{data.room_id ? ` · ${data.room_id}` : ''}
+        </Typography>
+        <Chip size="small" label={data.agent_role || 'co-pilot'}
+              sx={{ background: 'rgba(108,99,255,0.2)', color: ACCENT, fontSize: '0.65rem' }} />
+      </Box>
+      {participants.length > 0 && (
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 0.5 }}>
+          {participants.length} participant{participants.length === 1 ? '' : 's'}
+        </Typography>
+      )}
+      {lines.length > 0 && (
+        <Box sx={{ mb: 1, maxHeight: 140, overflowY: 'auto', background: 'rgba(0,0,0,0.25)',
+                   borderRadius: '8px', p: 1, fontSize: '0.8rem' }}>
+          {lines.slice(-10).map((line, i) => (
+            <Box key={i} sx={{ mb: 0.4, color: 'rgba(255,255,255,0.85)' }}>
+              {line.speaker && (
+                <Typography component="span" sx={{ fontWeight: 600, color: ACCENT, mr: 0.5, fontSize: '0.75rem' }}>
+                  {line.speaker}:
+                </Typography>
+              )}
+              <Typography component="span" sx={{ fontSize: '0.8rem' }}>{line.text || line}</Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+      {decisions.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="caption" sx={{ color: SUCCESS, fontWeight: 600, display: 'block', mb: 0.25 }}>
+            Decisions
+          </Typography>
+          <Box component="ul" sx={{ pl: 2, m: 0, '& li': { fontSize: '0.78rem', mb: 0.2, color: 'rgba(255,255,255,0.85)' } }}>
+            {decisions.map((d, i) => <li key={i}>{typeof d === 'string' ? d : d.text}</li>)}
+          </Box>
+        </Box>
+      )}
+      {actionItems.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="caption" sx={{ color: INFO_BLUE, fontWeight: 600, display: 'block', mb: 0.25 }}>
+            Action items
+          </Typography>
+          <Box component="ul" sx={{ pl: 2, m: 0, '& li': { fontSize: '0.78rem', mb: 0.2, color: 'rgba(255,255,255,0.85)' } }}>
+            {actionItems.map((a, i) => <li key={i}>{typeof a === 'string' ? a : a.text}</li>)}
+          </Box>
+        </Box>
+      )}
+      <Button size="small" fullWidth variant="outlined"
+              sx={{ borderColor: ERROR_RED, color: ERROR_RED, '&:hover': { borderColor: ERROR_RED, background: 'rgba(255,107,107,0.08)' } }}
+              onClick={handleLeave}>
+        Leave meet
+      </Button>
+    </Box>
+  );
+}
+
 // ─── Router: picks the right renderer ────────────────────────────────
 
 function OverlayContent({ data, onDismiss }) {
@@ -375,6 +453,7 @@ function OverlayContent({ data, onDismiss }) {
     case 'form': return <FormOverlay data={data} onDismiss={onDismiss} />;
     case 'list': return <ListOverlay data={data} />;
     case 'layout': return <LayoutOverlay data={data} />;
+    case 'meet_copilot': return <MeetCopilotOverlay data={data} onDismiss={onDismiss} />;
     default:
       return (
         <Box>
