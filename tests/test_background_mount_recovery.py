@@ -229,3 +229,82 @@ def test_watchdog_uses_isiconic_or_iswindowvisible(
         "IsIconic Win32 API call missing — the watchdog cannot detect "
         "iconic→non-iconic (minimize→restore) transitions."
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Test 4 — Auto-start wake: recovery must call show()+restore() before JS
+# ─────────────────────────────────────────────────────────────────────────
+
+def test_force_remount_calls_show_and_restore_before_evaluate_js(
+    app_source: str,
+) -> None:
+    """The recovery body must call both ``_window.show()`` and
+    ``_window.restore()`` BEFORE the first ``evaluate_js`` call. This is
+    the same action ``desktop/tray_handler.py:_on_restore`` performs —
+    the only path that has historically rendered content reliably after
+    an auto-start hidden→visible transition.
+
+    Captured 2026-05-07 (--background boot at 17:32:31, gui_app.log):
+      17:32:59  bg_shown evaluate_js → rootChildren=1, opacity:1
+                (React mounted in DOM)
+      17:33:00  watchdog hidden→visible fires
+      17:33:20  connectivity_inject → 'Main window failed to start'
+      17:33:21  watchdog evaluate_js → 'Main window failed to start'
+      17:44:03  user clicks tray ('Restore selected from system tray')
+                — the ONLY action is window.show() + window.restore() —
+                content paints immediately
+
+    Without these calls the WebView2 compositor stays suspended even
+    after pywebview's `shown` event fires, leaving the user staring at
+    a black window until they manually click the tray.
+    """
+    fn_start = app_source.find('def _force_remount_and_paint')
+    assert fn_start >= 0, "_force_remount_and_paint not found in app.py"
+
+    # The closure ends where the next sibling block starts. Recognized
+    # markers: the `if start_hidden:` block that follows it, or the
+    # `# Defensive: if the installed pywebview exposes` comment block,
+    # whichever comes first.
+    end_markers = [
+        '\n        # In background mode, run mount recovery',
+        '\n        if start_hidden:',
+        '\n        # Defensive: if the installed pywebview',
+    ]
+    fn_end = len(app_source)
+    for marker in end_markers:
+        idx = app_source.find(marker, fn_start)
+        if idx > 0:
+            fn_end = min(fn_end, idx)
+    body = app_source[fn_start:fn_end]
+
+    show_pos = body.find('_window.show()')
+    restore_pos = body.find('_window.restore()')
+    # Match the actual call site `_window.evaluate_js(` so docstring /
+    # comment mentions of "evaluate_js" don't false-positive the order
+    # check.
+    eval_pos = body.find('_window.evaluate_js(')
+
+    assert show_pos > 0, (
+        "_force_remount_and_paint missing _window.show() — the WebView2 "
+        "compositor cannot be woken by the canonical recovery path. The "
+        "tray 'Show' menu (desktop/tray_handler.py:_on_restore) is the "
+        "ONLY path that paints reliably after auto-start hidden→visible; "
+        "its sole action is show()+restore(). Mirror it here or the "
+        "auto-start black-screen regression returns."
+    )
+    assert restore_pos > 0, (
+        "_force_remount_and_paint missing _window.restore() — wake is "
+        "incomplete (tray 'Show' calls both show() and restore())."
+    )
+
+    if eval_pos > 0:
+        assert show_pos < eval_pos, (
+            "_window.show() must be called BEFORE the first evaluate_js. "
+            "The compositor must be awake before any JS query, otherwise "
+            "evaluate_js raises 'Main window failed to start' and the "
+            "recovery's mount-check returns None for all 3 retries."
+        )
+        assert restore_pos < eval_pos, (
+            "_window.restore() must be called BEFORE the first "
+            "evaluate_js (same compositor-wake reason as show())."
+        )

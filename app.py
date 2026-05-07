@@ -7032,6 +7032,10 @@ def main():
             pywebview's WebView2 suspends rAF while hidden OR iconic. React 18's
             createRoot uses rAF for scheduling, so the render may not complete
             until we nudge the compositor. This function:
+              (0) wakes the WebView2 compositor with show()+restore() — the
+                  same action tray "Show" performs (the only path that has
+                  historically rendered content reliably after auto-start
+                  hidden→visible),
               (1) waits for Flask (raw-socket, avoids proxy issues),
               (2) checks mount state with a STRICTER predicate that also
                   inspects the root's bounding box (paint-dead detection),
@@ -7042,6 +7046,31 @@ def main():
             """
             _local_url = f"http://localhost:{args.port}/local"
             _MAX_ATTEMPTS = 3
+
+            # ── (0) Wake the WebView2 compositor — same native action tray
+            # "Show" performs in desktop/tray_handler.py:_on_restore. Without
+            # it, the auto-start hidden→visible transition leaves the
+            # compositor suspended even though the OS reports the window
+            # visible: evaluate_js raises 'Main window failed to start' and
+            # load_url paints into a dead surface, so the user sees a black
+            # window until they manually click the tray icon. show() and
+            # restore() are idempotent on already-visible / non-minimized
+            # windows (Win32 ShowWindow no-ops when state is unchanged), so
+            # this is safe for the bg_shown / events_restored / watchdog
+            # callers alike. Each call is wrapped so a transient pywebview
+            # error cannot abort the recovery sequence below.
+            try:
+                _window.show()
+            except Exception as _ws_err:
+                logger.debug(
+                    f"[REMOUNT:{origin}] window.show() raised: {_ws_err}")
+            try:
+                _window.restore()
+            except Exception as _wr_err:
+                logger.debug(
+                    f"[REMOUNT:{origin}] window.restore() raised: {_wr_err}")
+            # Give the native compositor a beat to wake before evaluate_js.
+            time.sleep(0.3)
 
             # ── Wait for Flask to be ready (raw socket, avoids proxy issues) ──
             import socket as _bg_sock
