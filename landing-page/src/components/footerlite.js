@@ -97,7 +97,7 @@ export default function FooterLite() {
                       alt=""
                     />
                     <span style={{color: '#FFF', fontSize: '1.1rem'}}>
-                      EVOLVE
+                      Nunba
                     </span>
                   </Link>
                   <ul className="list-none footer-list md:text-end text-center  md:mt-0 space-x-1 flex justify-around items-center">

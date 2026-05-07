@@ -150,7 +150,7 @@ export default function Navbar() {
               className=" h-10 hidden dark:inline-block"
               alt=""
             />
-            <span style={{color: '#FFF', fontSize: '1rem'}}>EVOLVE</span>
+            <span style={{color: '#FFF', fontSize: '1rem'}}>Nunba</span>
           </RouterLink>
 
           <div className="menu-extras">

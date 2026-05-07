@@ -229,7 +229,7 @@ const Curriculai = (props) => {
 
       <div className="header fadeInUp" style={{animationDelay: '0.3s'}}>
         <div>
-          <h1>Hevolve</h1>
+          <h1>Nunba</h1>
           <h2 className="answer">
             Custom curriculum for every institution to provide world-class
             in-demand work degrees
