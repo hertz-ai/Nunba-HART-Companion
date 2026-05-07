@@ -38,6 +38,31 @@ export const CLOUD_CAPABILITY_SCOPES = {
       'Generate icebreaker openers using a cloud LLM at central topology nodes. Drafts run locally without it.',
     requires_age_18: true,
   },
+  // ── G6 (UNIF) — agent participation in external rooms ────────────
+  // Per HIVE AI MISSION: agent ALWAYS announces its presence in any
+  // external room before participating; never observes silently.  These
+  // scopes gate agent_voice_bridge / room_presence_service joining
+  // Discord audio rooms, Teams meetings, WhatsApp groups, Matrix rooms,
+  // Telegram supergroups, Slack channels, etc., so the user can
+  // participate / get notes / co-pilot — without surveillance risk.
+  agent_joins_external_room: {
+    label: 'AI agent joins external rooms (text)',
+    description:
+      'Allow your AI agent to join Discord channels, Teams chats, WhatsApp / Slack / Telegram groups, etc. on your behalf to take notes or answer when you ask. The agent always announces its presence and leaves on your or any participant\'s "no AI" request.',
+    requires_age_18: false,
+  },
+  agent_listens_external_audio: {
+    label: 'AI agent transcribes external voice rooms',
+    description:
+      'Allow your AI agent to attend Discord / Teams / Zoom audio rooms and transcribe what is said into your local knowledge graph so you can recall and search across meetings. Same announce-and-leave-on-objection rules.',
+    requires_age_18: false,
+  },
+  agent_writes_external_room: {
+    label: 'AI agent posts to external rooms on your behalf',
+    description:
+      'Allow your AI agent to send messages into external rooms when you explicitly ask (e.g. "post the summary to my Discord", "reply for me in this Slack channel"). Never sends without your turn-by-turn instruction.',
+    requires_age_18: false,
+  },
 };
 
 // Used when a scope shows up in the audit history that we don't have a
